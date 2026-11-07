@@ -1399,7 +1399,8 @@ function todoItems(A,P){
     const plan=new Map(prev), later=di? " (if nothing changes before then)" : "";
     for(const [pid,p] of N.lockNow) plan.set(p.slot,pid);
     for(const [pid,p] of N.lineup) plan.set(p.slot,pid);
-    for(const [slot,pid] of plan){ const had=prev.get(slot); if(pid===had) continue;
+    const first=new Map(plan); for(const [slot,E] of Object.entries(N.early||{})) if(E.tip>now) first.set(+slot,E.pid);
+    for(const [slot,pid] of first){ const had=prev.get(slot); if(pid===had) continue;
       const ts=[tipAt(pid,N.day), had? tipAt(had,N.day) : null].filter(Boolean).sort((a,b)=>a-b), t=ts[0]||null;
       if(t&&t<=now) continue;
       const from=[...prev].find(([,q])=>q===pid)?.[0], verb=from!=null? "Move" : "Start";
@@ -1407,9 +1408,11 @@ function todoItems(A,P){
         rems:[{id:"start-"+pid+"-"+N.day, t, lead:15, title:verb+" "+nm(pid)+" to "+P.SL[slot]}]});
     }
     for(const [slot,E] of Object.entries(N.early||{})){ if(!(E.tip>now)) continue;
-      out.push({t:E.tip, kind:"look", title:"Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
+      const already=prev.get(+slot)===E.pid;
+      out.push({t:E.tip, kind:"look", title: already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
         sub:"Free look: lock only if he scores "+(fx(N.at[E.pid])||"big")+"+. Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
-        rems:[{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}]});
+        rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
+          .concat(E.thenTip>now? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+(fx(N.at[E.pid])||"big")+"+ (then lock him)"}] : [])});
     }
     prev=plan;
   });
@@ -1539,12 +1542,13 @@ function renderWeek(){
       if(!x.starter || a.lockedOn || a.live || !a.latest || a.latest.dnp || !a.future.length) continue;
       const PL=planWeek(A,{force:{[x.pid]:"lock"},light:true}), PW=planWeek(A,{force:{[x.pid]:"hold"},light:true});
       const DL=teamDist(A,PL), DW=teamDist(A,PW), part=DL.parts.get(x.pid);
+      if(!part){ if(P0.pick.get(x.pid)?.k==="lock") force[x.pid]="hold"; continue }   // locking him isn't a real option: the slot is better used by someone else
       const oL=respond(DL).D, oW=respond(DW).D;
       const L=titleObj(DL.m,DL.v,oL,oth,median,wtMe), Wt=titleObj(DW.m,DW.v,oW,oth,median,wtMe);
       const rest= part? {m:DL.m-part.m, v:DL.v-part.v} : null;
       const at= rest? lockBar(rest,{m:DW.m-rest.m, v:DW.v-rest.v},oL,oth,median,wtMe) : null;
       calls[x.pid]={L,Wt,at,wpts: rest? DW.m-rest.m : null, ev:P0.pick.get(x.pid)?.k, title:!!wtMe};
-      const want= L.obj>=Wt.obj? "lock":"hold";
+      const want= L.obj>Wt.obj+1e-9? "lock":"hold";               // a tie keeps the option open
       if(want!==calls[x.pid].ev) force[x.pid]=want;
     }
     P= Object.keys(force).length? planWeek(A,{force}) : P0;
