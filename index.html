@@ -246,6 +246,7 @@ details.tr.me>summary{background:var(--accent-soft)}
 details.tr[open]>summary{background:var(--bg)}
 .tls{display:grid;gap:4px;padding:2px 0 10px}
 .tl{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:2px 8px;font-size:12.5px;padding:4px 0;border-top:1px dashed var(--line)}
+.twk{font:700 12px/1.2 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--accent);padding:10px 0 2px}
 .tl .ok{color:var(--good);font-weight:700}.tl .bad{color:var(--bad);font-weight:700}
 details.tr>summary>span:last-child{font-size:12px;line-height:1.25}
 .tl>span:nth-child(4){grid-column:2/4;font-size:12px}
@@ -1821,6 +1822,7 @@ async function managerTendencies(){
     const logs={}; for(const r of stats){ const st=r.stats; if(!st||!((st.min||0)>0||(st.sp||0)>0)) continue;
       (logs[r.player_id] ||= []).push({id:String(r.game_id), date:r.date, fp:scoreStats(st), mu:pmu[r.player_id+":"+r.game_id] ?? baseMean(r.player_id)}) }
     for(const k in logs) logs[k].sort((a,b)=>a.date<b.date?-1:1);
+    { const ds=stats.map(r=>r.date).filter(Boolean).sort(); if(ds.length) (LG.weekDates ||= {})[w]=[ds[0],ds[ds.length-1]] }
     const rows= legs? legs.map(l=>({rid:l.roster_id, mid:l.matchup_id, starters:l.starters||[], sg:l.starters_games||{}, players:l.players||[]}))
       : pub.map(m=>({rid:m.roster_id, mid:m.matchup_id, starters:m.starters||[], pp:m.players_points||{}, players:m.players||[]}));
     for(const r of rows){ r.slots=[];
@@ -1904,18 +1906,21 @@ function renderTend(){
   let h='<div class="tdh"><span>Team</span><span>Right calls</span><span>Win % lost / call</span><span>Misses</span></div>';
   for(const x of rows){ const t=x.t, st=tendStyle(t,lg), tm=x.team;
     const log=per[x.rid].log.slice().sort((a,b)=>b.w-a.w||b.steps.length-a.steps.length);
-    const items=log.filter(d=>d.steps.length).map(d=>{ const nm=playerInfo(d.pid).name, final=d.fp;
-      const wp=o=>Math.round(o.h*100)+'%'+(o.md||o.md===0? ' / '+Math.round(o.md*100)+'%' : '');
-      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(1)+' (game '+(c.i+1)+')' : 'Passed up '+c.sc.toFixed(1)+' (game '+(c.i+1)+')')+
-          ' · lock '+wp(c.L)+', wait '+wp(c.Wt)+(c.bk?'':' (no bench backup)')+(c.moot?' <span class="muted">· didn\'t matter</span>' : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗ −'+(c.cost*100).toFixed(0)+'%</span>')).join('<br>');
+    const wkLabel=w=>{ const d=LG.weekDates?.[w]; const f=x=>new Date(x+"T12:00:00").toLocaleDateString([], {month:"short", day:"numeric"}); return 'Week '+w+(d?' · '+f(d[0])+' – '+f(d[1]):'') };
+    let items='', lastW=null;
+    for(const d of log.filter(d=>d.steps.length)){
+      if(d.w!==lastW){ items+='<div class="twk">'+wkLabel(d.w)+'</div>'; lastW=d.w }
+      const nm=playerInfo(d.pid).name, final=d.fp;
+      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(1) : 'Passed up '+c.sc.toFixed(1))+' after game '+(c.i+1)+': <b>'+Math.round(c.L.h*100)+'%</b> to win if locked vs <b>'+Math.round(c.Wt.h*100)+'%</b> if not'+
+          (c.moot?' <span class="muted">· didn\'t matter</span>' : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
       const later=d.early? d.games.slice(d.k) : [];
-      const outcome= d.early? 'Locked '+final.toFixed(1)+'; the games he gave up scored '+later.map(v=>v.toFixed(1)).join(', ')
-        : 'Rode it to the last game: '+final.toFixed(1)+(d.games.length>1?' (passed up '+d.games.slice(0,-1).map(v=>v.toFixed(1)).join(', ')+')':'');
-      return '<div class="tl"><span>W'+d.w+'</span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }).join("");
+      const outcome= d.early? 'He locked '+final.toFixed(1)+'; the games after scored '+later.map(v=>v.toFixed(1)).join(', ')
+        : 'Rode it to the last game: '+final.toFixed(1);
+      items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
     h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(1)+'</span><span>'+t.waitMiss+' waited<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(1):'–')+'</span><span></span></div>';
-  h+='<div class="plan-note">Every lock-or-wait call in weeks 1–'+(W.week-1)+', replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open at that point, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. Each call shows the head-to-head / league-median win chance if he locked vs waited (weighted by title odds where available); a call is right if it was the better one, within 1% of a win. <i>Win % lost / call</i> is the average cost of the misses spread over all calls. '+(LG.tendExact?'Locks from Sleeper\'s exact records.':'Locks from the public feed; add your Sleeper login for exact records.')+'</div>';
+  h+='<div class="plan-note">Finished weeks only (1–'+(W.week-1)+'); week '+W.week+' is graded once it\'s over. Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The percentages are his chance to win that week\'s matchup if he locked vs if he didn\'t; the grade also counts the league median and title odds, so a call can be right with a slightly lower matchup number. '+(LG.tendExact?'Locks from Sleeper\'s exact records.':'Locks from the public feed; add your Sleeper login for exact records.')+'</div>';
   el.innerHTML=h;
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
