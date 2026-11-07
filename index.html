@@ -882,6 +882,7 @@ async function loadWeek(force){
     W.logs={};
     for(const r of (W.prevRows||[]).concat(stats)){ const s=r.stats; if(!s || !((s.min||0)>0 || (s.sp||0)>0)) continue;
       (W.logs[r.player_id] ||= new Map()).set(r.game_id,{date:r.date, fp:scoreStats(s), min:s.min||(s.sp||0)/60}) }
+    try{ const lu=await fetch("lineups.json?t="+Date.now(),{cache:"no-store"}); if(lu.ok){ const d=await lu.json(); for(const k in d) LINEUPS[k]=d[k] } }catch(e){}
     await loadLegs(lid,week);
     await loadClocks();
     W.loaded=true; W.updated=Date.now(); W.err=null;
@@ -1183,7 +1184,7 @@ function rowsFor(roster, matchup, mine){
   (roster.players||[]).forEach(pid=>{ if(!starters.includes(pid) && !res.includes(pid)) rows.push({pid,slot:"BN",starter:false}) });
   res.forEach(pid=>rows.push({pid,slot:"IR",starter:false}));
   const sg= legFor(roster.roster_id)? (legFor(roster.roster_id).starters_games||{}) : null;
-  return rows.map(r=>({...r,a:analyse(r.pid, matchup?.players_points?.[r.pid], r.starter, sg, mine, !!matchup?.unan?.[r.pid])}));
+  return rows.map(r=>({...r, rid:roster.roster_id, a:analyse(r.pid, matchup?.players_points?.[r.pid], r.starter, sg, mine, !!matchup?.unan?.[r.pid])}));
 }
 // Mean and variance of what a slot ends up with when the player is played with optimal lock/wait thresholds (last game forced).
 // Same as waitValue/moments, but if the last game disappoints the slot can go to a fallback worth `term` (a bench player with a later game).
@@ -1301,7 +1302,7 @@ function planWeek(A,opt={}){
     if(x.starter && a.live) hold=emax(waitValue(a.future)??-1e9, a.live.mu, a.live.sd);
     else if(a.future.length) hold=waitValue(a.future);
     if(hold!=null && hold>0) ch.push({k:"hold",v:hold});
-    if(x.starter && a.latest && !a.live && !a.latest.dnp) ch.push({k:"lock",v:a.latest.fp});
+    if(x.starter && a.latest && !a.live && !a.latest.dnp && startedWholeGame(x.rid, x.pid, a.latest.date)) ch.push({k:"lock",v:a.latest.fp});
     const f=opt.force&&opt.force[x.pid]; const ch2= f? ch.filter(h=>h.k===f) : ch;
     if(ch2.length) C.push({pid:x.pid,pos:x.a.info.pos,cur:x.starter?x.idx:-1,ch:ch2,x});
   }
@@ -1886,6 +1887,15 @@ async function managerTendencies(){
 // before that date was known. For each such deadline, every team's week is simulated from what was known then (locked
 // slots fixed, open slots playing out their remaining games), and each decision is judged by its effect on that team's
 // head-to-head and league-median chances (weighted by title odds where the League simulation has them).
+// Lockable only if he was in the starting lineup for that whole game. From the lineup history: no for a player who wasn't
+// starting at the last snapshot before that day and only joined later; unknown (no history yet) counts as yes.
+function startedWholeGame(rid, pid, date){
+  const H=LINEUPS?.[rid]; if(rid==null||!H||!H.length) return true;
+  const d0=Date.parse(date+"T00:00:00"), d1=d0+86400e3;
+  if(H[0][0]>=d0) { const first=H.find(([t])=>t>=d0); return H[0][0]>=d1? true : !!(first && first[1].includes(pid) && H[0][0]<d0+12*3600e3) }
+  let atStart=null, out=false; for(const [t,st] of H){ if(t<d0) atStart=st; else if(t<d1){ if(!st.includes(pid)) out=true } else break }
+  return !!(atStart && atStart.includes(pid)) && !out;
+}
 // Was he in this team's lineup at some point that day? Answered from the recorded lineup history; no history = assume yes.
 function startedThatDay(rid, pid, date){
   const H=LINEUPS?.[rid]; if(!H||!H.length) return true;
