@@ -1469,6 +1469,12 @@ function todoItems(A,P){
   const X=pid=>A.find(x=>x.pid===pid), nm=pid=>X(pid)?.a.info.name||pid;
   if(isMe) A.filter(x=>x.slot==="IR"&&!irOk(x.a.info.inj)).forEach(x=>out.push({t:null, kind:"roster", title:"Take "+x.a.info.name+" off IR",
     sub:(x.a.info.inj||"Healthy")+" players can't stay in IR here, and Sleeper blocks every pickup until he's activated (that costs a drop)."}));
+  // injured starters: a player who sits counts 0 if he's still in the slot when his game tips
+  for(const x of A){ const a=x.a, inj=String(a.info.inj||""); if(!x.starter||a.lockedOn||!a.future.length||!/^(out|doubtful|questionable|gtd|day-to-day|dtd|susp)/i.test(inj)) continue;
+    const g=a.future[0], t=tipAt(x.pid,g.date); if(t&&t<=now) continue; const bad=/^(out|doubtful|susp)/i.test(inj);
+    out.push({t, kind: bad? "roster" : "check", title: bad? "Bench "+a.info.name+": listed "+inj : "Check "+a.info.name+" before his game: listed "+inj,
+      sub: (bad? "If he sits, his slot counts 0 at "+dayLabel(g.date)+"'s tip. Swap in a bench player before then." : "If he's ruled out, swap him before "+dayLabel(g.date)+"'s tip or his slot counts 0.")+(a.latest&&!a.latest.dnp? " (Lock his "+a.latest.fp.toFixed(1)+" first if that's the call.)" : ""),
+      rems:[{id:"inj-"+x.pid+"-"+g.date, t: t||null, lead: bad? 120 : 45, title:(bad? "Bench ":"Check ")+a.info.name+" ("+inj+") before tip"}].filter(r=>r.t)}) }
   // lock it or play on, for every unlocked starter whose latest score could still be locked
   for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||!a.future.length) continue;
     const t=lockDeadline(a); if(!t||t<=now) continue;
@@ -1584,7 +1590,7 @@ function renderMatchup(A){
       if(g && !now) bits.push(tipS(x.pid,g)+(g.mu>0&&!now?' ~'+g.mu.toFixed(0):'')+(g.mu>0?'':' out'));
       else if(!g && !a.live) bits.push('done');
       s=bits.join(' · '); const p=x.starter&&D.parts.get(x.pid); if(p) val='~'+p.m.toFixed(1) }
-    return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>':'')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
+    return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
   const row=(lab,a,b)=>'<details class="mr"><summary><span class="sl">'+lab+'</span>'+cell(a,v.me,true)+cell(b,v.opp,false)+'</summary><div class="det">'+(a?playerDetail(a,true):'<div></div>')+(b?playerDetail(b,false):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
   let h='<div class="mhd"><span></span><span>'+(isMe?'You':esc(rosterName(viewRoster().roster_id)))+'</span><span>'+esc(v.name)+'</span></div>';
