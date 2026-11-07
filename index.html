@@ -1936,7 +1936,7 @@ function renderTend(){
     for(const d of log.filter(d=>d.steps.length)){
       if(d.w!==lastW){ items+='<div class="twk">'+wkLabel(d.w)+'</div>'; lastW=d.w }
       const nm=playerInfo(d.pid).name, final=d.fp;
-      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(1) : 'Passed up '+c.sc.toFixed(1))+' after game '+(c.i+1)+': <b>'+Math.round(c.L.h*100)+'%</b> to win if locked vs <b>'+Math.round(c.Wt.h*100)+'%</b> if not'+
+      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(1) : 'Passed up '+c.sc.toFixed(1))+' after game '+(c.i+1)+': <b>'+(c.L.h+c.L.md).toFixed(2)+'</b> wins if locked vs <b>'+(c.Wt.h+c.Wt.md).toFixed(2)+'</b> if not'+
           (c.moot?' <span class="muted">· didn\'t matter</span>' : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
       const later=d.early? d.games.slice(d.k) : [];
       const outcome= d.early? 'He locked '+final.toFixed(1)+'; the games after scored '+later.map(v=>v.toFixed(1)).join(', ')
@@ -1945,7 +1945,7 @@ function renderTend(){
     h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(1)+'</span><span>'+t.waitMiss+' waited<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(1):'–')+'</span><span></span></div>';
-  h+='<div class="plan-note">Finished weeks only (1–'+(W.week-1)+'); week '+W.week+' is graded once it\'s over. Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The percentages are his chance to win that week\'s matchup if he locked vs if he didn\'t; the grade also counts the league median and title odds, so a call can be right with a slightly lower matchup number. '+(LG.tendExact?'Locks from Sleeper\'s lock records.':'<b>Without your Sleeper login these are rough:</b> the public feed can\'t show past locks.')+'</div>';
+  h+='<div class="plan-note">Finished weeks only (1–'+(W.week-1)+'); week '+W.week+' is graded once it\'s over. Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The numbers are his expected wins that week if he locked vs if he didn\'t: the head-to-head chance plus the league-median chance (2.00 = sure of both). The right call is the higher one (within 0.01). The grade never looks at how the later games turned out; that\'s only shown in gray. '+(LG.tendExact?'Locks from Sleeper\'s lock records.':'<b>Without your Sleeper login these are rough:</b> the public feed can\'t show past locks.')+'</div>';
   el.innerHTML=h;
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
@@ -2070,10 +2070,12 @@ function renderLeague(){
   if(O.median){ const pm=pastMedians(), mp=medianOf(T.map(t=>t.proj));
     $("lgSum").insertAdjacentHTML("beforeend",'<span>League median: projected <b>~'+(mp!=null?mp.toFixed(0):'?')+'</b> this week'+(pm.length?' · past weeks '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(0)+'</b>').join(", "):'')+'</span>') }
   // this week's matchups
-  const pairs=pairsOf(W.matchups);
+  const pairs=pairsOf(W.matchups), lo=(()=>{ try{ return leagueOdds() }catch(e){ return [] } })(), myRid=myRoster()?.roster_id;
   $("lgWeek").innerHTML=pairs.map(([a,b])=>{
     const A=T.find(t=>t.rid===a), B=T.find(t=>t.rid===b); if(!A||!B) return "";
-    const pA=A.ww; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(1)+'</b> · Proj <b>'+X.proj.toFixed(0)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked</span></div>';
+    // same simulation as the Lock-in tab; your own matchup uses the Lock-in number exactly (with how your opponent plays)
+    const mine= W.vs && viewingMe() && (a===myRid||b===myRid) && W.vs.rid===(a===myRid?b:a), m=lo.find(x=>x.a===a&&x.b===b);
+    const pA= mine? (a===myRid? W.vs.win : 1-W.vs.win) : m? m.pa : A.ww; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(1)+'</b> · Proj <b>'+X.proj.toFixed(0)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked</span></div>';
     return '<div class="mu">'+side(A,false)+'<span class="vs">'+Math.round(pA*100)+'% – '+Math.round((1-pA)*100)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(pA*100).toFixed(1)+'%"></i></div></div>';
   }).join("");
   const order=[...T].sort((x,y)=>(y.w+y.t/2)-(x.w+x.t/2)||y.pf-x.pf);
