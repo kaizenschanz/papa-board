@@ -235,6 +235,19 @@ button.g:hover{border-color:var(--ink)}
 .pill b{color:var(--ink)}
 .pill.good{background:var(--good-soft);border-color:transparent;color:var(--good)}.pill.good b{color:var(--good)}
 .pill.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}.pill.bad b{color:var(--bad)}
+.tdh,details.tr>summary{display:grid;grid-template-columns:minmax(0,1fr) 62px 58px 58px;gap:8px;align-items:center;text-align:right}
+.tdh{font:700 11px/1.2 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:4px 0 6px;border-bottom:1px solid var(--line)}
+.tdh>span:first-child,details.tr>summary>span:first-child{text-align:left}
+details.tr{border-bottom:1px solid var(--line)}
+details.tr>summary{list-style:none;cursor:pointer;padding:8px 0;font-size:13.5px}
+details.tr>summary::-webkit-details-marker{display:none}
+details.tr>summary small{display:block;color:var(--muted);font-size:12px}
+details.tr.me>summary{background:var(--accent-soft)}
+details.tr[open]>summary{background:var(--bg)}
+.tls{display:grid;gap:4px;padding:2px 0 10px}
+.tl{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:2px 8px;font-size:12.5px}
+.tl>span:nth-child(4){grid-column:2/4;font-size:12px}
+.tdh.lgrow{border-bottom:0;font:400 12.5px/1.2 var(--body);text-transform:none;letter-spacing:0}
 .tend{font-size:12.5px;color:var(--muted);margin-top:10px}.tend b{color:var(--ink)}
 .oppmode{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:10px}
 .oppmode select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;max-width:100%}
@@ -1804,13 +1817,14 @@ async function managerTendencies(){
     const logs={}; for(const r of stats){ const st=r.stats; if(!st||!((st.min||0)>0||(st.sp||0)>0)) continue; (logs[r.player_id] ||= []).push({id:String(r.game_id), date:r.date, fp:scoreStats(st)}) }
     for(const k in logs) logs[k].sort((a,b)=>a.date<b.date?-1:1);
     const rows= legs? legs.map(l=>({rid:l.roster_id, starters:l.starters||[], sg:l.starters_games||{}})) : pub.map(m=>({rid:m.roster_id, starters:m.starters||[], pp:m.players_points||{}}));
-    for(const r of rows){ const T=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[]});
+    for(const r of rows){ const T=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[]});
       for(const pid of r.starters){ if(!pid||pid==="0") continue; const g=logs[pid]; if(!g||g.length<2) continue;
         let idx=-1;
         if(r.sg){ const gid=r.sg[pid]; if(gid!=null) idx=g.findIndex(x=>x.id===String(gid)) }
         else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) }
         if(idx<0) continue;
-        T.slots++; const avg=g.reduce((t,x)=>t+x.fp,0)/g.length;
+        T.slots++; const avg=g.reduce((t,x)=>t+x.fp,0)/g.length, best=Math.max(...g.map(x=>x.fp));
+        T.log.push({w, pid, k:idx+1, n:g.length, fp:g[idx].fp, avg, best, early: idx<g.length-1});
         if(idx<g.length-1){ T.early++; if(avg>0) T.ratios.push(g[idx].fp/avg); T.left.push(g.length-1-idx) } } }
   }
   LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
@@ -1818,16 +1832,24 @@ async function managerTendencies(){
 function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
   return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left)} }
 function leagueTend(){ let n=0,e=0; const r=[]; for(const T of Object.values(LG.tend||{})){ n+=T.slots; e+=T.early; r.push(...T.ratios) } return n? {early:e/n, ratio:r.length? r.reduce((a,b)=>a+b,0)/r.length : null} : null }
+function tendStyle(t,lg){ if(!t||!lg) return ''; const d=t.early-lg.early, r=(t.ratio??lg.ratio)-lg.ratio;
+  return d>0.08&&r<0.05? 'Safe' : d<-0.08||r>0.12? 'Gambler' : 'Balanced' }
 function renderTend(){
   const el=$("lgTend"); if(!el) return; const per=LG.tend;
   if(!per||!Object.keys(per).length){ el.innerHTML='<div class="empty">No finished weeks yet.</div>'; return }
-  const lg=leagueTend(), me=myRoster();
-  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid)})).filter(x=>x.t).sort((a,b)=>b.t.early-a.t.early);
+  const lg=leagueTend(), me=myRoster(), T=LG.out?.teams||[];
+  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid), team:T.find(x=>x.rid===+rid)})).filter(x=>x.t).sort((a,b)=>b.t.early-a.t.early);
   const f=v=>v==null?'–':v.toFixed(2);
-  el.innerHTML='<div class="lg-scroll"><table class="lg-table num"><thead><tr><th>#</th><th>Team</th><th>Slots</th><th>Lock early</th><th>Lock score vs his week</th><th>Games given up</th></tr></thead><tbody>'+
-    rows.map((x,i)=>'<tr class="'+(x.rid===me?.roster_id?'me':'')+'"><td>'+(i+1)+'</td><td>'+esc(rosterName(x.rid))+'</td><td>'+x.t.n+'</td><td class="odds">'+Math.round(x.t.early*100)+'%</td><td>'+(x.t.ratio!=null? '×'+f(x.t.ratio) : '–')+'</td><td>'+f(x.t.left)+'</td></tr>').join("")+
-    (lg?'<tr><td></td><td><i>League</i></td><td></td><td>'+Math.round(lg.early*100)+'%</td><td>'+(lg.ratio!=null?'×'+f(lg.ratio):'–')+'</td><td></td></tr>':'')+'</tbody></table></div>'+
-    '<div class="plan-note">Per starter slot, weeks 1–'+(W.week-1)+': <i>Lock early</i> is how often he locked a game before the player\'s last one instead of riding it out. <i>Lock score vs his week</i> is the locked game against that player\'s average that week (×1.30 = he waits for a big game). <i>Games given up</i> is how many games were still left when he locked. '+(LG.tendExact?'From Sleeper\'s exact lock records.':'From the public feed (add your Sleeper login for exact records).')+'</div>';
+  let h='<div class="tdh"><span>Team</span><span>Locks early</span><span>Locks at</span><span>Games left</span></div>';
+  for(const x of rows){ const st=tendStyle(x.t,lg), tm=x.team;
+    const log=per[x.rid].log.slice().sort((a,b)=>b.w-a.w||(b.early-a.early)||b.fp-a.fp);
+    const items=log.map(d=>{ const nm=playerInfo(d.pid).name;
+      return '<div class="tl"><span>W'+d.w+'</span><span>'+esc(nm)+'</span><span>'+(d.early? '<b>Locked '+d.fp.toFixed(1)+'</b> · game '+d.k+' of '+d.n : 'Rode it · '+d.fp.toFixed(1))+'</span><span class="muted">avg '+d.avg.toFixed(1)+' · best '+d.best.toFixed(1)+'</span></div>' }).join("");
+    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Safe"?'val':st==="Gambler"?'reach':'src')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF</small>':'')+'</span>'+
+      '<span>'+Math.round(x.t.early*100)+'%</span><span>'+(x.t.ratio!=null?'×'+f(x.t.ratio):'–')+'</span><span>'+f(x.t.left)+'</span></summary><div class="tls">'+items+'</div></details>' }
+  h+='<div class="tdh lgrow"><span><i>League average</i></span><span>'+(lg?Math.round(lg.early*100)+'%':'–')+'</span><span>'+(lg&&lg.ratio!=null?'×'+f(lg.ratio):'–')+'</span><span></span></div>';
+  h+='<div class="plan-note">Weeks 1–'+(W.week-1)+', one entry per starter slot (tap a team for every decision). <i>Locks early</i>: how often he locked before the player\'s last game instead of riding it out. <i>Locks at</i>: the locked game against that player\'s average that week (×1.40 = waits for a big night). <i>Games left</i>: games he gave up when locking. <i>Safe</i> locks more and sooner than the league; <i>Gambler</i> rides more or waits for bigger games. '+(LG.tendExact?'From Sleeper\'s exact lock records.':'From the public feed; add your Sleeper login for exact records.')+'</div>';
+  el.innerHTML=h;
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
 function leagueOdds(){
