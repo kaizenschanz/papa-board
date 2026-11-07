@@ -1460,8 +1460,15 @@ function roleNote(N,pid,P,A){
   const r=N.role[pid], t=N.at[pid], nm=q=>A.find(x=>x.pid===q)?.a.info.name||q;
   if(r==="look") return "Free look: lock only if he scores "+(fx(t)||"big")+"+.";
   if(r==="holdPlay") return "Lock it after his game if he scores "+(fx(vsTonight(pid,N.day)??t)||"big")+"+.";
-  if(r==="holdLast") return P.backup?.[pid]? "His last game: keep it at "+(fx(t)||"?")+"+, otherwise start "+nm(P.backup[pid].pid)+" ("+dayLabel(P.backup[pid].date)+")." : "His last game of the week, so it counts.";
+  if(r==="holdLast") return P.backup?.[pid]? "His last game: keep it at "+(fx(chainValue(A,P,pid,true)??t)||"?")+"+, otherwise start "+nm(P.backup[pid].pid)+" ("+dayLabel(P.backup[pid].date)+")." : "His last game of the week, so it counts.";
   return "";
+}
+// What the rest of a slot's chain is worth: the holder's own games and his bench fallbacks (or just the fallbacks), played right.
+function chainValue(A,P,pid,fallbacksOnly){
+  const x=A.find(x=>x.pid===pid); if(!x) return null; const st=[];
+  if(!fallbacksOnly) for(const g of ((x.a.live&&x.starter)? [x.a.live] : []).concat(x.a.future)) if(g.mu>0) st.push({mu:g.mu, cur:g.live? (g.cur||0) : null});
+  for(const b of [P.backup?.[pid], P.backup2?.[pid]]) if(b) for(const g of (b.games||[])) if(g.mu>0) st.push({mu:g.mu, cur:null});
+  if(!st.length) return null; return SHAPE? stepsValue(st)[0] : null;
 }
 // Every move left this week for the team shown, in time order. Also what the Reminders sync turns into reminders.
 function todoItems(A,P){
@@ -1500,20 +1507,30 @@ function todoItems(A,P){
       out.push({t, kind:"move", title:verb+" "+nm(pid)+" to "+P.SL[slot]+(had?" ("+nm(had)+" out)":""), sub:(roleNote(N,pid,P,A)+later).trim(),
         rems:[{id:"start-"+pid+"-"+N.day, t, lead:15, title:verb+" "+nm(pid)+" to "+P.SL[slot]}]});
     }
-    for(const [slot,E] of Object.entries(N.early||{})){ if(!(E.tip>now)) continue;
-      const already=prev.get(+slot)===E.pid;
-      out.push({t:E.tip, kind:"look", title: already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
-        sub:"Free look: lock only if he scores "+(fx(N.at[E.pid])||"big")+"+. Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
-        rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
-          .concat(E.thenTip>now? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+(fx(N.at[E.pid])||"big")+"+ (then lock him)"}] : [])});
+    for(const [slot,E] of Object.entries(N.early||{})){ if(!(E.thenTip>now)) continue;
+      const already=prev.get(+slot)===E.pid, started=!(E.tip>now);
+      const bar=fx(chainValue(A,P,E.then)??N.at[E.pid])||"big", lastG=!X(E.pid)?.a.future.some(g=>g.date>N.day);
+      out.push({t: started? E.thenTip : E.tip, pid:E.pid, kind:"look", title: started? nm(E.pid)+" is playing in "+P.SL[slot]+" (free look): keep him only at "+bar+"+" : already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
+        sub:"Keep his score only if it's "+bar+"+ (what "+nm(E.then)+"'s game plus your Sunday fallbacks are worth)"+(lastG?"; it's his last game, so it counts without a lock while he stays in":"; lock it if so")+". Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
+        rems:(already||started? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
+          .concat(E.thenTip>now? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+bar+"+"}] : [])});
     }
     prev=plan;
   });
+  // a free look already under way or just finished: keep him only if he beats the regular's chain, else the regular goes back in
+  for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||out.some(o=>o.kind==="look"&&o.pid===x.pid)) continue;
+    const today= a.live || (a.latest && a.latest.date===todayStr() && !a.future.length); if(!today || a.future.length) continue;
+    const other=[...P.pick].find(([pid,q])=>q.slot===x.idx && q.k==="hold" && pid!==x.pid), hp= other? other[0] : P.backup?.[x.pid]?.pid; if(!hp) continue;
+    const hx=X(hp); if(!hx||hx.starter) continue; const ht=tipAt(hp, hx.a.future[0]?.date); if(!ht||ht<=now) continue;
+    const bar=chainValue(A,P,hp), cur= a.live? (a.live.cur||0) : a.latest.fp, keep= !a.live && bar!=null && cur>=bar;
+    out.push({t:ht, pid:x.pid, kind:"look", title: a.live? a.info.name+" is playing ("+cur.toFixed(1)+" so far): keep him only at "+(fx(bar)||"?")+"+" : keep? "Leave "+a.info.name+" in: his "+cur.toFixed(1)+" beats "+(fx(bar)||"?") : "Put "+nm(hp)+" back in "+P.SL[x.idx]+": "+a.info.name+" finished with "+cur.toFixed(1),
+      sub: keep? "It's his last game, so it counts without a lock while he stays in; "+nm(hp)+" sits." : "Swap before "+clock(ht)+" ("+nm(hp)+"'s game plus your later fallbacks are worth about "+(fx(bar)||"?")+").",
+      rems: keep? [] : [{id:"back-"+hp, t:ht, lead:20, title:"Put "+nm(hp)+" back in "+P.SL[x.idx]+" unless "+a.info.name+" scored "+(fx(bar)||"?")+"+"}]}) }
   // after a slot holder's game: lock or keep, and when a bench player has to come in if he flopped
   for(const [pid,p] of P.pick){ if(p.k!=="hold") continue; const a=X(pid)?.a; if(!a||a.live||!a.future.length) continue;
     const g=a.future[0], tip=tipAt(pid,g.date); if(!tip) continue; const end=tip+GAME_MS; if(end<=now) continue;
     const N=days.find(d=>d.day===g.date), b=P.backup?.[pid];
-    const thr= N? fx(N.role[pid]==="holdPlay"? (vsTonight(pid,N.day)??N.at[pid]) : N.at[pid]) : null;
+    const thr= a.future.length>1? (N? fx(vsTonight(pid,N.day)??N.at[pid]) : null) : fx(chainValue(A,P,pid,true) ?? (N? N.at[pid] : null));
     if(a.future.length>1) out.push({t:end, approx:true, kind:"check", title:"After "+a.info.name+"'s game: lock it if he scores "+(thr||"big")+"+",
       sub:"Otherwise keep playing him ("+(a.future.length-1)+" more game"+(a.future.length>2?"s":"")+").",
       rems:[{id:"done-"+pid, t:end, lead:0, title:a.info.name+" done: lock at "+(thr||"?")+"+?"}]});
