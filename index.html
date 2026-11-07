@@ -1832,7 +1832,23 @@ async function managerTendencies(){
   const lid=S.league.league_id, raw=store.get("slpToken",null), tok=raw? fixTok(raw) : null, per={};
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   let exact=!!tok;
-  for(let w=1; w<W.week; w++){
+  for(let w=1; w<=W.week; w++){
+    if(w===W.week){                                    // this week so far
+      const cur=W.matchups.map(m=>{ const leg=legFor(m.roster_id), rr=S.rosters[m.roster_id]||{};
+        return {rid:m.roster_id, mid:m.matchup_id, starters:(rr.starters||m.starters||[]), sg: leg? (leg.starters_games||{}) : null, pp: leg? null : (m.players_points||{}), players:rr.players||m.players||[], current:true} });
+      const logs={}, add=pid=>{ if(logs[pid]) return; const pw=playerWeek(pid);
+        logs[pid]=pw.games.filter(g=>!g.dnp).map(g=>({id:String(g.id), date:g.date, fp: g.done&&!g.dnp? g.fp : null, mu:g.mu, live:!!g.live})) };
+      cur.forEach(r=>r.players.forEach(add));
+      { const ds=W.games.map(g=>g.date).sort(); if(ds.length) (LG.weekDates ||= {})[w]=[ds[0],ds[ds.length-1]] }
+      for(const r of cur){ r.slots=[];
+        r.starters.forEach((pid,si)=>{ if(!pid||pid==="0") return; const g=logs[pid]||[], played=g.filter(x=>x.fp!=null).length; let idx=-1;
+          if(played){ if(r.sg && r.sg[pid]!=null) idx=g.findIndex(x=>x.id===String(r.sg[pid]));
+            else if(r.pp && r.pp[pid]!=null && !r.sg){ idx=played-1; (r.open ||= new Set()).add(pid) }
+            else { idx=played-1; (r.open ||= new Set()).add(pid) } }      // not locked yet: his latest score is still a live decision
+          r.slots.push({pid,si,g,idx}) }) }
+      gradeWeek(w, cur, logs, SL, per);
+      continue;
+    }
     // Finished weeks: Sleeper's lock records (with your login) are right; the public feed reports each player's latest game,
     // not the locked one, so it can't show past locks. Without the login the grades are rough.
     let legs=null;
@@ -1885,7 +1901,11 @@ function gradeWeek(w, rows, logs, SL, per){
       const P=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
       for(const sl of r.slots){ const g=sl.g; if(sl.idx<0 || g.length<2) continue;
         const i=g.findIndex((x,k)=>k<g.length-1 && g[k+1].date===D); if(i<0 || i>sl.idx) continue;
-        const s=g[i].fp, locked= i===sl.idx;
+        if(g[i].fp==null) continue;
+        if(r.current && !(g[i+1].fp!=null || g[i+1].live)) continue;            // deadline not reached yet
+        const isOpen= r.current && r.open && r.open.has(sl.pid);
+        if(isOpen && i===sl.idx) continue;                                       // his latest score is still undecided
+        const s=g[i].fp, locked= i===sl.idx && !isOpen;
         // waiting: his games from the deadline on, then the best bench player who plays later in a spot this slot allows
         const st=g.slice(i+1).map(x=>gstep(sl.pid,x)), last=g[g.length-1].date;
         let bk=null; for(const bp of r.players){ if(r.starters.includes(bp)) continue; if(!elig(playerInfo(bp).pos, SL[sl.si])) continue;
@@ -1906,10 +1926,12 @@ function gradeWeek(w, rows, logs, SL, per){
   }
   // per-slot summary rows (what was locked, what was passed up)
   for(const r of rows){ const P=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
-    for(const sl of r.slots){ const g=sl.g; if(sl.idx<0 || g.length<1) continue; P.slots++;
-      const avg=g.reduce((t,x)=>t+x.fp,0)/g.length, early=sl.idx<g.length-1;
-      if(early){ P.early++; if(avg>0) P.ratios.push(g[sl.idx].fp/avg); P.left.push(g.length-1-sl.idx) }
-      P.log.push({w, pid:sl.pid, k:sl.idx+1, n:g.length, fp:g[sl.idx].fp, avg, early, games:g.map(x=>x.fp), steps:(sl.steps||[]).sort((a,b)=>a.i-b.i)}) } }
+    for(const sl of r.slots){ const g=sl.g; if(sl.idx<0 || g.length<1) continue;
+      const pl=g.filter(x=>x.fp!=null), avg=pl.length? pl.reduce((t,x)=>t+x.fp,0)/pl.length : 0, isOpen= r.current && r.open && r.open.has(sl.pid);
+      const early= !isOpen && sl.idx<g.length-1;
+      if(!r.current){ P.slots++; if(early){ P.early++; if(avg>0) P.ratios.push(g[sl.idx].fp/avg); P.left.push(g.length-1-sl.idx) } }
+      P.log.push({w, pid:sl.pid, k:sl.idx+1, n:g.length, fp:g[sl.idx].fp, avg, early, open:isOpen, current:!!r.current,
+        games:g.map(x=>x.fp), steps:(sl.steps||[]).sort((a,b)=>a.i-b.i)}) } }
 }
 function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
   return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left), dec:T.dec, acc:T.dec? T.right/T.dec : null,
@@ -1934,18 +1956,19 @@ function renderTend(){
     const wkLabel=w=>{ const d=LG.weekDates?.[w]; const f=x=>new Date(x+"T12:00:00").toLocaleDateString([], {month:"short", day:"numeric"}); return 'Week '+w+(d?' · '+f(d[0])+' – '+f(d[1]):'') };
     let items='', lastW=null;
     for(const d of log.filter(d=>d.steps.length)){
-      if(d.w!==lastW){ items+='<div class="twk">'+wkLabel(d.w)+'</div>'; lastW=d.w }
+      if(d.w!==lastW){ items+='<div class="twk">'+wkLabel(d.w)+(d.current?' · so far':'')+'</div>'; lastW=d.w }
       const nm=playerInfo(d.pid).name, final=d.fp;
       const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(1) : 'Passed up '+c.sc.toFixed(1))+' after game '+(c.i+1)+': <b>'+(c.L.h+c.L.md).toFixed(2)+'</b> wins if locked vs <b>'+(c.Wt.h+c.Wt.md).toFixed(2)+'</b> if not'+
           (c.moot?' <span class="muted">· didn\'t matter</span>' : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
-      const later=d.early? d.games.slice(d.k) : [];
-      const outcome= d.early? 'He locked '+final.toFixed(1)+'; the games after scored '+later.map(v=>v.toFixed(1)).join(', ')
+      const later=d.early? d.games.slice(d.k).filter(v=>v!=null) : [], left=d.games.slice(d.k).filter(v=>v==null).length;
+      const outcome= d.open? 'Still open: '+final.toFixed(1)+' is his latest score'+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
+        : d.early? 'He locked '+final.toFixed(1)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(1)).join(', ') : '')+(left?' ('+left+' still to play)':'')
         : 'Rode it to the last game: '+final.toFixed(1);
       items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
     h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(1)+'</span><span>'+t.waitMiss+' waited<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(1):'–')+'</span><span></span></div>';
-  h+='<div class="plan-note">Finished weeks only (1–'+(W.week-1)+'); week '+W.week+' is graded once it\'s over. Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The numbers are his expected wins that week if he locked vs if he didn\'t: the head-to-head chance plus the league-median chance (2.00 = sure of both). The right call is the higher one (within 0.01). The grade never looks at how the later games turned out; that\'s only shown in gray. '+(LG.tendExact?'Locks from Sleeper\'s lock records.':'<b>Without your Sleeper login these are rough:</b> the public feed can\'t show past locks.')+'</div>';
+  h+='<div class="plan-note">Weeks 1–'+W.week+'; this week counts only calls whose deadline has passed (a lock made, or a score let go once his next game tipped). Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The numbers are his expected wins that week if he locked vs if he didn\'t: the head-to-head chance plus the league-median chance (2.00 = sure of both). The right call is the higher one (within 0.01). The grade never looks at how the later games turned out; that\'s only shown in gray. '+(LG.tendExact?'Locks from Sleeper\'s lock records.':'<b>Without your Sleeper login these are rough:</b> the public feed can\'t show past locks.')+'</div>';
   el.innerHTML=h;
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
