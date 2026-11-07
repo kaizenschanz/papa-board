@@ -235,7 +235,7 @@ button.g:hover{border-color:var(--ink)}
 .pill b{color:var(--ink)}
 .pill.good{background:var(--good-soft);border-color:transparent;color:var(--good)}.pill.good b{color:var(--good)}
 .pill.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}.pill.bad b{color:var(--bad)}
-.tdh,details.tr>summary{display:grid;grid-template-columns:minmax(0,1fr) 62px 58px 58px;gap:8px;align-items:center;text-align:right}
+.tdh,details.tr>summary{display:grid;grid-template-columns:minmax(0,1fr) 54px 54px 62px;gap:8px;align-items:center;text-align:right}
 .tdh{font:700 11px/1.2 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:4px 0 6px;border-bottom:1px solid var(--line)}
 .tdh>span:first-child,details.tr>summary>span:first-child{text-align:left}
 details.tr{border-bottom:1px solid var(--line)}
@@ -245,7 +245,9 @@ details.tr>summary small{display:block;color:var(--muted);font-size:12px}
 details.tr.me>summary{background:var(--accent-soft)}
 details.tr[open]>summary{background:var(--bg)}
 .tls{display:grid;gap:4px;padding:2px 0 10px}
-.tl{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:2px 8px;font-size:12.5px}
+.tl{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:2px 8px;font-size:12.5px;padding:4px 0;border-top:1px dashed var(--line)}
+.tl .ok{color:var(--good);font-weight:700}.tl .bad{color:var(--bad);font-weight:700}
+details.tr>summary>span:last-child{font-size:12px;line-height:1.25}
 .tl>span:nth-child(4){grid-column:2/4;font-size:12px}
 .tdh.lgrow{border-bottom:0;font:400 12.5px/1.2 var(--body);text-transform:none;letter-spacing:0}
 .tend{font-size:12.5px;color:var(--muted);margin-top:10px}.tend b{color:var(--ink)}
@@ -1536,7 +1538,7 @@ function renderBoard(A,P){
     if(v.title!=null) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(1)+'%</b></span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
   if(v){ const t=tendOf(v.rid), lg=leagueTend();
-    if(t) h+='<div class="tend">'+esc(v.name)+' locks early on <b>'+Math.round(t.early*100)+'%</b> of slots (league '+(lg?Math.round(lg.early*100):'–')+'%)'+(t.ratio!=null?', usually at <b>×'+t.ratio.toFixed(2)+'</b> his player\'s week average':'')+'.</div>' }
+    if(t&&t.dec) h+='<div class="tend">'+esc(v.name)+' makes the right lock call <b>'+Math.round(t.acc*100)+'%</b> of the time (league '+(lg&&lg.acc!=null?Math.round(lg.acc*100):'–')+'%); misses: '+t.waitMiss+' waited too long, '+t.lockMiss+' locked too soon.</div>' }
   if(v) h+='<label class="oppmode">'+esc(v.name)+' plays <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>smart (protects his median too)</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>all-in on beating '+(isMe?'you':'them')+'</option></select></label>';
   $("wkScore").innerHTML=h;
   const exact=legFor(me.roster_id);
@@ -1813,41 +1815,60 @@ async function managerTendencies(){
     if(!legs) exact=false;
     const pub= legs? [] : await j("/league/"+lid+"/matchups/"+w).catch(()=>[]);
     const stats=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
+    const projs=await jx(RAW+"/projections/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
+    const pmu={}; for(const r of projs){ if(r.stats&&Object.keys(r.stats).length) pmu[r.player_id+":"+r.game_id]=0.95*scoreStats(r.stats) }
     const logs={}; for(const r of stats){ const st=r.stats; if(!st||!((st.min||0)>0||(st.sp||0)>0)) continue; (logs[r.player_id] ||= []).push({id:String(r.game_id), date:r.date, fp:scoreStats(st)}) }
     for(const k in logs) logs[k].sort((a,b)=>a.date<b.date?-1:1);
     const rows= legs? legs.map(l=>({rid:l.roster_id, starters:l.starters||[], sg:l.starters_games||{}})) : pub.map(m=>({rid:m.roster_id, starters:m.starters||[], pp:m.players_points||{}}));
-    for(const r of rows){ const T=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[]});
+    for(const r of rows){ const T=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, evLost:0});
       for(const pid of r.starters){ if(!pid||pid==="0") continue; const g=logs[pid]; if(!g||g.length<2) continue;
         let idx=-1;
         if(r.sg){ const gid=r.sg[pid]; if(gid!=null) idx=g.findIndex(x=>x.id===String(gid)) }
         else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) }
         if(idx<0) continue;
         T.slots++; const avg=g.reduce((t,x)=>t+x.fp,0)/g.length, best=Math.max(...g.map(x=>x.fp));
-        T.log.push({w, pid, k:idx+1, n:g.length, fp:g[idx].fp, avg, best, early: idx<g.length-1});
+        // grade every decision up to the one he took: waiting was worth V (his remaining games played right, pregame projections)
+        const mu=g.map(x=>pmu[pid+":"+x.id] ?? avg), V=new Array(g.length+1).fill(-1e9);
+        for(let i=g.length-1;i>=0;i--) V[i]=emaxE(mu[i],V[i+1]);
+        const steps=[];
+        for(let i=0;i<=idx && i<g.length-1;i++){ const sc=g[i].fp, wv=V[i+1], locked=i===idx, ok= locked? sc>=wv-0.5 : sc<wv+0.5;   // within half a point is a coin flip, not a miss
+          const lost= ok? 0 : Math.abs(sc-wv); T.dec++; if(ok) T.right++; else if(locked) T.lockMiss++; else T.waitMiss++; T.evLost+=lost;
+          steps.push({i, sc, wv, locked, ok, lost}) }
+        T.log.push({w, pid, k:idx+1, n:g.length, fp:g[idx].fp, avg, best, early: idx<g.length-1, games:g.map(x=>x.fp), steps});
         if(idx<g.length-1){ T.early++; if(avg>0) T.ratios.push(g[idx].fp/avg); T.left.push(g.length-1-idx) } } }
   }
   LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
 }
 function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
-  return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left)} }
-function leagueTend(){ let n=0,e=0; const r=[]; for(const T of Object.values(LG.tend||{})){ n+=T.slots; e+=T.early; r.push(...T.ratios) } return n? {early:e/n, ratio:r.length? r.reduce((a,b)=>a+b,0)/r.length : null} : null }
-function tendStyle(t,lg){ if(!t||!lg) return ''; const d=t.early-lg.early, r=(t.ratio??lg.ratio)-lg.ratio;
-  return d>0.08&&r<0.05? 'Safe' : d<-0.08||r>0.12? 'Gambler' : 'Balanced' }
+  return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left), dec:T.dec, acc:T.dec? T.right/T.dec : null,
+    waitMiss:T.waitMiss, lockMiss:T.lockMiss, lostPer:T.dec? T.evLost/T.dec : null} }
+function leagueTend(){ let n=0,e=0,d=0,ok=0,lost=0; const r=[]; for(const T of Object.values(LG.tend||{})){ n+=T.slots; e+=T.early; r.push(...T.ratios); d+=T.dec; ok+=T.right; lost+=T.evLost }
+  return n? {early:e/n, ratio:r.length? r.reduce((a,b)=>a+b,0)/r.length : null, acc:d? ok/d : null, lostPer:d? lost/d : null} : null }
+function tendStyle(t){ if(!t||!t.dec) return ''; const miss=t.waitMiss+t.lockMiss;
+  if(t.acc>=0.8) return 'Sharp';
+  if(miss>=2 && t.waitMiss>=2*t.lockMiss) return 'Waits too long';
+  if(miss>=2 && t.lockMiss>=2*t.waitMiss) return 'Locks too soon';
+  return 'Mixed' }
 function renderTend(){
   const el=$("lgTend"); if(!el) return; const per=LG.tend;
   if(!per||!Object.keys(per).length){ el.innerHTML='<div class="empty">No finished weeks yet.</div>'; return }
   const lg=leagueTend(), me=myRoster(), T=LG.out?.teams||[];
-  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid), team:T.find(x=>x.rid===+rid)})).filter(x=>x.t).sort((a,b)=>b.t.early-a.t.early);
-  const f=v=>v==null?'–':v.toFixed(2);
-  let h='<div class="tdh"><span>Team</span><span>Locks early</span><span>Locks at</span><span>Games left</span></div>';
-  for(const x of rows){ const st=tendStyle(x.t,lg), tm=x.team;
-    const log=per[x.rid].log.slice().sort((a,b)=>b.w-a.w||(b.early-a.early)||b.fp-a.fp);
-    const items=log.map(d=>{ const nm=playerInfo(d.pid).name;
-      return '<div class="tl"><span>W'+d.w+'</span><span>'+esc(nm)+'</span><span>'+(d.early? '<b>Locked '+d.fp.toFixed(1)+'</b> · game '+d.k+' of '+d.n : 'Rode it · '+d.fp.toFixed(1))+'</span><span class="muted">avg '+d.avg.toFixed(1)+' · best '+d.best.toFixed(1)+'</span></div>' }).join("");
-    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Safe"?'val':st==="Gambler"?'reach':'src')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF</small>':'')+'</span>'+
-      '<span>'+Math.round(x.t.early*100)+'%</span><span>'+(x.t.ratio!=null?'×'+f(x.t.ratio):'–')+'</span><span>'+f(x.t.left)+'</span></summary><div class="tls">'+items+'</div></details>' }
-  h+='<div class="tdh lgrow"><span><i>League average</i></span><span>'+(lg?Math.round(lg.early*100)+'%':'–')+'</span><span>'+(lg&&lg.ratio!=null?'×'+f(lg.ratio):'–')+'</span><span></span></div>';
-  h+='<div class="plan-note">Weeks 1–'+(W.week-1)+', one entry per starter slot (tap a team for every decision). <i>Locks early</i>: how often he locked before the player\'s last game instead of riding it out. <i>Locks at</i>: the locked game against that player\'s average that week (×1.40 = waits for a big night). <i>Games left</i>: games he gave up when locking. <i>Safe</i> locks more and sooner than the league; <i>Gambler</i> rides more or waits for bigger games. '+(LG.tendExact?'From Sleeper\'s exact lock records.':'From the public feed; add your Sleeper login for exact records.')+'</div>';
+  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid), team:T.find(x=>x.rid===+rid)})).filter(x=>x.t&&x.t.dec).sort((a,b)=>b.t.acc-a.t.acc||a.t.lostPer-b.t.lostPer);
+  const f1=v=>v==null?'–':v.toFixed(1), day=(w,i)=>'game '+(i+1);
+  let h='<div class="tdh"><span>Team</span><span>Right calls</span><span>Pts lost / call</span><span>Misses</span></div>';
+  for(const x of rows){ const t=x.t, st=tendStyle(t), tm=x.team;
+    const log=per[x.rid].log.slice().sort((a,b)=>b.w-a.w||b.steps.length-a.steps.length);
+    const items=log.filter(d=>d.steps.length).map(d=>{ const nm=playerInfo(d.pid).name, final=d.fp;
+      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(1)+' in game '+(c.i+1)+' (waiting was worth '+c.wv.toFixed(1)+')'
+          : 'Passed up '+c.sc.toFixed(1)+' in game '+(c.i+1)+' (waiting was worth '+c.wv.toFixed(1)+')')+(c.ok?' <span class="ok">✓</span>':' <span class="bad">✗ −'+c.lost.toFixed(1)+'</span>')).join('<br>');
+      const later=d.early? d.games.slice(d.k) : [];
+      const outcome= d.early? 'Locked '+final.toFixed(1)+'; the games he gave up scored '+later.map(v=>v.toFixed(1)).join(', ')
+        : 'Rode it to the last game: '+final.toFixed(1)+(d.games.length>1?' (passed up '+d.games.slice(0,-1).map(v=>v.toFixed(1)).join(', ')+')':'');
+      return '<div class="tl"><span>W'+d.w+'</span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }).join("");
+    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Mixed"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
+      '<span>'+Math.round(t.acc*100)+'%</span><span>'+f1(t.lostPer)+'</span><span>'+t.waitMiss+' waited<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
+  h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg?f1(lg.lostPer):'–')+'</span><span></span></div>';
+  h+='<div class="plan-note">Every lock-or-wait decision in weeks 1–'+(W.week-1)+', graded at the moment it was made: waiting is worth what the player\'s remaining games were expected to give if played right (that week\'s pregame projections, real score swings). Passing up a score worth more than that, or locking one worth less, is a miss; <i>Pts lost / call</i> is the average expected cost. <i>Waits too long</i> / <i>Locks too soon</i> say which way a manager misses. Not yet included: the matchup score at the time (when you\'re behind, waiting longer can be right) and bench players who could have taken the slot. '+(LG.tendExact?'Locks from Sleeper\'s exact records.':'Locks from the public feed; add your Sleeper login for exact records.')+'</div>';
   el.innerHTML=h;
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
