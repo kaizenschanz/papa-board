@@ -732,6 +732,7 @@ async function jx(url){
   if(!r.ok) throw new Error(url.replace(RAW,"")+" returned "+r.status);
   return r.json();
 }
+const NOASSUME=new URLSearchParams(location.search).get("noassume")==="1";
 const W = { view: store.get("view",null), loaded:false, loading:false, updated:0, err:null, poll:null, poolLimit:12,
   week:null, season:null, games:[], stats:{}, proj:{}, projMeta:{}, matchups:[], tot:{}, slowAt:0 };
 const erf=x=>{const t=1/(1+0.3275911*Math.abs(x));const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y};
@@ -1024,7 +1025,7 @@ function analyse(pid, counted, isStarter, sg, mine=true, unanimous=false){
   }
   const wv=waitValue(future);
   // newest game counting, next one not started: Sleeper can't say yet, so go with the call the board made for it
-  if(mine && !exact && !lockedOn && mark==null && isStarter && latest && !latest.dnp && !live && future.length && counted!=null && Math.abs(latest.fp-counted)<0.006 && latest.fp>=wv){ lockedOn=latest; lockSrc="assumed" }
+  if(mine && !NOASSUME && !exact && !lockedOn && mark==null && isStarter && latest && !latest.dnp && !live && future.length && counted!=null && Math.abs(latest.fp-counted)<0.006 && latest.fp>=wv){ lockedOn=latest; lockSrc="assumed" }
   let call, why="", value=null;
   if(lockedOn){ call={c:"locked",t:"Locked "+lockedOn.fp.toFixed(1)};
     why= lockSrc==="exact"? "locked "+dayLabel(lockedOn.date)+" (from Sleeper)" : lockSrc==="you"? "you marked "+dayLabel(lockedOn.date) : lockSrc==="sleeper"? "Sleeper shows "+dayLabel(lockedOn.date)+" locked" : "assumed: the call was Lock · Sleeper confirms at his next tip";
@@ -1370,8 +1371,11 @@ function renderPlan(A,P){
   { const T=timeline(A,P); if(T.length){ out.push('<div class="plan-h">Decision timeline <span class="muted">(open the board at each time; every call is redone with the results so far)</span></div>');
       T.forEach(([t,txt])=>out.push('<div class="plan-row"><span class="wk-slot" style="min-width:86px">'+whenLabel(t)+'</span><span class="call-why">'+txt+'</span></div>'));
       const n=T.filter(e=>e[2]).length;
+      W.tlJson=JSON.stringify({week:W.week, at:Date.now(), exact:!!legFor(myRoster()?.roster_id), events:T.filter(e=>e[2]).map(([t,html,c])=>({id:"w"+W.week+"-"+c.id, t, lead:c.lead, title:c.title, note:String(html).replace(/<[^>]+>/g,"").replace(/&#39;/g,"'").replace(/&amp;/g,"&")}))});
       if(n) out.push('<div class="plan-note"><a class="btn" id="icsBtn" href="alerts.ics?w='+W.week+'">Add this weekend\'s alerts to your calendar</a> Opens in Calendar on iPhone (use Safari). Alerts 15 minutes before each deadline; each one links back here and to your Sleeper matchup. <a href="data:text/calendar;charset=utf-8,'+encodeURIComponent(icsFor(T))+'" download="papa-week'+W.week+'.ics">Download the live list instead</a></div>') } }
   $("wkPlan").innerHTML=out.join("") || '<div class="empty">Nothing left to decide this week.</div>';
+  { let el=document.getElementById("tlJson"); if(!el){ el=document.createElement("script"); el.type="application/json"; el.id="tlJson"; document.body.appendChild(el) }
+    el.textContent= W.tlJson || JSON.stringify({week:W.week, at:Date.now(), events:[]}); W.tlJson=null }
 }
 
 function renderWeek(){
@@ -1754,7 +1758,7 @@ window.addEventListener("resize",syncBarHeight);
 press("srcSeg","src",S.src); press("posSeg","pos",S.pos==="FIT"?"ALL":S.pos); if(S.pos==="FIT") S.pos="ALL";
 $("user").value=store.get("user","zenkai5");
 const qs=new URLSearchParams(location.search); if(qs.get("draft")) $("draftOverride").value=qs.get("draft");
-syncBarHeight(); render(); showView(store.get("view",null)||"draft");
+syncBarHeight(); render(); showView(qs.get("view")||store.get("view",null)||"draft");
 lookupLeagues().then(ok=>{ if(ok) connect() }).catch(e=>{setMsg("Couldn't reach Sleeper: "+e.message+". The rankings still work offline.",true);setLive("err")});
 </script>
 </body>
