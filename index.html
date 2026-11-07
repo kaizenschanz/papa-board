@@ -235,6 +235,7 @@ button.g:hover{border-color:var(--ink)}
 .pill b{color:var(--ink)}
 .pill.good{background:var(--good-soft);border-color:transparent;color:var(--good)}.pill.good b{color:var(--good)}
 .pill.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}.pill.bad b{color:var(--bad)}
+.tend{font-size:12.5px;color:var(--muted);margin-top:10px}.tend b{color:var(--ink)}
 .oppmode{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:10px}
 .oppmode select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;max-width:100%}
 .status{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:12.5px;color:var(--muted);margin-top:10px}
@@ -330,6 +331,10 @@ details.fold #poolSeg{margin-bottom:6px}
     <div class="card">
       <h2>Standings <span>and playoff odds</span></h2>
       <div class="lg-scroll"><table class="lg-table num" id="lgTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>Manager tendencies <span>from finished weeks</span></h2>
+      <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
     </div>
     <div class="card legend">
       <b>How this works.</b> <i>Now</i> is Sleeper's live score. <i>Proj</i> is each team's expected final if they make the best calls from here: their locks so far plus the lineup the board would set for them, using the same projections and lock/wait math as the Lock-in tab. Locks come straight from Sleeper when your login is saved. Without it, the public data only proves a lock once that player's next game starts, so other teams show "at least" that many.
@@ -1518,6 +1523,8 @@ function renderBoard(A,P){
     if(v.med!=null) pills.push('<span class="pill">Median <b>'+pct(v.med)+'</b>'+(v.medProj!=null?' · ~'+v.medProj.toFixed(0):'')+'</span>');
     if(v.title!=null) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(1)+'%</b></span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
+  if(v){ const t=tendOf(v.rid), lg=leagueTend();
+    if(t) h+='<div class="tend">'+esc(v.name)+' locks early on <b>'+Math.round(t.early*100)+'%</b> of slots (league '+(lg?Math.round(lg.early*100):'–')+'%)'+(t.ratio!=null?', usually at <b>×'+t.ratio.toFixed(2)+'</b> his player\'s week average':'')+'.</div>' }
   if(v) h+='<label class="oppmode">'+esc(v.name)+' plays <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>smart (protects his median too)</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>all-in on beating '+(isMe?'you':'them')+'</option></select></label>';
   $("wkScore").innerHTML=h;
   const exact=legFor(me.roster_id);
@@ -1628,7 +1635,7 @@ function renderWeek(){
     const fin=titleObjD(myD,oD,tabMe,median,wtMe), worst=titleObjD(myD,Ow.D,null,false);
     const gamble=B.filter(x=>O.dec.includes(x.pid) && O.Q.pick.get(x.pid)?.k!=="lock").map(x=>x.a.info.name);
     W.vs={rows:A, oppRows:B, oppPlan:O.Q, term:P.term, oth, median, med: median? fin.md : null, medProj: medianOf(oth.map(o=>o.m).concat(myD.m)),
-      name:rosterName(opp.roster_id), me:myD, opp:oD, win:fin.h, winWorst:worst.h, calls, force, gamble, title: wtMe? wtMe.base : null,
+      name:rosterName(opp.roster_id), rid:opp.roster_id, me:myD, opp:oD, win:fin.h, winWorst:worst.h, calls, force, gamble, title: wtMe? wtMe.base : null,
       oppLocked:B.filter(x=>x.starter&&x.a.lockedOn).length, oppExact:!!legFor(opp.roster_id)};
   }
   // each player's call: the whole-team plan decides, the win math has the last word on lock vs wait
@@ -1656,6 +1663,7 @@ function renderWeek(){
   renderTodo(items);
   $("wkTodoH").textContent= isMe? "To do" : rosterName(me.roster_id)+"'s moves";
   if(isMe) W.tlJson=JSON.stringify({week:W.week, at:Date.now(), exact:!!legFor(myRoster()?.roster_id),
+    league: (()=>{ try{ return leagueOdds() }catch(e){ return null } })(),
     odds: W.vs? {win:+W.vs.win.toFixed(4), worst:+(W.vs.winWorst??0).toFixed(4), med:W.vs.med!=null?+W.vs.med.toFixed(4):null, me:+W.vs.me.m.toFixed(1), opp:+W.vs.opp.m.toFixed(1), oppName:W.vs.name, allIn:!!W.oppAllIn} : null,
     events:items.flatMap(i=>(i.rems||[]).map(r=>({id:"w"+W.week+"-"+r.id, t:r.t, lead:r.lead, title:r.title, note:i.title+". "+(i.sub||"")})))});
   { let el=document.getElementById("tlJson"); if(!el){ el=document.createElement("script"); el.type="application/json"; el.id="tlJson"; document.body.appendChild(el) }
@@ -1774,8 +1782,62 @@ async function loadLeague(force){
       LG.past=await pastWeeks();
     }
     computeLeague(); renderLeague();
+    managerTendencies().then(()=>{ renderTend(); if(W.view==="week") renderWeek() }).catch(()=>{});
   }catch(e){ $("lgSum").textContent="Couldn't build the league view: "+e.message }
   finally{ LG.busy=false }
+}
+// How each manager plays lock-in, from finished weeks: Sleeper's exact lock records with the login, else the public feed
+// (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
+// when locking, how good the locked game was against his average that week, and how many games he gave up.
+async function managerTendencies(){
+  if(LG.tend && LG.tendWeek===W.week) return LG.tend;
+  const lid=S.league.league_id, raw=store.get("slpToken",null), tok=raw? fixTok(raw) : null, per={};
+  let exact=!!tok;
+  for(let w=1; w<W.week; w++){
+    let legs=null;
+    if(tok){ try{ const r=await fetch("https://sleeper.com/graphql",{method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
+      body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+w+') { roster_id starters starters_games } }'})});
+      const d=await r.json(); legs=d?.data?.matchup_legs||null }catch(e){ legs=null } }
+    if(!legs) exact=false;
+    const pub= legs? [] : await j("/league/"+lid+"/matchups/"+w).catch(()=>[]);
+    const stats=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
+    const logs={}; for(const r of stats){ const st=r.stats; if(!st||!((st.min||0)>0||(st.sp||0)>0)) continue; (logs[r.player_id] ||= []).push({id:String(r.game_id), date:r.date, fp:scoreStats(st)}) }
+    for(const k in logs) logs[k].sort((a,b)=>a.date<b.date?-1:1);
+    const rows= legs? legs.map(l=>({rid:l.roster_id, starters:l.starters||[], sg:l.starters_games||{}})) : pub.map(m=>({rid:m.roster_id, starters:m.starters||[], pp:m.players_points||{}}));
+    for(const r of rows){ const T=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[]});
+      for(const pid of r.starters){ if(!pid||pid==="0") continue; const g=logs[pid]; if(!g||g.length<2) continue;
+        let idx=-1;
+        if(r.sg){ const gid=r.sg[pid]; if(gid!=null) idx=g.findIndex(x=>x.id===String(gid)) }
+        else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) }
+        if(idx<0) continue;
+        T.slots++; const avg=g.reduce((t,x)=>t+x.fp,0)/g.length;
+        if(idx<g.length-1){ T.early++; if(avg>0) T.ratios.push(g[idx].fp/avg); T.left.push(g.length-1-idx) } } }
+  }
+  LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
+}
+function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
+  return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left)} }
+function leagueTend(){ let n=0,e=0; const r=[]; for(const T of Object.values(LG.tend||{})){ n+=T.slots; e+=T.early; r.push(...T.ratios) } return n? {early:e/n, ratio:r.length? r.reduce((a,b)=>a+b,0)/r.length : null} : null }
+function renderTend(){
+  const el=$("lgTend"); if(!el) return; const per=LG.tend;
+  if(!per||!Object.keys(per).length){ el.innerHTML='<div class="empty">No finished weeks yet.</div>'; return }
+  const lg=leagueTend(), me=myRoster();
+  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid)})).filter(x=>x.t).sort((a,b)=>b.t.early-a.t.early);
+  const f=v=>v==null?'–':v.toFixed(2);
+  el.innerHTML='<div class="lg-scroll"><table class="lg-table num"><thead><tr><th>#</th><th>Team</th><th>Slots</th><th>Lock early</th><th>Lock score vs his week</th><th>Games given up</th></tr></thead><tbody>'+
+    rows.map((x,i)=>'<tr class="'+(x.rid===me?.roster_id?'me':'')+'"><td>'+(i+1)+'</td><td>'+esc(rosterName(x.rid))+'</td><td>'+x.t.n+'</td><td class="odds">'+Math.round(x.t.early*100)+'%</td><td>'+(x.t.ratio!=null? '×'+f(x.t.ratio) : '–')+'</td><td>'+f(x.t.left)+'</td></tr>').join("")+
+    (lg?'<tr><td></td><td><i>League</i></td><td></td><td>'+Math.round(lg.early*100)+'%</td><td>'+(lg.ratio!=null?'×'+f(lg.ratio):'–')+'</td><td></td></tr>':'')+'</tbody></table></div>'+
+    '<div class="plan-note">Per starter slot, weeks 1–'+(W.week-1)+': <i>Lock early</i> is how often he locked a game before the player\'s last one instead of riding it out. <i>Lock score vs his week</i> is the locked game against that player\'s average that week (×1.30 = he waits for a big game). <i>Games given up</i> is how many games were still left when he locked. '+(LG.tendExact?'From Sleeper\'s exact lock records.':'From the public feed (add your Sleeper login for exact records).')+'</div>';
+}
+// Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
+function leagueOdds(){
+  const out=[];
+  for(const [a,b] of pairsOf(W.matchups)){ const ra=S.rosters[a], rb=S.rosters[b]; if(!ra||!rb) continue;
+    const ma=W.matchups.find(m=>m.roster_id===a), mb=W.matchups.find(m=>m.roster_id===b);
+    const A=rowsFor(ra,ma,false), B=rowsFor(rb,mb,false), DA=teamDist(A,planWeek(A,{light:true}),1500), DB=teamDist(B,planWeek(B,{light:true}),1500);
+    out.push({a, b, an:rosterName(a), bn:rosterName(b), pa:+titleObjD(DA,DB,null,false).h.toFixed(4), ma:+DA.m.toFixed(1), mb:+DB.m.toFixed(1),
+      la:+lockedSum(A).toFixed(1), lb:+lockedSum(B).toFixed(1)}) }
+  return out;
 }
 // The most a team could have locked this week with hindsight: each player's best finished game, fitted into the lineup.
 async function refreshTitleWeights(){
@@ -1789,6 +1851,7 @@ async function refreshTitleWeights(){
       LG.past=await pastWeeks();
     }
     computeLeague(); renderWeek();
+    managerTendencies().then(()=>{ renderTend(); renderWeek() }).catch(()=>{});
   }catch(e){} finally{ LG.busy=false }
 }
 function hindsight(rows){
