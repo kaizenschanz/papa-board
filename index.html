@@ -1303,7 +1303,7 @@ function timeline(A,P){
     ev.push([t+GAME_MS,esc(a.info.name)+'\'s game ends (about): '+esc(oppName)+'\'s result is in']) }
   return ev.filter(e=>e[0]>now).sort((a,b)=>a[0]-b[0]);
 }
-const BOARD_URL="https://tubular-daifuku-24d38e.netlify.app";
+const BOARD_URL="https://kaizenschanz.github.io/papa-board/";
 function icsFor(T){
   const z=ms=>new Date(ms).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
   const tx=v=>String(v).replace(/<[^>]+>/g,"").replace(/&#39;|&apos;/g,"'").replace(/&amp;/g,"&").replace(/[\;,]/g,m=>"\\"+m).replace(/\n/g,"\\n");
