@@ -1959,7 +1959,7 @@ function tendStyle(t,lg){ if(!t||!t.dec||!lg||!(lg.lostPer>0)) return ''; const 
   if(t.dec<12) return '';
   if(r<=0.6) return 'Sharp';
   if(r<1.4) return 'Average';
-  return t.waitMiss>=2*t.lockMiss? 'Waits too long' : t.lockMiss>=2*t.waitMiss? 'Locks too soon' : 'Leaky' }
+  return t.waitMiss>=2*t.lockMiss? 'Waits too long' : t.lockMiss>=2*t.waitMiss? 'Locks too soon' : 'Costly both ways' }
 function renderTend(){
   const el=$("lgTend"); if(!el) return; const per=LG.tend;
   if(!per||!Object.keys(per).length){ el.innerHTML='<div class="empty">No finished weeks yet.</div>'; return }
