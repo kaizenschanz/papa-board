@@ -1810,12 +1810,13 @@ async function managerTendencies(){
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   let exact=!!tok;
   for(let w=1; w<W.week; w++){
-    let legs=null;
-    if(tok){ try{ const r=await fetch("https://sleeper.com/graphql",{method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
-      body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+w+') { roster_id matchup_id starters starters_games players } }'})});
-      const d=await r.json(); legs=d?.data?.matchup_legs||null }catch(e){ legs=null } }
-    if(!legs) exact=false;
-    const pub= legs? [] : await j("/league/"+lid+"/matchups/"+w).catch(()=>[]);
+    // Finished weeks: Sleeper's lock list for past rounds marks the wrong games, so read each starter's final counted score
+    // (three reads, the agreeing value) and match it to his games. The counted game is the locked one, or his last if he rode it.
+    const legs=null; exact=false;
+    const reads=(await Promise.all([0,1,2].map(i=>j("/league/"+lid+"/matchups/"+w+"?r="+i+"&t="+Date.now()).catch(()=>[])))).filter(x=>x&&x.length);
+    const pub=(reads[0]||[]).map(m=>{ const pp={};
+      for(const pid of Object.keys(m.players_points||{})){ const vals=reads.map(rd=>rd.find(x=>x.roster_id===m.roster_id)?.players_points?.[pid]).filter(v=>v!=null).sort((a,b)=>a-b); pp[pid]=vals[Math.floor(vals.length/2)] }
+      return {...m, players_points:pp} });
     const stats=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
     const projs=await jx(RAW+"/projections/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
     const pmu={}; for(const r of projs){ if(r.stats&&Object.keys(r.stats).length) pmu[r.player_id+":"+r.game_id]=0.95*scoreStats(r.stats) }
@@ -1920,7 +1921,7 @@ function renderTend(){
     h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(1)+'</span><span>'+t.waitMiss+' waited<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(1):'–')+'</span><span></span></div>';
-  h+='<div class="plan-note">Finished weeks only (1–'+(W.week-1)+'); week '+W.week+' is graded once it\'s over. Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The percentages are his chance to win that week\'s matchup if he locked vs if he didn\'t; the grade also counts the league median and title odds, so a call can be right with a slightly lower matchup number. '+(LG.tendExact?'Locks from Sleeper\'s exact records.':'Locks from the public feed; add your Sleeper login for exact records.')+'</div>';
+  h+='<div class="plan-note">Finished weeks only (1–'+(W.week-1)+'); week '+W.week+' is graded once it\'s over. Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The percentages are his chance to win that week\'s matchup if he locked vs if he didn\'t; the grade also counts the league median and title odds, so a call can be right with a slightly lower matchup number. '+'Locks come from each starter\'s final counted score in Sleeper.'+'</div>';
   el.innerHTML=h;
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
