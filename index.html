@@ -1370,7 +1370,7 @@ function renderPlan(A,P){
   { const T=timeline(A,P); if(T.length){ out.push('<div class="plan-h">Decision timeline <span class="muted">(open the board at each time; every call is redone with the results so far)</span></div>');
       T.forEach(([t,txt])=>out.push('<div class="plan-row"><span class="wk-slot" style="min-width:86px">'+whenLabel(t)+'</span><span class="call-why">'+txt+'</span></div>'));
       const n=T.filter(e=>e[2]).length;
-      if(n) out.push('<div class="plan-note"><a class="btn" id="icsBtn" href="data:text/calendar;charset=utf-8,'+encodeURIComponent(icsFor(T))+'" download="papa-week'+W.week+'.ics">Add your '+n+' decisions to your calendar</a> Alerts 15 minutes before each deadline (and right when a game you\'re waiting on should be over). Each alert links back here for the latest call. Re-add after big changes; the events update in place.</div>') } }
+      if(n) out.push('<div class="plan-note"><a class="btn" id="icsBtn" href="alerts.ics?w='+W.week+'">Add this weekend\'s alerts to your calendar</a> Opens in Calendar on iPhone (use Safari). Alerts 15 minutes before each deadline; each one links back here and to your Sleeper matchup. <a href="data:text/calendar;charset=utf-8,'+encodeURIComponent(icsFor(T))+'" download="papa-week'+W.week+'.ics">Download the live list instead</a></div>') } }
   $("wkPlan").innerHTML=out.join("") || '<div class="empty">Nothing left to decide this week.</div>';
 }
 
