@@ -350,8 +350,7 @@ details.fold #poolSeg{margin-bottom:6px}
       <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
     </div>
     <div class="card legend">
-      <b>How this works.</b> <i>Now</i> is Sleeper's live score. <i>Proj</i> is each team's expected final if they make the best calls from here: their locks so far plus the lineup the board would set for them, using the same projections and lock/wait math as the Lock-in tab. Locks come straight from Sleeper when your login is saved. Without it, the public data only proves a lock once that player's next game starts, so other teams show "at least" that many.
-      <i>Best so far (hindsight)</i> is the most a team could have locked from games already played: each player's best finished game, fitted into the lineup. It ignores games still to come, so a team's projection can be higher.
+      <b>How this works.</b> <i>Locked</i> is the points each team has locked so far (what Sleeper's app shows). <i>Proj</i> is each team's expected final if they make the best calls from here: their locks so far plus the lineup the board would set for them, using the same projections and lock/wait math as the Lock-in tab. Locks come straight from Sleeper when your login is saved. Without it, the public data only proves a lock once that player's next game starts, so other teams show "at least" that many.
       <b>Playoff odds</b> come from simulating the rest of the regular season (through week 21) 10,000 times. This week uses each team's projection; later weeks use team strength: the best weekly lineup from each roster's projected players, scaled to this league's real scoring level and blended 70/30 with the points each team has actually scored. Each week counts twice, the head-to-head plus the game against the league median, and the top 8 by record (then points) make the playoffs. The playoffs are simulated too (8 teams, 1v8 / 4v5 / 2v7 / 3v6, no byes, one week per round) to get title odds.
     </div>
   </section>
@@ -1903,8 +1902,8 @@ function computeLeague(){
     const m=W.matchups.find(x=>x.roster_id===r.roster_id)||{players_points:{},points:0};
     const rows=rowsFor(r,m,r.owner_id===S.userId), P=planWeek(rows,{light:true}), D=teamDist(rows,P);
     const s=r.settings||{};
-    return {rid:r.roster_id, name:rosterName(r.roster_id), me:r.roster_id===me?.roster_id, mid:m.matchup_id, now:m.points||0, proj:D.m, pv:D.v, exact:!!legFor(r.roster_id),
-      locked:rows.filter(x=>x.starter&&x.a.lockedOn).length, best:hindsight(rows),
+    return {rid:r.roster_id, name:rosterName(r.roster_id), me:r.roster_id===me?.roster_id, mid:m.matchup_id, now:lockedSum(rows), proj:D.m, pv:D.v, exact:!!legFor(r.roster_id),
+      locked:rows.filter(x=>x.starter&&x.a.lockedOn).length,
       w:s.wins||0, l:s.losses||0, t:s.ties||0, pf:(s.fpts||0)+(s.fpts_decimal||0)/100, pa:(s.fpts_against||0)+(s.fpts_against_decimal||0)/100,
       str:strength(r)};
   });
@@ -1976,7 +1975,7 @@ function renderLeague(){
   const pairs=pairsOf(W.matchups);
   $("lgWeek").innerHTML=pairs.map(([a,b])=>{
     const A=T.find(t=>t.rid===a), B=T.find(t=>t.rid===b); if(!A||!B) return "";
-    const pA=A.ww; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Now <b>'+X.now.toFixed(1)+'</b> · Proj <b>'+X.proj.toFixed(0)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+'/9 locked · best so far (hindsight) '+X.best.toFixed(0)+'</span></div>';
+    const pA=A.ww; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(1)+'</b> · Proj <b>'+X.proj.toFixed(0)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked</span></div>';
     return '<div class="mu">'+side(A,false)+'<span class="vs">'+Math.round(pA*100)+'% – '+Math.round((1-pA)*100)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(pA*100).toFixed(1)+'%"></i></div></div>';
   }).join("");
   const order=[...T].sort((x,y)=>(y.w+y.t/2)-(x.w+x.t/2)||y.pf-x.pf);
