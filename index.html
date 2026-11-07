@@ -1889,19 +1889,20 @@ function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; cons
     waitMiss:T.waitMiss, lockMiss:T.lockMiss, lostPer:T.dec? T.lost/T.dec : null} }
 function leagueTend(){ let n=0,e=0,d=0,ok=0,lost=0; const r=[]; for(const T of Object.values(LG.tend||{})){ n+=T.slots; e+=T.early; r.push(...T.ratios); d+=T.dec; ok+=T.right; lost+=T.lost }
   return n? {early:e/n, ratio:r.length? r.reduce((a,b)=>a+b,0)/r.length : null, acc:d? ok/d : null, lostPer:d? lost/d : null} : null }
-function tendStyle(t){ if(!t||!t.dec) return ''; const miss=t.waitMiss+t.lockMiss;
-  if(t.acc>=0.8) return 'Sharp';
-  if(miss>=2 && t.waitMiss>=2*t.lockMiss) return 'Waits too long';
-  if(miss>=2 && t.lockMiss>=2*t.waitMiss) return 'Locks too soon';
-  return 'Mixed' }
+// Compared with the league: how much win chance his misses cost per call, and which way he misses.
+function tendStyle(t,lg){ if(!t||!t.dec||!lg||!(lg.lostPer>0)) return ''; const r=t.lostPer/lg.lostPer;
+  if(t.dec<12) return '';
+  if(r<=0.6) return 'Sharp';
+  if(r<1.4) return 'Average';
+  return t.waitMiss>=2*t.lockMiss? 'Waits too long' : t.lockMiss>=2*t.waitMiss? 'Locks too soon' : 'Leaky' }
 function renderTend(){
   const el=$("lgTend"); if(!el) return; const per=LG.tend;
   if(!per||!Object.keys(per).length){ el.innerHTML='<div class="empty">No finished weeks yet.</div>'; return }
   const lg=leagueTend(), me=myRoster(), T=LG.out?.teams||[];
-  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid), team:T.find(x=>x.rid===+rid)})).filter(x=>x.t&&x.t.dec).sort((a,b)=>b.t.acc-a.t.acc||a.t.lostPer-b.t.lostPer);
+  const rows=Object.keys(per).map(rid=>({rid:+rid, t:tendOf(+rid), team:T.find(x=>x.rid===+rid)})).filter(x=>x.t&&x.t.dec).sort((a,b)=>a.t.lostPer-b.t.lostPer||b.t.acc-a.t.acc);
   const f1=v=>v==null?'–':v.toFixed(1), day=(w,i)=>'game '+(i+1);
   let h='<div class="tdh"><span>Team</span><span>Right calls</span><span>Win % lost / call</span><span>Misses</span></div>';
-  for(const x of rows){ const t=x.t, st=tendStyle(t), tm=x.team;
+  for(const x of rows){ const t=x.t, st=tendStyle(t,lg), tm=x.team;
     const log=per[x.rid].log.slice().sort((a,b)=>b.w-a.w||b.steps.length-a.steps.length);
     const items=log.filter(d=>d.steps.length).map(d=>{ const nm=playerInfo(d.pid).name, final=d.fp;
       const wp=o=>Math.round(o.h*100)+'%'+(o.md||o.md===0? ' / '+Math.round(o.md*100)+'%' : '');
@@ -1911,7 +1912,7 @@ function renderTend(){
       const outcome= d.early? 'Locked '+final.toFixed(1)+'; the games he gave up scored '+later.map(v=>v.toFixed(1)).join(', ')
         : 'Rode it to the last game: '+final.toFixed(1)+(d.games.length>1?' (passed up '+d.games.slice(0,-1).map(v=>v.toFixed(1)).join(', ')+')':'');
       return '<div class="tl"><span>W'+d.w+'</span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }).join("");
-    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Mixed"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
+    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(1)+'</span><span>'+t.waitMiss+' waited<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(1):'–')+'</span><span></span></div>';
   h+='<div class="plan-note">Every lock-or-wait call in weeks 1–'+(W.week-1)+', replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open at that point, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. Each call shows the head-to-head / league-median win chance if he locked vs waited (weighted by title odds where available); a call is right if it was the better one, within 1% of a win. <i>Win % lost / call</i> is the average cost of the misses spread over all calls. '+(LG.tendExact?'Locks from Sleeper\'s exact records.':'Locks from the public feed; add your Sleeper login for exact records.')+'</div>';
