@@ -1149,7 +1149,8 @@ const elig=(pos,slot)=>{const ok=SLOT_OK[slot]; return !!ok && pos.some(p=>ok.in
 // Best way to fill these open slots. C: [{pid,pos,cur,ch:[{k,v}]}], each player at most once, an empty slot scores 0.
 function bestAssign(C, slots, SL){
   const m=slots.length, M=1<<m, n=C.length, f=new Float64Array((n+1)*M);
-  // c.pin: a starter whose game is under way can't be moved or benched, so he must fill his own slot
+  // c.pin: a starter whose game is under way stays in his slot until it ends. Benching him mid-game is allowed (he just can't come
+  // back for that game), but waiting for the final and then keeping it or swapping is always at least as good, so the plan does that
   const opt=(c,j,ch,mask,i)=>ch.v+(c.cur===slots[j]?1e-3:0)+(c.pin!=null?1000:0)+f[(i+1)*M+(mask|1<<j)], bad=(c,j)=>!elig(c.pos,SL[slots[j]]) || (c.pin!=null && slots[j]!==c.pin);
   for(let i=n-1;i>=0;i--){ const c=C[i];
     for(let mask=0;mask<M;mask++){ let b=f[(i+1)*M+mask];
