@@ -355,7 +355,7 @@ details.fold #poolSeg{margin-bottom:6px}
     </div>
     <div class="card legend">
       <b>How this works.</b> <i>Locked</i> is the points each team has locked so far (what Sleeper's app shows). <i>Proj</i> is each team's expected final if they make the best calls from here: their locks so far plus the lineup the board would set for them, using the same projections and lock/wait math as the Lock-in tab. Locks come straight from Sleeper when your login is saved. Without it, the public data only proves a lock once that player's next game starts, so other teams show "at least" that many.
-      <b>Playoff odds</b> come from simulating the rest of the regular season (through week 21) 10,000 times. This week uses each team's projection; later weeks use team strength: the best weekly lineup from each roster's projected players, scaled to this league's real scoring level and blended 70/30 with the points each team has actually scored. Each week counts twice, the head-to-head plus the game against the league median, and the top 8 by record (then points) make the playoffs. The playoffs are simulated too (8 teams, 1v8 / 4v5 / 2v7 / 3v6, no byes, one week per round) to get title odds.
+      <b>Playoff odds</b> come from simulating the rest of the regular season (through week 21) 8,000 times. This week uses the same score simulation as the matchup cards (real score shapes, locks so far, the best calls from here), so its win and median odds match the scoreboard; later weeks use team strength: the best weekly lineup from each roster's projected players, scaled to this league's real scoring level and blended 70/30 with the points each team has actually scored. Each week counts twice, the head-to-head plus the game against the league median, and the top 8 by record (then points) make the playoffs. The playoffs are simulated too (8 teams, 1v8 / 4v5 / 2v7 / 3v6, no byes, one week per round) to get title odds.
     </div>
   </section>
 
@@ -2053,7 +2053,7 @@ function computeLeague(){
     const m=W.matchups.find(x=>x.roster_id===r.roster_id)||{players_points:{},points:0};
     const rows=rowsFor(r,m,r.owner_id===S.userId), P=planWeek(rows,{light:true}), D=teamDist(rows,P);
     const s=r.settings||{};
-    return {rid:r.roster_id, name:rosterName(r.roster_id), me:r.roster_id===me?.roster_id, mid:m.matchup_id, now:lockedSum(rows), proj:D.m, pv:D.v, exact:!!legFor(r.roster_id),
+    return {rid:r.roster_id, name:rosterName(r.roster_id), me:r.roster_id===me?.roster_id, mid:m.matchup_id, now:lockedSum(rows), proj:D.m, pv:D.v, tot:D.tot, exact:!!legFor(r.roster_id),
       locked:rows.filter(x=>x.starter&&x.a.lockedOn).length,
       w:s.wins||0, l:s.losses||0, t:s.ties||0, pf:(s.fpts||0)+(s.fpts_decimal||0)/100, pa:(s.fpts_against||0)+(s.fpts_against_decimal||0)/100,
       str:strength(r)};
@@ -2082,7 +2082,8 @@ function computeLeague(){
       for(let i=0;i<n;i++){ W_[i]=teams[i].w+teams[i].t/2; PF[i]=teams[i].pf }
       if(ti>=0){ W_[ti]+=addW; PF[ti]+=addPF }
       for(const wk of weeks){
-        for(let i=0;i<n;i++){ const t=teams[i]; sc[i]= wk.cur? t.proj+Math.sqrt(t.pv+36)*nrm() : t.mu+t.sd*nrm(); PF[i]+=sc[i] }
+        // this week: the same score samples the matchup cards use (real score shapes, locks so far, backup chains); later weeks: team strength
+        for(let i=0;i<n;i++){ const t=teams[i]; sc[i]= wk.cur? (t.tot&&t.tot.length? t.tot[s%t.tot.length] : t.proj+Math.sqrt(t.pv+36)*nrm()) : t.mu+t.sd*nrm(); PF[i]+=sc[i] }
         for(const [a,b] of wk.pairs){ const ia=idx[a], ib=idx[b]; if(ia==null||ib==null) continue; if(sc[ia]>sc[ib]){ W_[ia]++; if(wk.cur) weekWin[ia]++ } else { W_[ib]++; if(wk.cur) weekWin[ib]++ } }
         if(median){ const sorted=[...sc].sort((x,y)=>x-y), med=(sorted[n/2-1]+sorted[n/2])/2; for(let i=0;i<n;i++) if(sc[i]>med) W_[i]++ }
       }
