@@ -2048,7 +2048,9 @@ function gradeWeek(w, rows, logs, SL, per){
         const L=ev(s), Wt=ev(waitS), obj=o=> wt? wt.perWin*(o.h+o.md)+wt.perPt*o.m : o.h+o.md;
         const tol= wt? wt.perWin*0.01 : 0.01, bestL= obj(L)>=obj(Wt), ok= locked? obj(L)>=obj(Wt)-tol : obj(Wt)>=obj(L)-tol;
         const cost= ok? 0 : Math.abs((L.h+L.md)-(Wt.h+Wt.md)), moot= Math.abs((L.h+L.md)-(Wt.h+Wt.md))<0.005;   // couldn't change anything
-        if(!moot){ P.dec++; if(ok) P.right++; else if(locked) P.lockMiss++; else { P.waitMiss++; if(unproven) P.waitUnv=(P.waitUnv||0)+1 } P.lost+=cost }
+        if(!moot){ P.dec++; if(ok) P.right++; else if(locked) P.lockMiss++; else { P.waitMiss++; if(unproven) P.waitUnv=(P.waitUnv||0)+1 } P.lost+=cost
+          // the same tally without the unverified waits (pre-tracking games that may have been bench games)
+          if(!unproven){ const V=(P.v ||= {dec:0,right:0,lockMiss:0,waitMiss:0,lost:0}); V.dec++; if(ok) V.right++; else if(locked) V.lockMiss++; else V.waitMiss++; V.lost+=cost } }
         // Is the board over-valuing waiting? Same decision, his own remaining games only: what the board expected waiting to
         // deliver vs what playing it right (same keep thresholds) actually delivered with the real scores that followed.
         { const fut=g.slice(i+1); if(fut.length && fut.every(x=>x.fp!=null)){ const so=fut.map(x=>gstep(sl.pid,x)), Vo=stepsValue(so), po=steps(so);
@@ -2067,10 +2069,14 @@ function gradeWeek(w, rows, logs, SL, per){
       P.log.push({w, pid:sl.pid, k:sl.idx+1, n:g.length, fp:g[sl.idx].fp, avg, early, open:isOpen, current:!!r.current,
         games:g.map(x=>x.fp), steps:(sl.steps||[]).sort((a,b)=>a.i-b.i)}) } }
 }
-function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
-  return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left), dec:T.dec, acc:T.dec? T.right/T.dec : null,
-    waitMiss:T.waitMiss, waitUnv:T.waitUnv||0, lockMiss:T.lockMiss, lostPer:T.dec? T.lost/T.dec : null} }
-function leagueTend(){ let n=0,e=0,d=0,ok=0,lost=0; const r=[]; for(const T of Object.values(LG.tend||{})){ n+=T.slots; e+=T.early; r.push(...T.ratios); d+=T.dec; ok+=T.right; lost+=T.lost }
+// Unverified waits phase out on their own: once a manager has TEND_VERIFIED graded calls from the lineup-tracked era, only
+// those count; until then every call counts and the unverified waits are flagged.
+const TEND_VERIFIED=20;
+function tendSrc(T){ return T.v && T.v.dec>=TEND_VERIFIED? {...T.v, waitUnv:0, verified:true} : {dec:T.dec, right:T.right, lockMiss:T.lockMiss, waitMiss:T.waitMiss, lost:T.lost, waitUnv:T.waitUnv||0, verified:false} }
+function tendOf(rid){ const T=LG.tend?.[rid]; if(!T||!T.slots) return null; const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null, G=tendSrc(T);
+  return {n:T.slots, early:T.early/T.slots, ratio:mean(T.ratios), left:mean(T.left), dec:G.dec, acc:G.dec? G.right/G.dec : null,
+    waitMiss:G.waitMiss, waitUnv:G.waitUnv, lockMiss:G.lockMiss, lostPer:G.dec? G.lost/G.dec : null, verified:G.verified, vdec:T.v?.dec||0} }
+function leagueTend(){ let n=0,e=0,d=0,ok=0,lost=0; const r=[]; for(const T of Object.values(LG.tend||{})){ const G=tendSrc(T); n+=T.slots; e+=T.early; r.push(...T.ratios); d+=G.dec; ok+=G.right; lost+=G.lost }
   return n? {early:e/n, ratio:r.length? r.reduce((a,b)=>a+b,0)/r.length : null, acc:d? ok/d : null, lostPer:d? lost/d : null} : null }
 // Compared with the league: how much win chance his misses cost per call, and which way he misses.
 function tendStyle(t,lg){ if(!t||!t.dec||!lg||!(lg.lostPer>0)) return ''; const r=t.lostPer/lg.lostPer;
@@ -2080,7 +2086,7 @@ function tendStyle(t,lg){ if(!t||!t.dec||!lg||!(lg.lostPer>0)) return ''; const 
   return t.waitMiss>=2*t.lockMiss? 'Waits too long' : t.lockMiss>=2*t.waitMiss? 'Locks too soon' : 'Costly both ways' }
 // Is the board biased toward locking or waiting? Every graded call in the league, judged on what happened next.
 function waitCheckNote(){
-  const hist='<div class="plan-note">Before Nov 7 the board was not recording lineups, so a "waited too long" from then assumes he was starting. A few may really be bench games (a McCain night). The number in parentheses, like (3?), counts those. From Nov 7 on, bench games are left out for sure.</div>';
+  const hist='<div class="plan-note">Before Nov 7 the board was not recording lineups, so a "waited too long" from then assumes he was starting. A few may really be bench games (a McCain night). The number in parentheses, like (3?), counts those. Once a manager has '+TEND_VERIFIED+' graded calls from tracked lineups, the unverified ones drop out of his numbers automatically.</div>';
   const L=(LG.waitChk||[]).filter(x=>!x.moot); if(L.length<5) return hist;
   const avg=(xs,f)=>xs.reduce((t,x)=>t+f(x),0)/xs.length, sd=(xs,f)=>{ const m=avg(xs,f); return Math.sqrt(xs.reduce((t,x)=>t+(f(x)-m)**2,0)/Math.max(1,xs.length-1)) };
   const gap=avg(L,x=>x.got-x.promised), se=sd(L,x=>x.got-x.promised)/Math.sqrt(L.length), lockSaid=L.filter(x=>x.said==="lock"), waitSaid=L.filter(x=>x.said==="wait");
@@ -2112,7 +2118,7 @@ function renderTend(){
         : d.early? 'He locked '+final.toFixed(1)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(1)).join(', ') : '')+(left?' ('+left+' still to play)':'')
         : 'Rode it to the last game: '+final.toFixed(1);
       items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
-    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls</small>':'')+'</span>'+
+    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+tm.pf.toFixed(0)+' PF · '+t.dec+' calls'+(t.verified?' · verified calls only':' · '+t.vdec+'/'+TEND_VERIFIED+' verified')+'</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(1)+'</span><span>'+t.waitMiss+' waited'+(t.waitUnv?' <i title="before lineup tracking: could have been a bench game">('+t.waitUnv+'?)</i>':'')+'<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(1):'–')+'</span><span></span></div>';
   h+='<div class="plan-note">Weeks 1–'+W.week+'; this week counts only calls whose deadline has passed (a lock made, or a score let go once his next game tipped). Each call is replayed with only what was known when it had to be made (before the player\'s next game): every slot in the league locked or still open, that week\'s pregame projections and real score swings, and the best bench player who could have taken the slot later. The numbers are his expected wins that week if he locked vs if he didn\'t: the head-to-head chance plus the league-median chance (2.00 = sure of both). The right call is the higher one (within 0.01). The grade never looks at how the later games turned out; that\'s only shown in gray. '+(LG.tendExact?'Locks from Sleeper\'s lock records.':'<b>Without your Sleeper login these are rough:</b> the public feed can\'t show past locks.')+'</div>';
