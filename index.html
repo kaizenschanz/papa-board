@@ -1315,7 +1315,9 @@ function planWeek(A,opt={}){
     if(hold!=null && hold>0) ch.push({k:"hold",v:hold});
     if(x.starter && a.latest && !a.live && !a.latest.dnp && startedWholeGame(x.rid, x.pid, a.latest.date)) ch.push({k:"lock",v:a.latest.fp});
     const f=opt.force&&opt.force[x.pid]; const ch2= f? ch.filter(h=>h.k===f) : ch;
-    if(ch2.length) C.push({pid:x.pid,pos:x.a.info.pos,cur:x.starter?x.idx:-1,pin:(x.starter&&a.live)?x.idx:null,ch:ch2,x});
+    // opt.pinLock: what-if for where to lock him (that slot, locked, everyone else re-planned around it)
+    const pl=opt.pinLock&&opt.pinLock.pid===x.pid? opt.pinLock : null, ch3= pl? ch2.filter(h=>h.k==="lock") : ch2;
+    if(ch3.length) C.push({pid:x.pid,pos:x.a.info.pos,cur:x.starter?x.idx:-1,pin: pl? pl.slot : (x.starter&&a.live)?x.idx:null,ch:ch3,x});
   }
   let best=bestAssign(C,slots,SL);
   // A last game isn't forced if a bench player can take the slot in a later game: give each slot holder the best unused
@@ -1469,6 +1471,32 @@ function callWhy(vc){
   if(md) bits.push("median "+pct(vc.L.md)+" / "+pct(vc.Wt.md));
   return bits.join(" · ")+".";
 }
+// Where to lock a multi-position player. A locked player is stuck in that slot, while unlocked ones can still be shuffled
+// among any slots they're eligible for. So try every open slot he fits, re-plan everyone else around it, and pick the one with
+// the best title odds. When slots tie (nobody left needs the flexibility, as far as the projections can see), take the
+// narrowest one: PG/SG/SF/PF/C before G/F before UTIL, which keeps the wide slots open for whatever comes up.
+const SLOT_RANK={PG:0,SG:0,SF:0,PF:0,C:0,G:1,F:1,UTIL:2};
+function lockSlotFor(A,pid){
+  const v=W.vs, x=A.find(y=>y.pid===pid); if(!v||!x||!x.starter||!x.a.latest) return null;
+  const key="ls|"+pid; v._ls ||= {}; if(key in v._ls) return v._ls[key];
+  const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR"), locked=new Set(A.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx));
+  const opts=[];
+  for(let i=0;i<SL.length;i++){ if(locked.has(i)||!elig(x.a.info.pos,SL[i])) continue;
+    const occ=A.find(y=>y.starter&&y.idx===i&&y.pid!==pid); if(occ&&occ.a.live&&!elig(occ.a.info.pos,SL[x.idx])) continue;   // can't free that slot mid-game
+    const Q=planWeek(A,{force:v.force,light:true,pinLock:{pid,slot:i}}); if(Q.pick.get(pid)?.slot!==i) continue;
+    const o=titleObjD(teamDist(A,Q),v.opp,v.tab,v.median,v.wt).obj; opts.push({slot:i, name:SL[i], o, Q, occ}) }
+  if(!opts.length) return v._ls[key]=null;
+  const rank=o=>(SLOT_RANK[o.name]??1)+(o.slot===x.idx?-0.1:0);
+  opts.sort((a,b)=> Math.abs(a.o-b.o)>2e-6? b.o-a.o : rank(a)-rank(b));
+  const best=opts[0], worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
+  // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
+  let how="";
+  if(best.slot!==x.idx){ const o=best.occ, to=o? best.Q.pick.get(o.pid)?.slot : null;
+    how= o? "Move "+o.a.info.name+" to "+(to!=null? SL[to] : SL[x.idx])+" and "+x.a.info.name+" to "+SL[best.slot]+", then lock." : "Move him to "+SL[best.slot]+", then lock." }
+  const gap=best.o-worst.o;
+  return v._ls[key]={slot:best.slot, name:best.name, how, gap, n:opts.length,
+    why: opts.length<2? "" : gap>2e-6? "Locking him at "+best.name+" instead of "+worst.name+" is worth +"+(gap*100).toFixed(gap*100<0.01?3:2)+" pts of title odds (keeps the right slots open for your bench)." : "Every open slot he fits is even on title odds, so use the narrowest ("+best.name+") and keep the wide slots open."};
+}
 // Why this player and not the next one in line: the title-odds edge from re-planning without him.
 function edgeNote(pid,nm){ const e=W.vs?.alt?.[pid]; if(!e||!e.by) return "";
   return " "+nm(pid)+" over "+nm(e.by)+": title odds "+(Math.abs(e.d)<0.00005? "even" : "+"+(Math.abs(e.d)*100).toFixed(2)+" pts")+(W.vs.exclude===e.by? " (higher points pick was "+nm(e.by)+")" : "")+"."; }
@@ -1533,9 +1561,9 @@ function todoItems(A,P){
   for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||!a.future.length) continue;
     const t=lockDeadline(a); if(!t||t<=now) continue;
     const vc=v?.calls?.[x.pid], p=P.pick.get(x.pid);
-    if(a.call?.c==="lock"){ const kb=knownBy(t), mv=p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"";
-      out.push({t, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(1), sub:callWhy(vc)+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
-        rems:[{id:"lock-"+x.pid, t, lead:15, title:"Lock "+a.info.name+" "+a.latest.fp.toFixed(1)+" (last call)"}]}) }
+    if(a.call?.c==="lock"){ const kb=knownBy(t), ls=lockSlotFor(A,x.pid), at=ls? " at "+ls.name : "", mv= ls? (ls.how? " "+ls.how : "")+(ls.why? " "+ls.why : "") : (p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"");
+      out.push({t, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(1)+at, sub:callWhy(vc)+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
+        rems:[{id:"lock-"+x.pid, t, lead:15, title:"Lock "+a.info.name+" "+a.latest.fp.toFixed(1)+at+" (last call)"}]}) }
     else if(p) out.push({t, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(1),
       sub:(vc&&vc.at!=null?"Locking would need "+Math.max(0,vc.at).toFixed(1)+". ":"")+callWhy(vc)});
   }
@@ -1754,7 +1782,7 @@ function renderWeek(){
     const vc=W.vs?.calls[x.pid];
     if(vc && x.starter && !a.lockedOn){
       const lockIt = W.vs.force[x.pid]? W.vs.force[x.pid]==="lock" : (p&&p.k==="lock");
-      if(lockIt){ a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(1)}; a.why=callWhy(vc) }
+      if(lockIt){ const ls=lockSlotFor(A,x.pid); a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(1)+(ls&&ls.slot!==x.idx? " at "+ls.name : "")}; a.why=callWhy(vc)+(ls? (ls.how?" "+ls.how:"")+(ls.why?" "+ls.why:"") : "") }
       else { a.call={c:"wait",t:"Wait"}; a.why=(vc.at!=null? "Locking would need "+Math.max(0,vc.at).toFixed(1)+". " : "")+callWhy(vc) }
     }
     if(P.night){ const r=P.night.role[x.pid];
