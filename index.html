@@ -254,6 +254,12 @@ details.tr>summary>span:last-child{font-size:12px;line-height:1.25}
 .tdh.lgrow{border-bottom:0;font:400 12.5px/1.2 var(--body);text-transform:none;letter-spacing:0}
 .tend{font-size:12.5px;color:var(--muted);margin-top:10px}.tend b{color:var(--ink)}
 .oppmode{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:10px}
+.claims{border:1px solid var(--line);border-radius:6px;padding:10px;margin:6px 0 10px}.claims-h{font:700 13px/1.2 var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.claim{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}.claim:first-of-type{border-top:0}
+.claim .sub{font-size:12px;color:var(--muted)}.claim .ev{font:700 15px/1 var(--display);color:var(--good)}.claim small{color:var(--muted)}
+.who{border:1px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:12px;margin-bottom:12px}
+.who-h{font:700 18px/1.1 var(--display);letter-spacing:.02em}.who-s{font-size:13px;color:var(--muted);margin:4px 0 10px}
+.who-b{display:flex;flex-wrap:wrap;gap:8px}.who-b .btn{min-height:40px;text-align:left}.who-b small{color:var(--muted);font-weight:400;margin-left:4px}
 .oppmode select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;max-width:100%}
 /* phone polish: dark header that doesn't glare, no setup strip outside the draft, bigger tap targets, wrapping status lines */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .bar{background:var(--panel);color:var(--ink);border-bottom:1px solid var(--line)}}
@@ -372,6 +378,7 @@ details.fold #poolSeg{margin-bottom:6px}
 
   <section class="wk lk" id="weekView" hidden>
     <div class="card" id="wkBoardCard">
+      <div class="who" id="whoBox" hidden></div>
       <div class="sb-top">
         <select id="teamSel" aria-label="Team to show"></select>
         <button class="btn ghost icon" type="button" id="wkRefresh" aria-label="Refresh" title="Refresh">&#8635;</button>
@@ -477,10 +484,12 @@ const SEASON = "2026";
 const SLOT_ORDER = ["PG","SG","SF","PF","C","G","F","UTIL","UTIL"];
 const SLOT_OK = {PG:["PG"],SG:["SG"],SF:["SF"],PF:["PF"],C:["C"],G:["PG","SG"],F:["SF","PF"],UTIL:["PG","SG","SF","PF","C"]};
 
+// browser storage, with an in-memory fallback so picks still work this visit when storage is blocked (private mode)
+const MEM={};
 const store = {
-  get(k,d){try{const v=localStorage.getItem("prb:"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
-  set(k,v){try{localStorage.setItem("prb:"+k,JSON.stringify(v))}catch(e){}},
-  del(k){try{localStorage.removeItem("prb:"+k)}catch(e){}}
+  get(k,d){try{const v=localStorage.getItem("prb:"+k);if(v!=null) return JSON.parse(v)}catch(e){} return k in MEM? MEM[k] : d},
+  set(k,v){MEM[k]=v; try{localStorage.setItem("prb:"+k,JSON.stringify(v))}catch(e){}},
+  del(k){delete MEM[k]; try{localStorage.removeItem("prb:"+k)}catch(e){}}
 };
 
 const S = {
@@ -851,9 +860,32 @@ function waitValue(gs){ if(!gs.length) return null; let v=gs[gs.length-1].mu; fo
 function sdFor(pid,mu){ if(!(mu>0)) return 0; return volOf(pid)*(SPREAD.A+SPREAD.B*mu) }
 function scoreStats(st){ let t=0; for(const k in CUR_SC){ if(st[k]) t+=CUR_SC[k]*st[k] } return t }
 const dayLabel=d=>new Date(d+"T12:00:00").toLocaleDateString([], {weekday:"short"});
-function myRoster(){ return Object.values(S.rosters).find(r=>r.owner_id===S.userId) || null }
+// Whose board is this? Anyone with the link can use it: their pick (saved in their browser), a ?me=<roster id> link, or the
+// account in their own Sleeper login. Never assumed from the default username, so a friend isn't shown as the owner.
+function tokUserId(){ const raw=store.get("slpToken",null); if(!raw) return null; const t=fixTok(raw), p=t.split("."); if(p.length!==3) return null;
+  try{ const j=JSON.parse(atob(p[1].replace(/-/g,"+").replace(/_/g,"/")+"===".slice((p[1].length+3)%4))); return j.user_id? String(j.user_id) : null }catch(e){ return null } }
+const ownsRoster=(r,uid)=>!!(r && uid && (String(r.owner_id)===String(uid) || (r.co_owners||[]).map(String).includes(String(uid))));
+const meKey=()=>"me:"+(S.league?.league_id||"");
+function myRoster(){
+  const R=Object.values(S.rosters||{}); if(!R.length) return null;
+  const q=new URLSearchParams(location.search).get("me"); if(q && S.rosters[+q]) store.set(meKey(), +q);
+  const rid=store.get(meKey(),null); if(rid!=null && S.rosters[rid]) return S.rosters[rid];
+  const tu=tokUserId(); if(tu){ const r=R.find(r=>ownsRoster(r,tu)); if(r) return r }
+  return null;
+}
 // The Lock-in tab can show any team (dropdown); it always opens on yours.
-function viewRoster(){ return (W.viewRid!=null && S.rosters[W.viewRid]) || myRoster() }
+function viewRoster(){ return (W.viewRid!=null && S.rosters[W.viewRid]) || myRoster() || Object.values(S.rosters).find(r=>r.owner_id===S.userId) || Object.values(S.rosters)[0] || null }
+// one-time "which team is yours?" for anyone opening the link without a saved pick or a Sleeper login
+function renderWho(){
+  const el=$("whoBox"); if(!el) return; const mine=myRoster();
+  if(mine){ el.hidden=true; el.innerHTML=""; return }
+  const R=Object.values(S.rosters||{}).sort((a,b)=>rosterName(a.roster_id).localeCompare(rosterName(b.roster_id)));
+  el.hidden=false;
+  el.innerHTML='<div class="who-h">Which team is yours?</div><div class="who-s">Pick once and this board shows your To do, your pickups and your title odds. It\'s saved only in this browser.</div><div class="who-b">'+
+    R.map(r=>{ const u=S.users?.[r.owner_id]; return '<button type="button" class="btn ghost" data-me="'+r.roster_id+'">'+esc(rosterName(r.roster_id))+(u&&u.display_name&&u.display_name!==rosterName(r.roster_id)?' <small>'+esc(u.display_name)+'</small>':'')+'</button>' }).join("")+'</div>';
+}
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-me]"); if(b){ store.set(meKey(), +b.dataset.me); W.viewRid=null; W._oth=null; LG.wt=null; LG.out=null; renderWho(); loadWeek(true); refreshTitleWeights(); return }
+  if(e.target.closest("#whoReset")){ store.del(meKey()); W.viewRid=null; renderWho(); renderWeek(); $("whoBox").scrollIntoView({behavior:"smooth",block:"start"}) } });
 function viewingMe(){ const v=viewRoster(), m=myRoster(); return !!(v&&m&&v.roster_id===m.roster_id) }
 
 async function loadWeek(force){
@@ -1588,13 +1620,19 @@ function chainValue(A,P,pid,fallbacksOnly){
 function todoItems(A,P){
   const now=Date.now(), out=[], v=W.vs, isMe=viewingMe();
   const X=pid=>A.find(x=>x.pid===pid), nm=pid=>X(pid)?.a.info.name||pid, last=pid=>String(nm(pid)).split(" ").slice(-1)[0];   // lock-screen reminders: last names, verb first
-  if(isMe){ const used=new Set(P?.pick?.keys()||[]), backs=new Set(Object.values(P?.backup||{}).concat(Object.values(P?.backup2||{})).map(b=>b.pid));
+  { const used=new Set(P?.pick?.keys()||[]), backs=new Set(Object.values(P?.backup||{}).concat(Object.values(P?.backup2||{})).map(b=>b.pid));
     // who to drop: the bench player worth least for the rest of the season (same order as the Pickups card)
     const dropScore=x=>{ const ros=baseMean(x.pid), f=x.a.future.filter(g=>g.mu>0); return f.length? (ros+f.reduce((t,g)=>t+g.mu,0)/f.length)/2 : ros };
     const drops=A.filter(x=>x.slot==="BN"&&!used.has(x.pid)&&!backs.has(x.pid)).sort((a,b)=>dropScore(a)-dropScore(b));
     A.filter(x=>x.slot==="IR"&&!irOk(x.a.info.inj)).forEach((x,i)=>{ const d=drops[i];
       out.push({t:null, kind:"roster", title:(d? "Drop "+d.a.info.name+", then take "+x.a.info.name+" off IR" : "Take "+x.a.info.name+" off IR"),
         sub:(x.a.info.inj||"Healthy")+" players can't stay in IR here, and Sleeper blocks every pickup until he's activated."+(d? " "+d.a.info.name+" is your least valuable bench player (~"+dropScore(d).toFixed(1)+"/g) and isn't needed this week." : "")}) }) }
+  // waiver claim for later days (clears overnight), only if it raises title odds; the runners-up go in the note
+  { const cl=claimOptions(A,P);
+    if(cl.length){ const c=cl[0], dl=new Date(); dl.setHours(23,30,0,0);
+      out.push({t:null, kind:"roster", title:"Claim "+c.name+" tonight, drop "+c.drop.a.info.name,
+        sub:"Adds "+claimGain(c)+(c.title?" title chance":"")+": he "+c.role+". Rest of season ~"+c.ros.toFixed(1)+"/g vs "+c.drop.a.info.name+"'s "+c.dropRos.toFixed(1)+"."+(cl.length>1? " Other options: "+cl.slice(1).map(o=>o.name+" ("+o.pos.join("/")+", "+claimGain(o)+")").join(", ")+"." : "")+" Claims clear overnight.",
+        rems: isMe? [{id:"claim-"+c.pid, t:dl.getTime(), lead:60, title:"Claim "+String(c.name).split(" ").slice(-1)[0]+" (drop "+String(c.drop.a.info.name).split(" ").slice(-1)[0]+") before waivers run"}] : []}) } }
   // injured starters: a player who sits counts 0 if he's still in the slot when his game tips
   for(const x of A){ const a=x.a, inj=String(a.info.inj||""); if(!x.starter||a.lockedOn||!a.future.length||!/^(out|doubtful|questionable|gtd|day-to-day|dtd|susp)/i.test(inj)) continue;
     const g=a.future[0], t=tipAt(x.pid,g.date); if(t&&t<=now) continue; const bad=/^(out|doubtful|susp)/i.test(inj);
@@ -1703,7 +1741,7 @@ function renderBoard(A,P){
   $("wkSum").innerHTML=(exact? '<span class="ok">● Exact locks from Sleeper</span>'
       : W.legErr? '<span class="warn">● Your Sleeper login didn\'t work</span> <button type="button" class="linkbtn" data-open="wkMore">Fix it</button>'
       : '<span class="warn">● Locks are estimated</span> <button type="button" class="linkbtn" data-open="wkMore">Add your Sleeper login</button>')+
-    '<span>Updated '+clock(W.updated||Date.now())+'</span>';
+    '<span>Updated '+clock(W.updated||Date.now())+'</span>'+(myRoster()&&store.get(meKey(),null)!=null? '<button type="button" class="linkbtn" id="whoReset">Not your team?</button>' : '');
 }
 // Both lineups slot by slot; tap a row for each player's games, sources and the reasoning.
 function playerDetail(x,mine){
@@ -1764,6 +1802,7 @@ function renderInfo(){
 
 function renderWeek(){
   if(!W.loaded) return;
+  renderWho();
   const me=viewRoster(), isMe=viewingMe();
   if(!me){ $("wkTodo").innerHTML='<div class="empty">Couldn\'t find your roster in this league.</div>'; return }
   { const sel=$("teamSel"), mineR=myRoster(), opts=Object.values(S.rosters).sort((a,b)=>(a.roster_id===mineR?.roster_id?-1:b.roster_id===mineR?.roster_id?1:rosterName(a.roster_id).localeCompare(rosterName(b.roster_id))));
@@ -1877,7 +1916,7 @@ function renderWeek(){
   { let el=document.getElementById("tlJson"); if(!el){ el=document.createElement("script"); el.type="application/json"; el.id="tlJson"; document.body.appendChild(el) }
     el.textContent= W.tlJson || JSON.stringify({week:W.week, at:Date.now(), events:[]}); W.tlJson=null }
   renderMatchup(A);
-  $("wkPoolCard").hidden=!isMe; if(isMe) renderPool(me, A, P);
+  $("wkPoolCard").hidden=false; renderPool(me, A, P);
   renderInfo();
 }
 
@@ -1906,6 +1945,50 @@ function srcTitle(g){
   return base+(srcParts(g)||("Sleeper "+(g.slp||0).toFixed(2)));
 }
 const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+// Waiver claims by championship odds. Claims clear overnight, so a pickup only plays games after today. For each promising
+// free agent: add him, drop the least valuable bench player nobody needs (after any IR activations), re-plan the whole week
+// (he can start, back someone up, or take an early free look in any slot he's eligible for) and score it against the
+// opponent's simulated week. The best 3-4 that raise title odds, with where he'd play.
+const claimGain=c=> c.title? tChance(c.d)+(c.d>=0?"":"") : "+"+c.d.toFixed(3)+" wins";
+function benchDropScore(x){ const ros=baseMean(x.pid), f=x.a.future.filter(g=>g.mu>0); return f.length? (ros+f.reduce((t,g)=>t+g.mu,0)/f.length)/2 : ros }
+function claimOptions(A,P){
+  const v=W.vs; if(!v||!v.me?.tot||!A.length) return [];
+  const key=(viewRoster()?.roster_id)+"|"+W.updated+"|"+(v.rid||"")+"|"+(v.wt? v.wt.perWin : "nw"); if(W._claims&&W._claims.k===key) return W._claims.list;
+  const done=list=>{ W._claims={k:key,list}; return list };
+  const today=todayStr(), owned=new Set(Object.values(S.rosters).flatMap(r=>r.players||[]));
+  const need=new Set([...P.pick.keys(), ...[P.backup,P.backup2,P.pre].flatMap(B=>Object.values(B||{}).map(b=>b.pid))]);
+  const nIR=A.filter(x=>x.slot==="IR"&&!irOk(x.a.info.inj)).length;
+  const drops=A.filter(x=>x.slot==="BN"&&!need.has(x.pid)).sort((a,b)=>benchDropScore(a)-benchDropScore(b)), drop=drops[nIR];
+  if(!drop) return done([]);
+  const basis={...(v.planBase||{force:v.force}), light:true};
+  const score=(R)=>{ const Q=planWeek(R,basis), D=teamDist(R,Q); return {Q, o:titleObjD(D,v.opp,v.tab,v.median,v.wt).obj, m:D.m} };
+  const b0=score(A);
+  const SL=P.SL, openSlots=new Set((P.slots||[]).filter(sl=>![...P.pick].some(([,q])=>q.slot===sl && q.k==="lock")).map(sl=>SL[sl]));
+  const pre=[];
+  for(const pid of Object.keys(W.proj)){ if(owned.has(pid)) continue;
+    const info=playerInfo(pid); if(!info.team || /^(Out|IR|Suspension)$/i.test(info.inj||"")) continue;
+    if(![...openSlots].some(sn=>elig(info.pos,sn))) continue;                       // nowhere he could play
+    const fut=playerWeek(pid).games.filter(g=>!g.done && !g.live && g.date>today && g.mu>0); if(!fut.length) continue;
+    // a claim costs the dropped player for the rest of the season: skip anyone clearly worse than him beyond this week
+    if(baseMean(pid) < baseMean(drop.pid)-2) continue;
+    pre.push({pid, info, fut, v:waitValue(fut)}) }
+  pre.sort((a,b)=>b.v-a.v);
+  const out=[];
+  for(const c of pre.slice(0,14)){
+    const a=analyse(c.pid,null,false,null,false), a2={...a, future:a.future.filter(g=>g.date>today), live:null, latest:null};
+    const row={pid:c.pid, slot:"BN", starter:false, rid:A[0].rid, a:a2};
+    const A2=A.filter(x=>x.pid!==drop.pid).concat([row]), r=score(A2), d=r.o-b0.o;
+    let role="sits on the bench (no spot this week)"; const q=r.Q.pick.get(c.pid);
+    if(q) role= q.k==="hold"? "starts at "+SL[q.slot]+" ("+c.fut.map(g=>dayLabel(g.date)).join(", ")+")" : "fills "+SL[q.slot];
+    else { const h=Object.entries(r.Q.backup||{}).concat(Object.entries(r.Q.backup2||{})).find(([,b])=>b.pid===c.pid);
+      const pl=Object.entries(r.Q.pre||{}).find(([,b])=>b.pid===c.pid);
+      if(h) role="backs up "+(A.find(x=>x.pid===h[0])?.a.info.name||"a starter")+" ("+dayLabel(c.fut[0].date)+")";
+      else if(pl) role="early free look before "+(A.find(x=>x.pid===pl[0])?.a.info.name||"a starter") }
+    out.push({pid:c.pid, name:c.info.name, team:c.info.team, pos:c.info.pos, inj:c.info.inj, d, dm:r.m-b0.m, role, games:c.fut, drop, ros:baseMean(c.pid), dropRos:baseMean(drop.pid), title:!!v.wt}) }
+  // only when it's worth it: at least +0.01% title chance (or +0.005 expected wins before the season weights load)
+  const bar= v.wt? 0.0001 : 0.005;
+  return done(out.filter(x=>x.d>bar).sort((a,b)=>b.d-a.d).slice(0,4));
+}
 function renderPool(me, A, P){
   const owned=new Set(Object.values(S.rosters).flatMap(r=>r.players||[]));
   const benchIds=new Set(A.filter(x=>!x.starter && x.slot==="BN").map(x=>x.pid));
@@ -1921,6 +2004,11 @@ function renderPool(me, A, P){
   const moves=[];
 
   const nextDrop=drops[badIR.length];
+  { const cl=claimOptions(A,P);
+    moves.push('<div class="claims"><div class="claims-h">Best claims for '+(viewingMe()?'your':'their')+' title chances</div>'+(cl.length? cl.map((c,i)=>
+      '<div class="claim"><span class="rk">'+(i+1)+'</span><div><b>'+esc(c.name)+'</b> <small>'+esc((c.team||"")+" "+c.pos.join("/"))+'</small>'+(c.inj?' <span class="chip inj">'+esc(c.inj)+'</span>':'')+
+      '<div class="sub">'+esc(c.role)+' · drop '+esc(c.drop.a.info.name)+' · '+(c.dm>=0?'+':'')+c.dm.toFixed(2)+' pts this week · rest of season ~'+c.ros.toFixed(1)+'/g vs '+c.dropRos.toFixed(1)+'</div></div><span class="ev">'+claimGain(c)+'</span></div>').join("")
+      : '<div class="sub">No free agent raises '+(viewingMe()?'your':'their')+' title odds this week (after the drop and the overnight wait).</div>')+'</div>') }
   moves.push('<div class="plan-note">Claims clear overnight, so a pickup counts from tomorrow\'s games.'+(nextDrop?' Next drop after that: <b>'+esc(nextDrop.x.a.info.name)+'</b> (~'+nextDrop.ros.toFixed(2)+'/g).':'')+'</div>');
   // the open starters a pickup could replace: not locked yet; their current worth for comparison
   // the open slots and who the plan has holding each one for the rest of the week
@@ -1949,13 +2037,13 @@ function renderPool(me, A, P){
   // same look as the matchup rows: name + status line + value on the right, tap for the details
   $("wkPool").innerHTML = moves.join("") + (cand.length ? cand.slice(0,W.poolLimit).map((c,i)=>{
     const badge= c.beat? '<span class="badge start">Add</span>' : '';
-    const sub=badge+esc((c.info.team||"FA")+" "+c.info.pos.join("/"))+' · '+c.n+' game'+(c.n===1?'':'s')+(c.mine?' · your bench':' · from '+dayLabel(c.from))+' · ~'+c.proj.toFixed(0)+'/g';
+    const sub=badge+esc((c.info.team||"FA")+" "+c.info.pos.join("/"))+' · '+c.n+' game'+(c.n===1?'':'s')+(c.mine?(viewingMe()?' · your bench':' · bench'):' · from '+dayLabel(c.from))+' · ~'+c.proj.toFixed(0)+'/g';
     return '<details class="mr pk"><summary><span class="sl">'+(i+1)+'</span><div class="pc"><span class="n">'+esc(c.info.name)+(c.info.inj?' <span class="chip inj">'+esc(c.info.inj)+'</span>':'')+'</span><span class="s">'+sub+'</span><span class="v">'+c.v.toFixed(2)+'</span></div></summary>'+
       '<div class="det"><div class="pd">'+
         (c.beat?'<div class="ln why">Beats <b>'+esc(c.beat.name)+'</b> in '+c.beat.slot+' ('+c.beat.value.toFixed(2)+' for the rest of the week vs his '+c.v.toFixed(2)+').</div>':'')+
         '<div class="ln">Games he can play for you: <b>'+esc(c.sched.join(" · "))+'</b>'+(c.skipped?' <i>(plus '+c.skipped+' today, before a claim clears)</i>':'')+'</div>'+
         '<div class="ln">Projection <b>'+c.proj.toFixed(2)+'</b>/g'+(c.src?' ('+c.src+')':'')+' · last '+(c.r4?c.r4.list.length:0)+' <b>'+(c.r4?c.r4.avg.toFixed(2):'–')+'</b>/g'+(c.r4?' <i>('+c.r4.list.map(g=>g.fp.toFixed(0)).join(', ')+')</i>':'')+'</div>'+
-        '<div class="ln">'+(c.mine?'On your bench.':'Free agent: a claim counts from '+dayLabel(c.from)+'.')+' Value is what he\'s worth for the rest of the week played right (lock a big game, else ride on).</div>'+
+        '<div class="ln">'+(c.mine?(viewingMe()?'On your bench.':'On their bench.'):'Free agent: a claim counts from '+dayLabel(c.from)+'.')+' Value is what he\'s worth for the rest of the week played right (lock a big game, else ride on).</div>'+
       '</div></div></details>' }).join("")
     : '<div class="empty">No players with games left this week.</div>');
   $("wkPoolMore").hidden = cand.length<=W.poolLimit;
