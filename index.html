@@ -1323,7 +1323,7 @@ function planWeek(A,opt={}){
     const f=opt.force&&opt.force[x.pid]; const ch2= f? ch.filter(h=>h.k===f) : ch;
     // opt.pinLock: what-if for where to lock him (that slot, locked, everyone else re-planned around it)
     const pl=opt.pinLock&&opt.pinLock.pid===x.pid? opt.pinLock : null, ch3= pl? ch2.filter(h=>h.k==="lock") : ch2;
-    if(ch3.length) C.push({pid:x.pid,pos:x.a.info.pos,cur:x.starter?x.idx:-1,pin: pl? pl.slot : (x.starter&&a.live)?x.idx:null,ch:ch3,x});
+    if(ch3.length) C.push({pid:x.pid,pos:x.a.info.pos,cur:x.starter?x.idx:-1,pin: pl? pl.slot : ((x.starter&&a.live) || (opt.keep&&opt.keep.has(x.pid)))? x.idx : null,ch:ch3,x});
   }
   let best=bestAssign(C,slots,SL);
   // A last game isn't forced if a bench player can take the slot in a later game: give each slot holder the best unused
@@ -1600,8 +1600,18 @@ function todoItems(A,P){
     }
     prev=plan;
   });
+  // last game over: keep his score or swap in a later bench player, by title odds
+  for(const [pid,k] of Object.entries(v?.keepCalls||{})){ const x=X(pid); if(!x||!k.by) continue;   /* nobody left to swap in: it just counts */ const a=x.a, by=k.by, bt=by&&X(by)? tipAt(by, X(by).a.future[0]?.date) : null;
+    const edge=Math.abs(k.K.obj-k.X.obj), eTxt= k.title? "title odds +"+(edge*100).toFixed(edge*100<0.01?3:2)+" pts" : Math.abs(k.K.wins-k.X.wins).toFixed(2)+" expected wins";
+    const odds="head-to-head "+pct(k.K.h)+" if kept, "+pct(k.X.h)+" with "+(by?nm(by):"the swap")+(v.median? " · median "+pct(k.K.md)+" / "+pct(k.X.md) : "");
+    if(k.keep) out.push({t:bt||null, pid, kind:"look", title:"Leave "+a.info.name+" in: his "+k.fp.toFixed(1)+" clears the "+fx(k.at)+" line",
+      sub:"It's his last game, so it counts while he stays in. Keeping it beats starting "+(by?nm(by):"a bench player")+": "+eTxt+" · "+odds+".", rems:[]});
+    else if(bt&&bt>now){ const dup=out.find(o=>o.kind==="move" && o.title.startsWith("Start "+nm(by)) || o.kind==="move" && o.title.startsWith("Move "+nm(by)));
+      if(dup){ dup.sub=(a.info.name+"'s "+k.fp.toFixed(1)+" is under the "+fx(k.at)+" line. Swapping beats keeping it: "+eTxt+" · "+odds+". "+dup.sub).trim() }
+      else out.push({t:bt, pid, kind:"move", title:"Start "+nm(by)+" for "+a.info.name+" (his "+k.fp.toFixed(1)+" is under the "+fx(k.at)+" line)",
+      sub:"Swapping beats keeping his score: "+eTxt+" · "+odds+".", rems:[{id:"swap-"+pid, t:bt, lead:15, title:"Start "+nm(by)+" for "+a.info.name}]}) } }
   // a free look already under way or just finished: keep him only if he beats the regular's chain, else the regular goes back in
-  for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||out.some(o=>o.kind==="look"&&o.pid===x.pid)) continue;
+  for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||out.some(o=>o.kind==="look"&&o.pid===x.pid)||v?.keepCalls?.[x.pid]) continue;
     const g0=a.future[0], tipped= g0 && g0.date===todayStr() && tipAt(x.pid,g0.date) && tipAt(x.pid,g0.date)<=now && a.future.length===1;
     const today= a.live || tipped || (a.latest && a.latest.date===todayStr() && !a.future.length); if(!today || (a.future.length && !tipped)) continue;
     const other=[...P.pick].find(([pid,q])=>q.slot===x.idx && q.k==="hold" && pid!==x.pid), hp= other? other[0] : P.backup?.[x.pid]?.pid; if(!hp) continue;
@@ -1754,27 +1764,40 @@ function renderWeek(){
       const want= L.obj>Wt.obj+1e-9? "lock":"hold";               // a tie keeps the option open
       if(want!==calls[x.pid].ev) force[x.pid]=want;
     }
-    P= Object.keys(force).length? planWeek(A,{force}) : P0;
+    // A starter whose last game is over: his score counts if he stays in, or he can be swapped for a bench player who plays
+    // later. Decided by title odds (keep his score vs the swap's whole chain), with the line where the two are even.
+    const keep=new Set(), drop=new Set(), keepCalls={};
+    for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||a.future.length) continue;
+      if(!startedWholeGame(x.rid, x.pid, a.latest.date)) continue;
+      const PK=planWeek(A,{force,light:true,keep:new Set([x.pid])}), PX=planWeek(A,{force,light:true,exclude:new Set([x.pid])});
+      if(PK.pick.get(x.pid)?.k!=="lock") continue;
+      const DK=teamDist(A,PK), DX=teamDist(A,PX), oK=respond(DK).D, oX=respond(DX).D;
+      const K=titleObjD(DK,oK,tabMe,median,wtMe), X=titleObjD(DX,oX,tabMe,median,wtMe), at=lockBarD(DK,a.latest.fp,DX,oK,oX,tabMe,median,wtMe);
+      const by=[...PX.pick].find(([p2,q2])=>q2.k==="hold" && ![...PK.pick].some(([p3,q3])=>p3===p2 && q3.k==="hold"))?.[0] || null;
+      keepCalls[x.pid]={K, X, at, by, keep: K.obj>=X.obj, fp:a.latest.fp, title:!!wtMe};
+      (K.obj>=X.obj? keep : drop).add(x.pid) }
+    const base={force, keep, exclude:drop};
+    P= planWeek(A,base);
     // Who starts and who backs up, by title odds rather than points: re-plan without each starter (whose game hasn't tipped)
     // and each backup in turn, and keep whichever version gives the better title odds. Same draws for every version.
     const alt={}; let exclude=null;
-    { const Ob=respond(teamDist(A,P)).D, obj=Q=>titleObjD(teamDist(A,Q),Ob,tabMe,median,wtMe).obj, PL=planWeek(A,{force,light:true}), b0=obj(PL);
+    { const Ob=respond(teamDist(A,P)).D, obj=Q=>titleObjD(teamDist(A,Q),Ob,tabMe,median,wtMe).obj, PL=planWeek(A,{...base,light:true}), b0=obj(PL);
       const cand=new Set(); for(const [pid,q] of PL.pick) if(q.k==="hold") cand.add(pid);
       for(const B of [PL.backup,PL.backup2]) for(const h in (B||{})) cand.add(B[h].pid);
       let best=b0;
-      for(const pid of cand){ const x=A.find(y=>y.pid===pid); if(!x || x.a.live || (x.starter && x.a.future[0] && tipAt(pid,x.a.future[0].date)<=Date.now())) continue;
-        const Q=planWeek(A,{force,light:true,exclude:new Set([pid])}), o=obj(Q);
+      for(const pid of cand){ const x=A.find(y=>y.pid===pid); if(!x || x.a.live || keep.has(pid) || (x.starter && x.a.future[0] && tipAt(pid,x.a.future[0].date)<=Date.now())) continue;
+        const Q=planWeek(A,{...base,light:true,exclude:new Set([...drop,pid])}), o=obj(Q);
         // who took his place: the new holder of his slot, or the new backup for the same starter
         const roles=R=>{ const z=new Set(); for(const [p2,q2] of R.pick) if(q2.k==="hold") z.add(p2); for(const B of [R.backup,R.backup2]) for(const h in (B||{})) z.add(B[h].pid); return z };
         const r0=roles(PL), by=[...roles(Q)].find(p2=>!r0.has(p2))||null;
         alt[pid]={d:b0-o, by};
         if(o>best+1e-6){ best=o; exclude=pid } }
-      if(exclude){ P=planWeek(A,{force,exclude:new Set([exclude])}); const r=alt[exclude]; if(r&&r.by) alt[r.by]={d:-r.d, by:exclude, flipped:true} } }
+      if(exclude){ P=planWeek(A,{...base,exclude:new Set([...drop,exclude])}); const r=alt[exclude]; if(r&&r.by) alt[r.by]={d:-r.d, by:exclude, flipped:true} } }
     const myD=teamDist(A,P), O=respond(myD), oD=O.D, Ow=respond(myD,true);
     for(const [pid,c] of Object.entries(calls)) if(c.wpts!=null) P.thr[pid]=c.wpts;
     const fin=titleObjD(myD,oD,tabMe,median,wtMe), worst=titleObjD(myD,Ow.D,null,false);
     const gamble=B.filter(x=>O.dec.includes(x.pid) && O.Q.pick.get(x.pid)?.k!=="lock").map(x=>x.a.info.name);
-    W.vs={rows:A, plan:P, alt, exclude, tab:tabMe, wt:wtMe, oppRows:B, oppPlan:O.Q, term:P.term, oth, median, med: median? fin.md : null, medProj: medianOf(oth.map(o=>o.m).concat(myD.m)),
+    W.vs={rows:A, plan:P, alt, exclude, keepCalls, tab:tabMe, wt:wtMe, oppRows:B, oppPlan:O.Q, term:P.term, oth, median, med: median? fin.md : null, medProj: medianOf(oth.map(o=>o.m).concat(myD.m)),
       name:rosterName(opp.roster_id), rid:opp.roster_id, me:myD, opp:oD, win:fin.h, winWorst:worst.h, calls, force, gamble, title: wtMe? wtMe.base : null,
       oppLocked:B.filter(x=>x.starter&&x.a.lockedOn).length, oppExact:!!legFor(opp.roster_id)};
   }
