@@ -355,7 +355,7 @@ details.fold #poolSeg{margin-bottom:6px}
     </div>
     <div class="card legend">
       <b>How this works.</b> <i>Locked</i> is the points each team has locked so far (what Sleeper's app shows). <i>Proj</i> is each team's expected final if they make the best calls from here: their locks so far plus the lineup the board would set for them, using the same projections and lock/wait math as the Lock-in tab. Locks come straight from Sleeper when your login is saved. Without it, the public data only proves a lock once that player's next game starts, so other teams show "at least" that many.
-      <b>Playoff odds</b> come from simulating the rest of the regular season (through week 21) 8,000 times. This week uses the same score simulation as the matchup cards (real score shapes, locks so far, the best calls from here), so its win and median odds match the scoreboard; later weeks use team strength: the best weekly lineup from each roster's projected players, scaled to this league's real scoring level and blended 70/30 with the points each team has actually scored. Each week counts twice, the head-to-head plus the game against the league median, and the top 8 by record (then points) make the playoffs. The playoffs are simulated too (8 teams, 1v8 / 4v5 / 2v7 / 3v6, no byes, one week per round) to get title odds.
+      <b>Playoff odds</b> come from simulating the rest of the regular season (through week 21) 8,000 times. This week uses the same score simulation as the matchup cards (real score shapes, locks so far, the best calls from here), so its win and median odds match the scoreboard; later weeks use team strength: the best weekly lineup from each roster's projected players, scaled to this league's real scoring level and blended 70/30 with the points each team has actually scored. Each run also redraws how good every team really is (about ±10 points a week, for injuries, trades and projection misses), so a strong start doesn't read as a lock. Each week counts twice, the head-to-head plus the game against the league median, and the top 8 by record (then points) make the playoffs. The playoffs are simulated too (8 teams, 1v8 / 4v5 / 2v7 / 3v6, no byes, one week per round) to get title odds.
     </div>
   </section>
 
@@ -2061,7 +2061,8 @@ function computeLeague(){
   // Team strength for future weeks. Actual weekly scores come from Sleeper's weekly results (rescored in the current settings;
   // the PF totals in the standings were recorded under the old free-throw scoring). Roster strength is scaled to the league's
   // real scoring level, blended 70/30 with actual points per week, then pulled halfway to the league average because a few
-  // weeks of results and preseason-ish projections both overstate how far apart teams really are. Weekly swing: ±28.
+  // weeks of results and preseason-ish projections both overstate how far apart teams really are. Weekly swing: ±28,
+  // plus a per-run ±10 on each team's true level.
   const past=(LG.past||[]).filter(m=>m.length);
   for(const t of teams){ const pts=past.map(m=>(m.find(x=>x.roster_id===t.rid)||{}).points).filter(x=>x>0); t.act= pts.length? pts.reduce((a,b)=>a+b,0)/pts.length : null }
   const withAct=teams.filter(t=>t.act!=null);
@@ -2077,13 +2078,15 @@ function computeLeague(){
     let seed=12345; const rnd=()=>{ seed|=0; seed=seed+0x6D2B79F5|0; let x=Math.imul(seed^seed>>>15,1|seed); x=x+Math.imul(x^x>>>7,61|x)^x; return ((x^x>>>14)>>>0)/4294967296 };
     const nrm=()=>{ let u=0,v=0; while(!u) u=rnd(); while(!v) v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v) };
     const made=new Float64Array(n), first=new Float64Array(n), champ=new Float64Array(n), winsSum=new Float64Array(n), weekWin=new Float64Array(n), pfSum=new Float64Array(n);
-    const sc=new Float64Array(n), W_=new Float64Array(n), PF=new Float64Array(n);
+    const off=new Float64Array(n), sc=new Float64Array(n), W_=new Float64Array(n), PF=new Float64Array(n);
     for(let s=0;s<N;s++){
-      for(let i=0;i<n;i++){ W_[i]=teams[i].w+teams[i].t/2; PF[i]=teams[i].pf }
+      // each season run also draws how good every team really is (±10 a week: injuries, trades, pickups, projection misses), so
+      // 17 weeks of weekly noise don't average out into false certainty
+      for(let i=0;i<n;i++){ W_[i]=teams[i].w+teams[i].t/2; PF[i]=teams[i].pf; off[i]=10*nrm() }
       if(ti>=0){ W_[ti]+=addW; PF[ti]+=addPF }
       for(const wk of weeks){
         // this week: the same score samples the matchup cards use (real score shapes, locks so far, backup chains); later weeks: team strength
-        for(let i=0;i<n;i++){ const t=teams[i]; sc[i]= wk.cur? (t.tot&&t.tot.length? t.tot[s%t.tot.length] : t.proj+Math.sqrt(t.pv+36)*nrm()) : t.mu+t.sd*nrm(); PF[i]+=sc[i] }
+        for(let i=0;i<n;i++){ const t=teams[i]; sc[i]= wk.cur? (t.tot&&t.tot.length? t.tot[s%t.tot.length] : t.proj+Math.sqrt(t.pv+36)*nrm()) : t.mu+off[i]+t.sd*nrm(); PF[i]+=sc[i] }
         for(const [a,b] of wk.pairs){ const ia=idx[a], ib=idx[b]; if(ia==null||ib==null) continue; if(sc[ia]>sc[ib]){ W_[ia]++; if(wk.cur) weekWin[ia]++ } else { W_[ib]++; if(wk.cur) weekWin[ib]++ } }
         if(median){ const sorted=[...sc].sort((x,y)=>x-y), med=(sorted[n/2-1]+sorted[n/2])/2; for(let i=0;i<n;i++) if(sc[i]>med) W_[i]++ }
       }
@@ -2094,7 +2097,7 @@ function computeLeague(){
       let alive=order.slice(0,cut);
       while(alive.length>1){
         const nx=[]; const k=alive.length;
-        for(let j=0;j<k/2;j++){ const hi=alive[j], lo=alive[k-1-j]; const a=teams[hi].mu+teams[hi].sd*nrm(), b=teams[lo].mu+teams[lo].sd*nrm(); nx.push(a>=b?hi:lo) }
+        for(let j=0;j<k/2;j++){ const hi=alive[j], lo=alive[k-1-j]; const a=teams[hi].mu+off[hi]+teams[hi].sd*nrm(), b=teams[lo].mu+off[lo]+teams[lo].sd*nrm(); nx.push(a>=b?hi:lo) }
         alive=nx.length===4? [nx[0],nx[3],nx[1],nx[2]] : nx;   // keep bracket halves: (1v8, 4v5) and (2v7, 3v6)
       }
       if(alive.length) champ[alive[0]]++;
