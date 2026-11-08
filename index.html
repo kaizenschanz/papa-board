@@ -2013,11 +2013,13 @@ async function managerTendencies(){
 // Lockable only if he was in the starting lineup for that whole game. From the lineup history: no for a player who wasn't
 // starting at the last snapshot before that day and only joined later; unknown (no history yet) counts as yes.
 function startedWholeGame(rid, pid, date){
+  // judged against that game's tip: in the lineup at tip (last recorded lineup before it) and never out until it ended.
+  // If the recording only starts after the tip, there's no way to tell, so it gets the benefit of the doubt.
   const H=LINEUPS?.[rid]; if(rid==null||!H||!H.length) return true;
-  const d0=Date.parse(date+"T00:00:00"), d1=d0+86400e3;
-  if(H[0][0]>=d0) { const first=H.find(([t])=>t>=d0); return H[0][0]>=d1? true : !!(first && first[1].includes(pid) && H[0][0]<d0+12*3600e3) }
-  let atStart=null, out=false; for(const [t,st] of H){ if(t<d0) atStart=st; else if(t<d1){ if(!st.includes(pid)) out=true } else break }
-  return !!(atStart && atStart.includes(pid)) && !out;
+  const tip=(typeof tipAt==="function"&&tipAt(pid,date)) || Date.parse(date+"T19:00:00"), end=tip+2.5*3600e3;
+  let atTip=null; for(const [t,st] of H){ if(t<=tip) atTip=st; else if(t<end){ if(!st.includes(pid)) return false } else break }   // out at any point during it: no
+  if(H[0][0]>tip) return true;
+  return !!(atTip && atTip.includes(pid));
 }
 // Was he in this team's lineup at some point that day? Answered from the recorded lineup history; no history = assume yes.
 // true/false from the recorded lineup history; null when there's no history for that day (Sleeper keeps none, so a game
