@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-y2g6umfVMGP6gtmS71tWEKhI44R57X2W2w/zLxvuLLc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Ch4V6uLygaKHurtt11gV8grMrjoxjwAuCMg8F08qe9w='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2093,8 +2093,7 @@ function renderBoard(A,P){
       : exact && !legOld()? '<span class="ok">● Exact locks · '+snapT+'</span>'
       : exact? '<span class="warn">● Locks as of '+snapT+'</span>'
       : W.legErr? '<span class="warn">● Sleeper login failed</span> <button type="button" class="linkbtn" data-open="wkMore">Fix</button>'
-      : '<span class="warn">● Locks estimated · '+clock(W.updated||Date.now())+'</span>')+
-    (myRoster()&&store.get(meKey(),null)!=null? '<button type="button" class="linkbtn" id="whoReset">Not your team?</button>' : '');
+      : '<span class="warn">● Locks estimated · '+clock(W.updated||Date.now())+'</span>');
 }
 // Both lineups slot by slot; tap a row for each player's games, sources and the reasoning.
 function playerDetail(x,mine){
