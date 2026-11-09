@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TwH8KpIeW3aTTL8jSV9JPrTuvsb1Kgo+4QS+XVbrOp0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JOrexdAfEmKA9LhmaAIhumDTsbRkgcGtJXzz9yr2l1c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2164,6 +2164,13 @@ function renderBoard(A,P){
       : '<span class="warn">● Locks estimated · '+clock(W.updated||Date.now())+'</span>');
 }
 // Both lineups slot by slot; tap a row for each player's games, sources and the reasoning.
+// What a player is worth this week on his own games, played right (lock a big one, else ride on): his locked score, or the
+// simulated value of the games he has left, or his latest score if he can still lock it and that's worth more.
+function weekValue(x){ const a=x.a, pid=x.pid; if(a.lockedOn) return a.lockedOn.fp;
+  const live=!!(a.live&&x.starter), st=(live? [mkStep(pid,a.live,0)] : []).concat(a.future.map((g,j)=>mkStep(pid,g,j+(live?1:0)))).filter(t=>t.mu>0||t.cur!=null);
+  let v= st.length? (SHAPE? stepsValue(st)[0] : waitValue(st.map(t=>({mu:t.mu, sd:sdFor(pid,t.mu)})))) : null;
+  if(x.starter && a.latest && !a.latest.dnp && !a.live && startedWholeGame(x.rid,pid,a.latest.date)) v=Math.max(a.latest.fp, v??0);
+  return v!=null && isFinite(v)? v : null }
 function playerDetail(x,mine){
   const a=x.a, pid=x.pid;
   const chips=a.games.map(g=>{
@@ -2175,6 +2182,7 @@ function playerDetail(x,mine){
   const r4=recent(pid,4), st=[];
   if(a.avg!=null) st.push('Season <b>'+a.avg.toFixed(2)+'</b>');
   if(r4) st.push('Last '+r4.list.length+' <b>'+r4.avg.toFixed(2)+'</b>');
+  { const wk=weekValue(x); if(wk!=null) st.push('Week <b>'+(a.lockedOn? '' : '~')+wk.toFixed(2)+'</b>') }   // user, 11-08: his weekly value next to season and last 4
   const nx=a.future[0], sp=nx&&srcParts(nx);
   let why="";
   if(mine && a.why && (x.starter&&!a.lockedOn || a.call?.t?.startsWith("Start"))) why=a.why;
