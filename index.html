@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VeVWiBrDJl9q4g15sYuSEQuMPy/NxV6EYvB1IKzuphk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TwH8KpIeW3aTTL8jSV9JPrTuvsb1Kgo+4QS+XVbrOp0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1373,7 +1373,9 @@ function recent(pid,n=4){
 function legFor(rid){ return (W.legs||[]).find(l=>l.roster_id===rid) || null }
 function rowsFor(roster, matchup, mine){
   const slotsAll=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
-  const starters=roster.starters||[], res=roster.reserve||[], rows=[];
+  // next week (before Sleeper rolls over): the lineup set for that week lives in its matchup, not the roster record (user, 11-08:
+  // Poeltl and Walker started for week 4 while the roster still showed week 3)
+  const starters=(W.week>W.baseWeek && matchup?.starters?.length? matchup.starters : roster.starters)||[], res=roster.reserve||[], rows=[];
   starters.forEach((pid,i)=>{ if(pid && pid!=="0") rows.push({pid,slot:slotsAll[i]||"UTIL",starter:true,idx:i}) });
   (roster.players||[]).forEach(pid=>{ if(!starters.includes(pid) && !res.includes(pid)) rows.push({pid,slot:"BN",starter:false}) });
   res.forEach(pid=>rows.push({pid,slot:"IR",starter:false}));
@@ -1962,7 +1964,9 @@ function swapLine(A,P,slotPid,pid,date,pid2,date2){
   const st=slotSteps(A,P,slotPid), i=st.findIndex(t=>t.pid===pid&&t.date===date), j=st.findIndex(t=>t.pid===pid2&&t.date===date2);
   if(i<0||j<0||!overlapOf(st,i)?.J.includes(j)) return null;
   let bar=switchBar(slotPid,st,i,j); if(bar==null) bar=switchBarPts(st,i,j);
-  return bar==null? null : {bar, lo: st[i].cur!=null? st[i].cur : 0};
+  // exp: what he'd normally have by that tip (a bar far below it only matters if he barely plays: not worth a line)
+  const t0=st[i], ph=stepPhase(t0,st[j].t), live=t0.cur!=null, f0=live? (t0.f0||0) : 0, exp= live? t0.cur+(f0<1? (ph-f0)/(1-f0) : 0)*Math.max(0,t0.mu-t0.cur) : ph*(t0.mu0>0? t0.mu0 : t0.mu);
+  return bar==null? null : {bar, lo: live? t0.cur : 0, exp, real: bar===Infinity || bar>=0.25*exp};
 }
 // What the rest of a slot's chain is worth: the holder's own games and his bench fallbacks (or just the fallbacks), played right.
 function chainValue(A,P,pid,fallbacksOnly){
@@ -2018,7 +2022,10 @@ function todoItems(A,P){
     for(const [pid,p] of N.lineup) plan.set(p.slot,pid);
     const first=new Map(plan); for(const [slot,E] of Object.entries(N.early||{})) if(E.tip>now) first.set(+slot,E.pid);
     for(const [slot,pid] of first){ const had=prev.get(slot); if(pid===had) continue; if(N.lockNow.has(pid)) continue;
-      const tw=tipAt(pid,N.day); if(!tw) continue;                 // he doesn't play that day: nothing to set (an earlier item covers it)
+      if(N.early?.[slot]?.pid===pid && N.early[slot].tip>now) continue;     // the free-look line below says it
+      // he doesn't play that day: nothing to set, and the slot keeps who's really in it (else the next day's item compares against a
+      // lineup that never happened: "Start Kuzma to F (Buzelis out)" with Kuzma already there)
+      const tw=tipAt(pid,N.day); if(!tw){ if(had!=null) plan.set(slot,had); continue }
       const ts=[tw, had? tipAt(had,N.day) : null].filter(Boolean).sort((a,b)=>a-b), t=ts[0]||null;
       if(t&&t<=now) continue;
       const from=[...prev].find(([,q])=>q===pid)?.[0], verb=from!=null? "Move" : "Start";
@@ -2063,7 +2070,7 @@ function todoItems(A,P){
     const hx=X(hp); if(!hx||hx.starter) continue; const ht=tipAt(hp, hx.a.future[0]?.date); if(!ht||ht<=now) continue;
     // his game is still on when the fallback tips: keep him or bench him then, on his score so far (not his final)
     if(a.live && !other && ht<(gameEnd(x.pid,a.live)||0)){ const b=P.backup?.[x.pid], sl= b? swapLine(A,P,x.pid,x.pid,a.live.date,b.pid,b.date) : null;
-      if(!sl || !(sl.bar>sl.lo+0.01)) continue;     // no score so far would make the switch worth it: his game just counts
+      if(!sl || !(sl.bar>sl.lo+0.01) || !sl.real) continue;     // no real score so far would make the switch worth it: his game just counts
       const cur=a.live.cur||0, sw=sl.bar===Infinity, bar=fx(sl.bar), ok=!sw && cur>=sl.bar;
       out.push({t:ht, pid:x.pid, kind: sw? "move" : "look",
         title: sw? "Bench "+a.info.name+" and start "+nm(hp)+" before "+clock(ht) : ok? "Leave "+a.info.name+" in: "+cur.toFixed(2)+" so far clears the "+bar+" he needs" : a.info.name+" has "+cur.toFixed(2)+" so far: keep him only at "+bar+"+",
@@ -2089,7 +2096,7 @@ function todoItems(A,P){
       rems:[{id:"done-"+pid, t:end, lead:-10, title:last(pid)+" done: lock if "+(thr||"?")+"+"}]});
     else if(b){ const bt=tipAt(b.pid,b.date);
       // the fallback tips while he's still playing: the call is made at that tip, on his score so far
-      if(bt && bt<end){ if(!(bt>now)) continue; const sl=swapLine(A,P,pid,pid,g.date,b.pid,b.date); if(!sl || !(sl.bar>sl.lo+0.01)) continue;
+      if(bt && bt<end){ if(!(bt>now)) continue; const sl=swapLine(A,P,pid,pid,g.date,b.pid,b.date); if(!sl || !(sl.bar>sl.lo+0.01) || !sl.real) continue;
         const sw=sl.bar===Infinity, bar=fx(sl.bar);
         out.push({t:bt, kind:"check", title: sw? "Bench "+a.info.name+" for "+nm(b.pid)+" at "+clock(bt)+", whatever he has" : "Keep "+a.info.name+" in only if he has "+bar+"+ so far",
           note: sw? "" : "Otherwise bench him mid-game and start "+nm(b.pid)+".",
@@ -2105,7 +2112,7 @@ function todoItems(A,P){
   // mid-week switch: a bench player tips while a holder's game (not his last) is on; benched or not, the holder plays his next game
   for(const [pid,L] of Object.entries(P.mid||{})){ const x=X(pid); if(!x) continue; const a=x.a;
     for(const m of L){ const bt=tipAt(m.pid,m.date); if(!bt||bt<=now) continue;
-      const sl=swapLine(A,P,pid,pid,m.after,m.pid,m.date); if(!sl || !(sl.bar>sl.lo+0.01)) continue;
+      const sl=swapLine(A,P,pid,pid,m.after,m.pid,m.date); if(!sl || !(sl.bar>sl.lo+0.01) || !sl.real) continue;
       const nx=a.future.find(g=>g.date>m.after), back= nx? " He's back in for "+dayLabel(nx.date)+"." : "";
       const live= !!(a.live && a.live.date===m.after), cur= live? (a.live.cur||0) : 0, sw=sl.bar===Infinity, bar=fx(sl.bar), ok= live && !sw && cur>=sl.bar;
       out.push({t:bt, pid, kind: sw? "move" : "check",
@@ -2681,7 +2688,7 @@ async function managerTendencies(){
   for(let w=1; w<=W.week; w++){
     if(w===W.week){                                    // this week so far
       const cur=W.matchups.map(m=>{ const leg=legFor(m.roster_id), rr=S.rosters[m.roster_id]||{};
-        return {rid:m.roster_id, mid:m.matchup_id, starters:(rr.starters||m.starters||[]), sg: leg? (leg.starters_games||{}) : null, pp: leg? null : (m.players_points||{}), players:rr.players||m.players||[], current:true} });
+        return {rid:m.roster_id, mid:m.matchup_id, starters:(W.week>W.baseWeek && m.starters?.length? m.starters : (rr.starters||m.starters||[])), sg: leg? (leg.starters_games||{}) : null, pp: leg? null : (m.players_points||{}), players:rr.players||m.players||[], current:true} });
       const logs={}, add=pid=>{ if(logs[pid]) return; const pw=playerWeek(pid);
         logs[pid]=pw.games.map(g=>({id:String(g.id), date:g.date, t:tipAt(pid,g.date), fp: g.done&&!g.dnp? g.fp : null, dnp:!!g.dnp, mu:g.mu, live:!!g.live})) };
       cur.forEach(r=>r.players.forEach(add));
