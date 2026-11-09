@@ -313,7 +313,7 @@ details.mr[open]>summary{background:var(--bg)}
 .pc .v.lk{color:var(--good)}
 .badge{display:inline-block;font:700 10.5px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;padding:2px 5px;border-radius:3px;margin-right:5px;vertical-align:1px}
 .badge.lock{background:var(--good);color:var(--panel)}.badge.wait{background:var(--warn-soft);color:var(--warn)}.badge.start{background:var(--accent-soft);color:var(--accent)}
-.mr .det{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:4px 0 12px 44px}
+.mr .det{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:4px 0 12px 44px}   /* under each player, lined up with the row */
 details.mr.pk>summary{grid-template-columns:34px minmax(0,1fr)}
 .mr.pk .det{grid-template-columns:1fr}
 .pd{min-width:0}.pd .who{font-weight:700;font-size:13.5px}.pd .who span{font-weight:400;color:var(--muted);font-size:12px}
@@ -338,7 +338,7 @@ details.fold #poolSeg{margin-bottom:6px}
 #setupEdit{display:none}.setup.compact #setupEdit{display:inline}
 .clock small.lkd{font:600 11px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;opacity:.7}
 @media (max-width:640px){
-  .mr .det{grid-template-columns:1fr;padding-left:0}
+  .mr .det{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding-left:38px}
   .mhd,details.mr>summary,.mtot{grid-template-columns:30px minmax(0,1fr) minmax(0,1fr);gap:8px}
   details.mr.pk>summary{grid-template-columns:30px minmax(0,1fr)}
   .pc .n{font-size:13.5px}.pc .v{font-size:16px}
