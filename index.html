@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YEvAw7vxvlmMSWxwzQOK5jZTF3AkiiPzHhGA4Vx223c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DqnuurxmJLR0ljczAt5P4sMBMJYq16V2x7vaoOWw80k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1941,8 +1941,8 @@ function todoItems(A,P){
   // waiver claim for later days (clears overnight), only if it raises title odds; the runners-up go in the note.
   // A finished week leaves claims to next week's page, which sees the games they'd play.
   if(!weekOver()){ const cl=claimOptions(A,P);
-    if(cl.length){ const c=cl[0], dl=new Date(); dl.setHours(23,30,0,0);
-      out.push({t:null, kind:"roster", title:"Claim "+c.name+" tonight, drop "+c.drop.a.info.name,
+    if(cl.length){ const c=cl[0], later= c.from && c.from>addDay(todayStr(),1), dl= later? new Date(addDay(c.from,-1)+"T23:30:00") : new Date(); if(!later) dl.setHours(23,30,0,0);
+      out.push({t:null, kind:"roster", title:"Claim "+c.name+(later? " (clears "+dayLabel(c.from)+")" : " tonight")+", drop "+c.drop.a.info.name,
         sub:"Adds "+claimGain(c)+(c.title?" title chance ("+claimSplit(c)+")":"")+": he "+c.role+". Season ~"+c.ros.toFixed(1)+"/g vs "+c.drop.a.info.name+"'s "+c.dropRos.toFixed(1)+"."+
           (c.denies? " He's also "+c.denies+"'s likeliest pickup, so this takes him off their board." : "")+
           (c.pGet<0.97? " About "+Math.round(c.pGet*100)+"% to get him"+(c.ahead.length? " ("+c.ahead.join(", ")+" "+(c.ahead.length>1?"are":"is")+" ahead of you on waivers)" : "")+"." : "")+
@@ -2383,7 +2383,7 @@ function pickupFor(rid, opt={}){
   if(!open.size||!cands.length) return done({...zero, nights:K-from, drop});
   const D0=teamDist(rows,Q0,N), base=rows.filter(x=>!drop||x.pid!==drop.pid);
   const faA=pid=> W._fa.A[pid] ||= analyse(pid,null,false,null,false);
-  const evalAt=(c,s)=>{ const a=faA(c.pid), fut=a.future.filter(g=>g.date>=s&&g.mu>0); if(!fut.length) return null;
+  const evalAt=(c,s0)=>{ const cf=claimFrom(c.pid), s= cf>s0? cf : s0, a=faA(c.pid), fut=a.future.filter(g=>g.date>=s&&g.mu>0); if(!fut.length) return null;
     const row={pid:c.pid, slot:"BN", starter:false, rid, a:{...a, future:a.future.filter(g=>g.date>=s), live:null, latest:null}};
     const R2=base.concat([row]), Q2=planWeek(R2,{light:true}), D2=teamDist(R2,Q2,N), g=new Float64Array(N); let gm=0;
     for(let i=0;i<N;i++){ g[i]=D2.tot[i]-D0.tot[i]; gm+=g[i] } return {pid:c.pid, name:c.info.name, g, m:gm/N} };
@@ -2394,7 +2394,7 @@ function pickupFor(rid, opt={}){
   const M=opt.focal?5:3, L=opt.focal?3:2, ks=[...new Set([from, Math.floor((from+K-1)/2), K-1])].sort((a,b)=>a-b), G={}, bySt={};
   let first=[];
   for(const k of ks){ const s=starts[k]; if(s in bySt){ G[k]=bySt[s]; continue }
-    const prox=cands.map(c=>{ const f=c.fut.filter(g=>g.date>=s); return {c, v:f.length? waitValue(f) : 0} }).filter(o=>o.v>0).sort((a,b)=>b.v-a.v);
+    const prox=cands.map(c=>{ const cf=claimFrom(c.pid), f=c.fut.filter(g=>g.date>=s && g.date>=cf); return {c, v:f.length? waitValue(f) : 0} }).filter(o=>o.v>0).sort((a,b)=>b.v-a.v);
     let list;
     if(k===ks[0]) list=prox.slice(0,M).map(o=>o.c);
     else { const mp=new Map(); for(const t of first){ const c=cands.find(c=>c.pid===t.pid); if(c) mp.set(c.pid,c) } for(const o of prox.slice(0,2)) if(mp.size<L+1) mp.set(o.c.pid,o.c); list=[...mp.values()] }
@@ -2421,6 +2421,13 @@ function withPickups(D,pk){
     tot[s]=x; m+=x } m/=N; let v=0; for(let s=0;s<N;s++) v+=(tot[s]-m)**2; v/=N;
   return {...D, tot, m, v, pk:m-D.m, raw:D} }
 function benchDropScore(x){ const ros=rosMean(x.pid), f=x.a.future.filter(g=>g.mu>0); return f.length? (ros+f.reduce((t,g)=>t+g.mu,0)/f.length)/2 : ros }
+// First day a free agent could play for you. A dropped player sits on waivers for waiver_clear_days x 24 h, then clears at the
+// next nightly run (~12:08 AM): Gafford and Gillespie, dropped during a run, cleared exactly 48 h later; Caruso, dropped Sun
+// 9:51 PM, isn't available until Wednesday (user, 11-08). Anyone else clears at tonight's run and plays from tomorrow.
+function claimFrom(pid){ const tom=addDay(todayStr(),1), cd=+(S.league?.settings?.waiver_clear_days??2); let t=0;
+  for(const x of (W.tx||[])) if(x.status==="complete" && x.drops && x.drops[pid]!=null && x.status_updated>t) t=x.status_updated;
+  if(!t) return tom; const t2=t+cd*86400e3, h=new Date(t2), d= h.getHours()*60+h.getMinutes()<=15? ymd(t2) : addDay(ymd(t2),1);
+  return d>tom? d : tom }
 function claimOptions(A,P){
   const v=W.vs; if(!v||!v.me?.tot||!A.length) return [];
   const key=(viewRoster()?.roster_id)+"|"+W.updated+"|"+(v.rid||"")+"|"+(v.wt? v.wt.perWin : "nw")+"|"+(LG.out?.N||0)+"|"+(v.opp?.pk||0).toFixed(3)+"|"+(W.txAt||0); if(W._claims&&W._claims.k===key) return W._claims.list;
@@ -2459,17 +2466,17 @@ function claimOptions(A,P){
   const pre=[], seen=new Set();
   for(const pid of new Set([...Object.keys(W.projMeta||W.proj||{}), ...Object.keys(typeof byId!=="undefined"? byId : {})])){ if(owned.has(pid)) continue;
     const info=playerInfo(pid); if(!info.team || seasonAvail(pid, info.inj)<0.5) continue;
-    const fut=playerWeek(pid).games.filter(g=>!g.done && !g.live && g.date>today && g.mu>0);
+    const from=claimFrom(pid), fut=playerWeek(pid).games.filter(g=>!g.done && !g.live && g.date>=from && g.mu>0);
     const fits=fut.length && [...openSlots].some(sn=>elig(info.pos,sn));
-    pre.push({pid, info, fut: fits? fut : [], v: fits? waitValue(fut) : 0, ros:baseMean(pid)}) }
+    pre.push({pid, info, from, fut: fits? fut : [], v: fits? waitValue(fut) : 0, ros:baseMean(pid)}) }
   // the best this-week options plus the best season-long ones (no game left this week, but better every week after)
   const pick=[...pre].filter(c=>c.v>0).sort((a,b)=>b.v-a.v).slice(0,10).concat([...pre].sort((a,b)=>b.ros-a.ros).slice(0,6)).filter(c=>!seen.has(c.pid)&&seen.add(c.pid));
   const out=[];
   for(const c of pick){
     let d=0, dm=0, r=null;
-    if(c.fut.length){ const a=analyse(c.pid,null,false,null,false), a2={...a, future:a.future.filter(g=>g.date>today), live:null, latest:null};
-      const row={pid:c.pid, slot:"BN", starter:false, rid:A[0].rid, a:a2};
-      const A2=A.filter(x=>x.pid!==drop.pid).concat([row]);
+    if(c.fut.length){ const a=analyse(c.pid,null,false,null,false), a2={...a, future:a.future.filter(g=>g.date>=c.from), live:null, latest:null};
+      const row={pid:c.pid, slot:"BN", starter:false, rid:A[0].rid, a:a2}, keepD=drop.a.future.filter(g=>g.date<c.from);
+      const A2=A.filter(x=>x.pid!==drop.pid).concat(keepD.length? [{...drop, a:{...drop.a, future:keepD}}] : []).concat([row]);
       const opp2= oppTop.has(c.pid) && v.oppRid!=null? withPickups(oppRaw, pickupFor(v.oppRid,{rows:v.oppRows, exclude:new Set([c.pid]), focal:true})) : v.opp;
       r=score(A2,opp2); d=r.o-b0.o; dm=r.m-b0.m }
     const F=futVal(c.pid);
@@ -2480,7 +2487,7 @@ function claimOptions(A,P){
       if(h) role="backs up "+(A.find(x=>x.pid===h[0])?.a.info.name||"a starter")+" ("+dayLabel(c.fut[0].date)+")";
       else if(pl) role="early free look before "+(A.find(x=>x.pid===pl[0])?.a.info.name||"a starter") }
     const G=getP(c.pid);   // a claim that doesn't go through gains nothing (and costs nothing)
-    out.push({pid:c.pid, name:c.info.name, team:c.info.team, pos:c.info.pos, inj:c.info.inj, dWeek:G.p*d, dFut:G.p*F.d, dmu:F.dmu, d:G.p*(d+F.d), dm, role, games:c.fut, drop, ros:c.ros, dropRos:rosMean(drop.pid), title:!!v.wt,
+    out.push({pid:c.pid, name:c.info.name, team:c.info.team, pos:c.info.pos, inj:c.info.inj, from:c.from, dWeek:G.p*d, dFut:G.p*F.d, dmu:F.dmu, d:G.p*(d+F.d), dm, role, games:c.fut, drop, ros:c.ros, dropRos:rosMean(drop.pid), title:!!v.wt,
       pGet:G.p, ahead:G.who, denies: oppTop.has(c.pid)? v.name : null}) }
   // only when it's worth it: at least +0.01% title chance (or +0.005 expected wins before the season weights load)
   const bar= v.wt? 0.0001 : 0.005;
