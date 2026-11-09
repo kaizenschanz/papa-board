@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DqnuurxmJLR0ljczAt5P4sMBMJYq16V2x7vaoOWw80k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mmQuILS2KU6yMCEyMGAtJkmScm9uJWE8q0XnamMBDFE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1119,6 +1119,15 @@ function seasonAvail(pid, inj){
   return 1 }
 
 // Live game clocks from ESPN for any day with games under way: share of the game played and a label like "Q2 4:07".
+// Tip times for finished days (each lock call is judged at the next tip): ESPN's scoreboard, kept in this browser for good.
+async function pastTips(dates){
+  const today=todayStr(), have=d=>Object.values(W.tips||{}).some(T=>T&&T[d]), need=[...new Set(dates)].filter(d=>d&&d<today&&!have(d));
+  await Promise.all(need.map(async d=>{ let m=store.get("tipsd:"+d,null);
+    if(!m){ try{ const sb=await fetch(ESPN_SITE+"/scoreboard?dates="+d.replace(/-/g,"")).then(r=>r.json()); m={};
+      for(const e of sb.events||[]) for(const x of (e.competitions?.[0]?.competitors||[])) m[ESPN_TEAM[x.team.abbreviation]||x.team.abbreviation]=e.date;
+      if(Object.keys(m).length) store.set("tipsd:"+d,m) }catch(e){ return } }
+    W.tips ||= {}; for(const ab in m) (W.tips[ab] ||= {})[d] ||= m[ab] }));
+}
 async function loadClocks(){
   W.clock={};
   const days=[...new Set(W.games.filter(g=>g.status!=="complete" && g.date<=todayStr()).map(g=>g.date))];
@@ -2618,14 +2627,13 @@ async function managerTendencies(){
       const cur=W.matchups.map(m=>{ const leg=legFor(m.roster_id), rr=S.rosters[m.roster_id]||{};
         return {rid:m.roster_id, mid:m.matchup_id, starters:(rr.starters||m.starters||[]), sg: leg? (leg.starters_games||{}) : null, pp: leg? null : (m.players_points||{}), players:rr.players||m.players||[], current:true} });
       const logs={}, add=pid=>{ if(logs[pid]) return; const pw=playerWeek(pid);
-        logs[pid]=pw.games.filter(g=>!g.dnp).map(g=>({id:String(g.id), date:g.date, fp: g.done&&!g.dnp? g.fp : null, mu:g.mu, live:!!g.live})) };
+        logs[pid]=pw.games.map(g=>({id:String(g.id), date:g.date, t:tipAt(pid,g.date), fp: g.done&&!g.dnp? g.fp : null, dnp:!!g.dnp, mu:g.mu, live:!!g.live})) };
       cur.forEach(r=>r.players.forEach(add));
       { const ds=W.games.map(g=>g.date).sort(); if(ds.length) (LG.weekDates ||= {})[w]=[ds[0],ds[ds.length-1]] }
       for(const r of cur){ r.slots=[];
-        r.starters.forEach((pid,si)=>{ if(!pid||pid==="0") return; const g=logs[pid]||[], played=g.filter(x=>x.fp!=null).length; let idx=-1;
-          if(played){ if(r.sg && r.sg[pid]!=null) idx=g.findIndex(x=>x.id===String(r.sg[pid]));
-            else if(r.pp && r.pp[pid]!=null && !r.sg){ idx=played-1; (r.open ||= new Set()).add(pid) }
-            else { idx=played-1; (r.open ||= new Set()).add(pid) } }      // not locked yet: his latest score is still a live decision
+        r.starters.forEach((pid,si)=>{ if(!pid||pid==="0") return; const g=logs[pid]||[], lastP=g.map(x=>x.fp!=null).lastIndexOf(true); let idx=-1;
+          if(lastP>=0){ if(r.sg && r.sg[pid]!=null) idx=g.findIndex(x=>x.id===String(r.sg[pid]));
+            else { idx=lastP; (r.open ||= new Set()).add(pid) } }      // not locked yet: his latest score is still a live decision
           r.slots.push({pid,si,g,idx}) }) }
       gradeWeek(w, cur, logs, SL, per);
       continue;
@@ -2642,24 +2650,34 @@ async function managerTendencies(){
     const stats=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
     const projs=await jx(RAW+"/projections/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]);
     const pmu={}; for(const r of projs){ if(r.stats&&Object.keys(r.stats).length) pmu[r.player_id+":"+r.game_id]=0.95*scoreStats(r.stats) }
-    const logs={}; for(const r of stats){ const st=r.stats; if(!st||!((st.min||0)>0||(st.sp||0)>0)) continue;
-      (logs[r.player_id] ||= []).push({id:String(r.game_id), date:r.date, fp:scoreStats(st), mu:pmu[r.player_id+":"+r.game_id] ?? baseMean(r.player_id)}) }
-    for(const k in logs) logs[k].sort((a,b)=>a.date<b.date?-1:1);
+    // Every game his team played that week, missed ones included: when a lock call was made nobody knew he'd sit later, so
+    // those games were still part of waiting (at his usual level that week). Games he played: Sleeper's projection for it.
+    const box={}; for(const r of stats) if(r.stats) box[r.player_id+":"+r.game_id]=r;
+    const wg=(W.sched||[]).filter(g=>+g.week===w); await pastTips(wg.map(g=>g.date));
+    const logs={}, gamesOf=pid=>{ if(logs[pid]) return; const team=playerInfo(pid).team;
+      let L= team? wg.filter(g=>g.home?.team===team||g.away?.team===team).map(g=>{ const s=box[pid+":"+g.game_id]?.stats, pl= s && ((s.min||0)>0||(s.sp||0)>0);
+        return {id:String(g.game_id), date:g.date, t:tipAt(pid,g.date), fp: pl? scoreStats(s) : null, dnp:!pl, mu: pmu[pid+":"+g.game_id] ?? null} }) : [];
+      if(!L.some(x=>x.fp!=null)) L=stats.filter(r=>r.player_id===pid && r.stats && ((r.stats.min||0)>0||(r.stats.sp||0)>0)).map(r=>({id:String(r.game_id), date:r.date, t:tipAt(pid,r.date), fp:scoreStats(r.stats), dnp:false, mu:pmu[pid+":"+r.game_id] ?? null}));   // changed teams / unsigned now
+      L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+      const lv=L.filter(x=>x.mu>0).map(x=>x.mu), usual= lv.length? lv.reduce((a,b)=>a+b,0)/lv.length : baseMean(pid);
+      for(const x of L) if(!(x.mu>0)) x.mu=usual;
+      logs[pid]=L };
     { const ds=stats.map(r=>r.date).filter(Boolean).sort(); if(ds.length) (LG.weekDates ||= {})[w]=[ds[0],ds[ds.length-1]] }
     const rows= legs? legs.map(l=>({rid:l.roster_id, mid:l.matchup_id, starters:l.starters||[], sg:l.starters_games||{}, players:l.players||[]}))
       : pub.map(m=>({rid:m.roster_id, mid:m.matchup_id, starters:m.starters||[], pp:m.players_points||{}, players:m.players||[]}));
+    rows.forEach(r=>r.players.concat(r.starters).forEach(pid=>{ if(pid&&pid!=="0") gamesOf(pid) }));
     for(const r of rows){ r.slots=[];
       r.starters.forEach((pid,si)=>{ if(!pid||pid==="0") return; const g=logs[pid]||[]; let idx=-1;
         if(g.length){
-          if(r.sg){ const gid=r.sg[pid]; idx= gid!=null? g.findIndex(x=>x.id===String(gid)) : g.length-1 }   // not in Sleeper's lock list = rode it out
+          if(r.sg){ const gid=r.sg[pid]; idx= gid!=null? g.findIndex(x=>x.id===String(gid)) : g.map(x=>x.fp!=null).lastIndexOf(true) }   // not in Sleeper's lock list = rode it out (his last game played)
           else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) } }
         r.slots.push({pid,si,g,idx}) }) }
     gradeWeek(w, rows, logs, SL, per);
   }
   LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
 }
-// Replays one finished week. A lock call about game i had to be made before the player's next game, so everything played
-// before that date was known. For each such deadline, every team's week is simulated from what was known then (locked
+// Replays one finished week. A lock call about game i had to be made before his team's next game tipped, so everything that
+// had finished by that tip was known. For each such deadline, every team's week is simulated from what was known then (locked
 // slots fixed, open slots playing out their remaining games), and each decision is judged by its effect on that team's
 // head-to-head and league-median chances (weighted by title odds where the League simulation has them).
 // Lockable only if he was in the starting lineup for that whole game. From the lineup history: no for a player who wasn't
@@ -2688,15 +2706,22 @@ function gradeWeek(w, rows, logs, SL, per){
   const N=200, median=!!S.league.settings?.league_average_match;
   const steps=st=>{ const V=stepsValue(st); return q=>{ for(let k=0;k<st.length;k++){ const x=stepDraw(st[k],q); if(k===st.length-1||x>=V[k+1]) return x } return 0 } };
   const gstep=(pid,x)=>({mu:x.mu, r:volOf(pid), cur:null, key:hashKey(pid+":"+x.id)});
-  const deadlines=new Set(); rows.forEach(r=>r.slots.forEach(sl=>sl.g.forEach((x,i)=>{ if(i>0) deadlines.add(x.date) })));
-  for(const D of [...deadlines].sort()){
+  // A lock call about game i can be made until his team's next game tips, so that's when it's judged (user, 11-08: "use the
+  // info they had at the time... the best info is right before tip of the next game"). Everything finished by then counts as
+  // known, games earlier that day included; nothing after does. Games he went on to miss still count as expected games
+  // (nobody knew yet), except one he sat out at that very tip (inactive lists are out by then).
+  const tipOf=x=>x.t||Date.parse(x.date+"T19:00:00"), endOf=x=>tipOf(x)+GAME_MS;
+  const deadlines=new Set(); rows.forEach(r=>r.slots.forEach(sl=>sl.g.forEach((x,i)=>{ if(i>0) deadlines.add(tipOf(x)) })));
+  for(const D of [...deadlines].sort((a,b)=>a-b)){
     // every team at deadline D: per-slot samples and totals
     const teams=rows.map(r=>{ const slotS=new Map(), tot=new Float64Array(N);
-      for(const sl of r.slots){ const g=sl.g, known=g.filter(x=>x.date<D), fut=g.filter(x=>x.date>=D), arr=new Float64Array(N);
+      for(const sl of r.slots){ const g=sl.g, arr=new Float64Array(N);
         if(!g.length){ slotS.set(sl.si,arr); continue }
-        const li=sl.idx, lockedNow= li>=0 && g[li].date<D && (known.length-1>li || !fut.length);
-        if(lockedNow || !fut.length){ arr.fill(li>=0&&g[li].date<D? g[li].fp : (known.length? known[known.length-1].fp : 0)) }
-        else { const cur=known.length? known[known.length-1].fp : null, st=fut.map(x=>gstep(sl.pid,x)), V=stepsValue(st), play=steps(st);
+        const known=g.filter(x=>endOf(x)<=D && x.fp!=null), fut=g.filter(x=>endOf(x)>D && !(x.dnp && tipOf(x)<=D)), li=sl.idx;
+        const closed=k=>g.slice(k+1).some(x=>tipOf(x)<=D);          // a later game has tipped: game k can't be locked any more
+        const lockedNow= li>=0 && endOf(g[li])<=D && (closed(li) || !fut.length);
+        if(lockedNow || !fut.length){ arr.fill(li>=0&&endOf(g[li])<=D? g[li].fp : (known.length? known[known.length-1].fp : 0)) }
+        else { const lk=known.length? known[known.length-1] : null, cur= lk && !closed(g.indexOf(lk))? lk.fp : null, st=fut.map(x=>gstep(sl.pid,x)), V=stepsValue(st), play=steps(st);
           for(let q=0;q<N;q++) arr[q]= (cur!=null && cur>=V[0])? cur : play(q) }
         slotS.set(sl.si,arr); for(let q=0;q<N;q++) tot[q]+=arr[q] }
       return {r, slotS, tot} });
@@ -2704,19 +2729,20 @@ function gradeWeek(w, rows, logs, SL, per){
       const others=teams.filter(x=>x!==T), wt=LG.wtFor? LG.wtFor(r.rid) : null;
       const P=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
       for(const sl of r.slots){ const g=sl.g; if(sl.idx<0 || g.length<2) continue;
-        const i=g.findIndex((x,k)=>k<g.length-1 && g[k+1].date===D); if(i<0 || i>sl.idx) continue;
+        const i=g.findIndex((x,k)=>k<g.length-1 && tipOf(g[k+1])===D); if(i<0 || i>sl.idx) continue;
         if(g[i].fp==null) continue;
         const started=startedThatDay(r.rid, sl.pid, g[i].date); if(started===false) continue;   // he wasn't in the lineup for that game (lineup history)
-        if(r.current && !(g[i+1].fp!=null || g[i+1].live)) continue;            // deadline not reached yet
+        if(r.current && tipOf(g[i+1])>Date.now()) continue;                     // deadline not reached yet
         const isOpen= r.current && r.open && r.open.has(sl.pid);
         if(isOpen && i===sl.idx) continue;                                       // his latest score is still undecided
         const s=g[i].fp, locked= i===sl.idx && !isOpen, unproven= started===null && !locked;   // a lock proves he started; a 'wait' needs the history
         // waiting: his games from the deadline on, then the best bench player who plays later in a spot this slot allows
-        const st=g.slice(i+1).map(x=>gstep(sl.pid,x)), last=g[g.length-1].date;
+        const st=g.slice(i+1).filter((x,k)=>!(k===0 && x.dnp)).map(x=>gstep(sl.pid,x)), last=g[g.length-1].date;   // sat at the deadline tip: known
         let bk=null; for(const bp of r.players){ if(r.starters.includes(bp)) continue; if(!elig(playerInfo(bp).pos, SL[sl.si])) continue;
           const lg_=(logs[bp]||[]).filter(x=>x.date>last); if(!lg_.length) continue; const v=waitValue(lg_.map(x=>({mu:x.mu,sd:sdFor(bp,x.mu)})));
           if(!bk||v>bk.v) bk={v, st:lg_.map(x=>gstep(bp,x))} }
         if(bk) st.push(...bk.st);
+        if(!st.length) continue;                                                  // he sat the rest: his score stood either way
         const play=steps(st), rest=new Float64Array(N), own=T.slotS.get(sl.si), waitS=new Float64Array(N);
         for(let q=0;q<N;q++){ rest[q]=T.tot[q]-own[q]; waitS[q]=play(q) }
         const ev=add=>{ let h=0, md=0, m=0; for(let q=0;q<N;q++){ const me=rest[q]+(typeof add==="number"? add : add[q]); m+=me; if(me>opp.tot[q]) h++;
@@ -2744,7 +2770,7 @@ function gradeWeek(w, rows, logs, SL, per){
       const early= !isOpen && sl.idx<g.length-1;
       if(!r.current){ P.slots++; if(early){ P.early++; if(avg>0) P.ratios.push(g[sl.idx].fp/avg); P.left.push(g.length-1-sl.idx) } }
       P.log.push({w, pid:sl.pid, k:sl.idx+1, n:g.length, fp:g[sl.idx].fp, avg, early, open:isOpen, current:!!r.current,
-        games:g.map(x=>x.fp), steps:(sl.steps||[]).sort((a,b)=>a.i-b.i)}) } }
+        games:g.map(x=>x.dnp? 0 : x.fp), steps:(sl.steps||[]).sort((a,b)=>a.i-b.i)}) } }
 }
 // Unverified waits phase out on their own: once a manager has TEND_VERIFIED graded calls from the lineup-tracked era, only
 // those count; until then every call counts and the unverified waits are flagged.
