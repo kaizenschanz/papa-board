@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cEjq1rslQnosz2SUxxJmQAyfLs95tf0r9x28k2Wqd54='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0sNbYxM5JEIpQw68i4c7oHUlZrnZJVfOsP1FT4Uoag4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2627,6 +2627,9 @@ function claimOptions(A,P){
   const pre=[], seen=new Set();
   for(const pid of new Set([...Object.keys(W.projMeta||W.proj||{}), ...Object.keys(typeof byId!=="undefined"? byId : {})])){ if(owned.has(pid)) continue;
     const info=playerInfo(pid); if(!info.team || seasonAvail(pid, info.inj)<0.5) continue;
+    // no Sleeper projection this week (injured, usually): never suggested (user, 11-09: "if they don't have projections just
+    // don't suggest them"; Yves Missi, 2 games played, drew a two-drop claim off his 2-game average)
+    if(!Object.values(W.proj?.[pid]||{}).some(r=>r&&r.stats&&scoreStats(r.stats)>0)) continue;
     const from=claimFrom(pid), fut=playerWeek(pid).games.filter(g=>!g.done && !g.live && g.date>=from && g.mu>0);
     const fits=fut.length && [...openSlots].some(sn=>elig(info.pos,sn));
     pre.push({pid, info, from, fut: fits? fut : [], v: fits? waitValue(fut) : 0, ros:baseMean(pid)}) }
