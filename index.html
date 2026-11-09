@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-boil/xZfVmzvA8GXk7pJEhjY2sMjwPwCllIibpEr/A4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AYMZZrqifhoNH93ha+hQUzM3UX2n+/DdqnVPaFtFtt8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2806,7 +2806,7 @@ function gradeWeek(w, rows, logs, SL, per){
             let pm=0; for(let q=0;q<N;q++) pm+=po(q); pm/=N;
             let got=fut[fut.length-1].fp; for(let k=0;k<fut.length-1;k++) if(fut[k].fp>=Vo[k+1]){ got=fut[k].fp; break }
             (LG.waitChk ||= []).push({rid:r.rid, w, s, said: bestL?"lock":"wait", did: locked?"lock":"wait", promised:pm, got, moot}) } }
-        (sl.steps ||= []).push({i, sc:s, locked, ok, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven});
+        (sl.steps ||= []).push({i, sc:s, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven});
       } }
   }
   // per-slot summary rows (what was locked, what was passed up)
@@ -2861,7 +2861,8 @@ function renderTend(){
       if(d.w!==lastW){ items+='<div class="twk">'+wkLabel(d.w)+(d.current?' · so far':'')+'</div>'; lastW=d.w }
       const nm=playerInfo(d.pid).name, final=d.fp;
       const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(2) : 'Passed up '+c.sc.toFixed(2))+' after game '+(c.i+1)+': <b>'+(c.L.h+c.L.md).toFixed(2)+'</b> wins if locked vs <b>'+(c.Wt.h+c.Wt.md).toFixed(2)+'</b> if not'+
-          (c.moot?' <span class="muted">· didn\'t matter</span>' : c.close?' <span class="muted">· close call</span>' : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
+          // low stakes / close: credit the side the replay leaned to (Trae, locked 21.54 on a "coin flip, lean lock" with a big lead)
+          (c.moot? (c.best?' <span class="ok">✓</span> <span class="muted">low stakes</span>':' <span class="muted">low stakes</span>') : c.close? (c.best?' <span class="ok">✓</span> <span class="muted">close</span>':' <span class="muted">close call</span>') : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
       const later=d.early? d.games.slice(d.k).filter(v=>v!=null) : [], left=d.games.slice(d.k).filter(v=>v==null).length;
       const outcome= d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
         : d.early? 'He locked '+final.toFixed(2)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(2)).join(', ') : '')+(left?' ('+left+' still to play)':'')
