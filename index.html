@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6h9TfiHRUx11eO55PjNyoDZRW1K0BhauwpLhKvyp+38='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-RGKKXV8JrRDenpVhiBraXC5JS0iQumddFqJceW2kzmA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -203,6 +203,11 @@ button.g:hover{border-color:var(--ink)}
 .mu .sc b{color:var(--ink);font:700 16px/1 var(--display)}
 .mu .sc b.md{font:700 13px/1 var(--body)}
 .mu .vs{font:700 13px/1 var(--display);color:var(--muted);text-align:center}
+details.lgm>summary{list-style:none;cursor:pointer}
+details.lgm>summary::-webkit-details-marker{display:none}
+details.lgm>summary .vs::after{content:"▾";display:block;margin-top:3px;font-size:11px;opacity:.6;transition:transform .15s}
+details.lgm[open]>summary .vs::after{transform:rotate(180deg)}
+details.lgm .lgg{padding:4px 0 12px}
 .wpbar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--line);overflow:hidden;display:flex}
 .wpbar i{display:block;height:100%;background:var(--accent)}
 .warn-note{background:var(--warn-soft);border-radius:4px;padding:6px 8px;margin-bottom:4px}
@@ -2154,21 +2159,27 @@ function playerDetail(x,mine){
   const nx=a.future[0], sp=nx&&srcParts(nx);
   let why="";
   if(mine && a.why && (x.starter&&!a.lockedOn || a.call?.t?.startsWith("Start"))) why=a.why;
-  if(!mine && x.starter && !a.lockedOn && a.latest && !a.latest.dnp && a.future.length && W.vs?.oppPlan)
+  if(mine===false && x.starter && !a.lockedOn && a.latest && !a.latest.dnp && a.future.length && W.vs?.oppPlan)
     why= W.vs.oppPlan.pick.get(pid)?.k==="lock"? "Their best play: lock it." : "Their best play: play on.";
   return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div>'+
     (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(why?'<div class="ln why">'+esc(why)+'</div>':'')+'</div>';
 }
-function renderMatchup(A){
-  const v=W.vs, el=$("wkMatch"); if(!v||!v.oppRows){ el.innerHTML='<div class="empty">No opponent this week.</div>'; return }
-  const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR"), B=v.oppRows, isMe=viewingMe();
+// One matchup as rows: each slot's player, his lock or live score, his next game, and the slot's projected value (from that
+// team's own plan; a slot the plan gives to someone else shows "-> him"). Used by the Lock-in tab (your matchup, with your calls)
+// and by the League tab (any matchup).
+// Re-render without closing what the viewer has open (user, 11-08: rows snapped shut on the 2-minute refresh): <details data-k>
+// keep their open state, and the page keeps its scroll position.
+function keepOpen(el, html){ const open=new Set([...el.querySelectorAll("details[data-k][open]")].map(d=>d.dataset.k)), y=window.scrollY;
+  el.innerHTML=html; if(open.size) el.querySelectorAll("details[data-k]").forEach(d=>{ if(open.has(d.dataset.k)) d.open=true });
+  if(Math.abs(window.scrollY-y)>2) window.scrollTo(0,y) }
+function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA){
+  const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   const tipS=(pid,g)=>{ const t=tipAt(pid,g.date); return dayLabel(g.date)+(t?" "+clock(t).replace(":00","").replace(" ","").toLowerCase():"") };
-  // a slot the plan gives to someone else (Buzelis over Kuzma at F): show that player and the slot's value in the row
   const holderAt=(Q,i)=>{ const e=Q&&[...Q.pick].find(([,q])=>q.slot===i); return e? e[0] : null };
-  const cell=(x,D,mine)=>{ if(!x) return '<div class="pc"><span class="n muted">—</span></div>';
+  const cell=(x,D,Q,R,mine)=>{ if(!x) return '<div class="pc"><span class="n muted">—</span></div>';
     const a=x.a; let s="", val="", vc="";
-    const hp= x.starter&&!a.lockedOn? holderAt(mine? v.plan : v.oppPlan, x.idx) : null, other= hp&&hp!==x.pid&&!D.parts.get(x.pid)? hp : null;
-    if(other){ const o=(mine? A : B).find(y=>y.pid===other), q=D.parts.get(other);
+    const hp= x.starter&&!a.lockedOn? holderAt(Q, x.idx) : null, other= hp&&hp!==x.pid&&!D.parts.get(x.pid)? hp : null;
+    if(other){ const o=R.find(y=>y.pid===other), q=D.parts.get(other);
       return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+q.m.toFixed(2)+'</span>':'')+'</div>' }
     const badge= mine&&x.starter&&!a.lockedOn&&a.call&&/^(lock|wait)$/.test(a.call.c)? '<span class="badge '+a.call.c+'">'+(a.call.c==="lock"?"Lock":"Wait")+'</span> '
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
@@ -2181,15 +2192,19 @@ function renderMatchup(A){
       else if(!g && !a.live && !now) bits.push('done');
       s=bits.join(' · '); if(p && !val) val='~'+p.m.toFixed(2) }
     return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
-  const row=(lab,a,b)=>'<details class="mr"><summary><span class="sl">'+lab+'</span>'+cell(a,v.me,true)+cell(b,v.opp,false)+'</summary><div class="det">'+(a?playerDetail(a,true):'<div></div>')+(b?playerDetail(b,false):'<div></div>')+'</div></details>';
+  const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA)+cell(b,DB,QB,B,false)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null):'<div></div>')+(b?playerDetail(b,mineA? false : null):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
-  let h='<div class="mhd"><span></span><span>'+(isMe?'You':esc(rosterName(viewRoster().roster_id)))+'</span><span>'+esc(v.name)+'</span></div>';
+  let h='<div class="mhd"><span></span><span>'+esc(nameA)+'</span><span>'+esc(nameB)+'</span></div>';
   SL.forEach((s,i)=>{ h+=row(s,at(A,i),at(B,i)) });
   const tot=(R,D)=>'<div class="pc"><span class="n">'+lockedSum(R).toFixed(2)+' locked</span><span class="s">± '+Math.sqrt(D.v).toFixed(0)+'</span><span class="v">'+D.m.toFixed(2)+'</span></div>';
-  h+='<div class="mtot"><span class="sl">Total</span>'+tot(A,v.me)+tot(B,v.opp)+'</div>';
+  h+='<div class="mtot"><span class="sl">Total</span>'+tot(A,DA)+tot(B,DB)+'</div>';
   const bA=A.filter(x=>!x.starter), bB=B.filter(x=>!x.starter), n=Math.max(bA.length,bB.length);
   if(n){ h+='<div class="mbh">Bench</div>'; for(let i=0;i<n;i++) h+=row('',bA[i],bB[i]) }
-  el.innerHTML=h;
+  return h;
+}
+function renderMatchup(A){
+  const v=W.vs, el=$("wkMatch"); if(!v||!v.oppRows){ el.innerHTML='<div class="empty">No opponent this week.</div>'; return }
+  keepOpen(el, gridHTML(A, v.me, v.plan, v.oppRows, v.opp, v.oppPlan, viewingMe()?'You':rosterName(viewRoster().roster_id), v.name, true));
 }
 function renderInfo(){
   const bits=[], LI=W.linesInfo;
@@ -2574,17 +2589,17 @@ function renderPool(me, A, P){
   const by=W.poolSort||"week";
   cand.sort(by==="hot"? (a,b)=>(b.r4?.avg??-99)-(a.r4?.avg??-99) : by==="proj"? (a,b)=>b.proj-a.proj : (a,b)=>b.v-a.v);
   // same look as the matchup rows: name + status line + value on the right, tap for the details
-  $("wkPool").innerHTML = moves.join("") + (cand.length ? cand.slice(0,W.poolLimit).map((c,i)=>{
+  keepOpen($("wkPool"), moves.join("") + (cand.length ? cand.slice(0,W.poolLimit).map((c,i)=>{
     const badge= c.beat? '<span class="badge start">Add</span>' : '';
     const sub=badge+esc((c.info.team||"FA")+" "+c.info.pos.join("/"))+' · '+c.n+' game'+(c.n===1?'':'s')+(c.mine?(viewingMe()?' · your bench':' · bench'):' · from '+dayLabel(c.from))+' · ~'+c.proj.toFixed(0)+'/g';
-    return '<details class="mr pk"><summary><span class="sl">'+(i+1)+'</span><div class="pc"><span class="n">'+esc(c.info.name)+(c.info.inj?' <span class="chip inj">'+esc(c.info.inj)+'</span>':'')+'</span><span class="s">'+sub+'</span><span class="v">'+c.v.toFixed(2)+'</span></div></summary>'+
+    return '<details class="mr pk" data-k="pk'+c.pid+'"><summary><span class="sl">'+(i+1)+'</span><div class="pc"><span class="n">'+esc(c.info.name)+(c.info.inj?' <span class="chip inj">'+esc(c.info.inj)+'</span>':'')+'</span><span class="s">'+sub+'</span><span class="v">'+c.v.toFixed(2)+'</span></div></summary>'+
       '<div class="det"><div class="pd">'+
         (c.beat?'<div class="ln why">Beats <b>'+esc(c.beat.name)+'</b> in '+c.beat.slot+' ('+c.beat.value.toFixed(2)+' for the rest of the week vs his '+c.v.toFixed(2)+').</div>':'')+
         '<div class="ln">Games he can play for you: <b>'+esc(c.sched.join(" · "))+'</b>'+(c.skipped?' <i>(plus '+c.skipped+' today, before a claim clears)</i>':'')+'</div>'+
         '<div class="ln">Projection <b>'+c.proj.toFixed(2)+'</b>/g'+(c.src?' ('+c.src+')':'')+' · last '+(c.r4?c.r4.list.length:0)+' <b>'+(c.r4?c.r4.avg.toFixed(2):'–')+'</b>/g'+(c.r4?' <i>('+c.r4.list.map(g=>g.fp.toFixed(0)).join(', ')+')</i>':'')+'</div>'+
         '<div class="ln">'+(c.mine?(viewingMe()?'On your bench.':'On their bench.'):'Free agent: a claim counts from '+dayLabel(c.from)+'.')+' Value is what he\'s worth for the rest of the week played right (lock a big game, else ride on).</div>'+
       '</div></div></details>' }).join("")
-    : '<div class="empty">No players with games left this week.</div>');
+    : '<div class="empty">No players with games left this week.</div>'));
   $("wkPoolMore").hidden = cand.length<=W.poolLimit;
 }
 
@@ -2852,10 +2867,10 @@ function renderTend(){
         : d.early? 'He locked '+final.toFixed(2)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(2)).join(', ') : '')+(left?' ('+left+' still to play)':'')
         : 'Rode it to the last game: '+final.toFixed(2);
       items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
-    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+t.dec+' calls</small>':'')+'</span>'+
+    h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'" data-k="t'+x.rid+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(2)+'</span><span>'+t.waitMiss+' waited'+(t.waitUnv?' <i title="before lineup tracking: could have been a bench game">('+t.waitUnv+'?)</i>':'')+'<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(2):'–')+'</span><span></span></div>';
-  el.innerHTML=h;
+  keepOpen(el,h);
 }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
 function leagueOdds(){
@@ -3013,6 +3028,16 @@ function computeLeague(){
   LG.out={teams, weeks:weeks.length, N, median, scale:avgActual/avgModel};
 }
 function pairsOf(m){ const by={}; (m||[]).forEach(x=>{ if(x.matchup_id!=null) (by[x.matchup_id] ||= []).push(x.roster_id) }); return Object.values(by).filter(p=>p.length===2) }
+// Both lineups of a League-tab matchup. Yours (when the Lock-in tab shows it) uses that tab's numbers exactly; any other is each
+// team's own plan and simulated week, the same way the league odds are worked out.
+function lgMatchGrid(a,b){
+  const v=W.vs, my=myRoster()?.roster_id;
+  if(v && viewingMe() && (a===my||b===my) && v.rid===(a===my? b : a))
+    return a===my? gridHTML(v.rows, v.me, v.plan, v.oppRows, v.opp, v.oppPlan, "You", v.name, true) : gridHTML(v.oppRows, v.opp, v.oppPlan, v.rows, v.me, v.plan, v.name, "You", false);
+  const side=rid=>{ const r=S.rosters[rid], m=W.matchups.find(x=>x.roster_id===rid)||{players_points:{}}, R=rowsFor(r,m,false), Q=planWeek(R,{light:true}); return {R, Q, D:teamDist(R,Q,1500)} };
+  const A=side(a), B=side(b);
+  return gridHTML(A.R, A.D, A.Q, B.R, B.D, B.Q, a===my? "You" : rosterName(a), b===my? "You" : rosterName(b), false);
+}
 function renderLeague(){
   const O=LG.out; if(!O) return; const T=O.teams;
   $("lgTitle").textContent=(S.league.name||"League")+" · Week "+W.week;
@@ -3021,6 +3046,7 @@ function renderLeague(){
   if(O.median){ const pm=pastMedians(), mp=medianOf(T.map(t=>t.proj));
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(0):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(0)+'</b>').join(", "):'')+'</span>') }
   // this week's matchups
+  const openRows=new Set([...$("lgWeek").querySelectorAll("details.lgm details.mr[open]")].map(r=>{ const m=r.closest("details.lgm"); return m.dataset.a+"-"+m.dataset.b+"|"+r.dataset.k })), y0=window.scrollY;
   const pairs=pairsOf(W.matchups), lo=(()=>{ try{ return leagueOdds() }catch(e){ return [] } })(), myRid=myRoster()?.roster_id;
   $("lgWeek").innerHTML=pairs.map(([a,b])=>{
     const A=T.find(t=>t.rid===a), B=T.find(t=>t.rid===b); if(!A||!B) return "";
@@ -3028,8 +3054,14 @@ function renderLeague(){
     const mine= W.vs && viewingMe() && (a===myRid||b===myRid) && W.vs.rid===(a===myRid?b:a), m=lo.find(x=>x.a===a&&x.b===b);
     const pA= mine? (a===myRid? W.vs.win : 1-W.vs.win) : m? m.pa : A.ww;
     const medOf=rid=> mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+Math.round(medOf(X.rid)*100)+'%</b>':'')+'</span></div>';
-    return '<div class="mu">'+side(A,false)+'<span class="vs">'+Math.round(pA*100)+'% – '+Math.round((1-pA)*100)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(pA*100).toFixed(2)+'%"></i></div></div>';
+    return '<details class="lgm" data-a="'+a+'" data-b="'+b+'"'+((LG.openM||new Set()).has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+Math.round(pA*100)+'% – '+Math.round((1-pA)*100)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(pA*100).toFixed(2)+'%"></i></div></div></summary><div class="lgg"></div></details>';
   }).join("");
+  // tap a matchup for both lineups (same rows as the Lock-in tab); it and its open rows stay open through refreshes
+  LG.openM ||= new Set();
+  $("lgWeek").querySelectorAll("details.lgm").forEach(d=>{ const k=d.dataset.a+"-"+d.dataset.b, fill=()=>{ const g=d.querySelector(".lgg"); if(!g.innerHTML) try{ g.innerHTML=lgMatchGrid(+d.dataset.a,+d.dataset.b) }catch(e){ g.innerHTML='<div class="empty">Couldn\'t build this matchup.</div>' } };
+    if(d.open){ fill(); d.querySelectorAll(".lgg details.mr").forEach(r=>{ if(openRows.has(k+"|"+r.dataset.k)) r.open=true }) }
+    d.addEventListener("toggle",()=>{ if(d.open){ LG.openM.add(k); fill() } else LG.openM.delete(k) }) });
+  if(Math.abs(window.scrollY-y0)>2) window.scrollTo(0,y0);
   // projected finish: expected wins at season's end, then expected points (the league's tiebreak)
   const order=[...T].sort((x,y)=>y.xw-x.xw||y.xpf-x.xpf);
   const cut=S.league.settings?.playoff_teams||8;
