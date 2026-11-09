@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/hDouosgUBKXYuSVoxGjv1gO5xVvA6jN8h3/jsvlmxg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VeVWiBrDJl9q4g15sYuSEQuMPy/NxV6EYvB1IKzuphk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2245,7 +2245,7 @@ function renderWeek(){
   const me=viewRoster(), isMe=viewingMe();
   if(!me){ $("wkTodo").innerHTML='<div class="empty">Couldn\'t find your roster in this league.</div>'; return }
   { const sel=$("teamSel"), mineR=myRoster(), opts=Object.values(S.rosters).sort((a,b)=>(a.roster_id===mineR?.roster_id?-1:b.roster_id===mineR?.roster_id?1:rosterName(a.roster_id).localeCompare(rosterName(b.roster_id))));
-    const html=opts.map(r=>'<option value="'+r.roster_id+'"'+(r.roster_id===me.roster_id?' selected':'')+'>'+esc(rosterName(r.roster_id))+(r.roster_id===mineR?.roster_id?' (you)':'')+'</option>').join("");
+    const html=opts.map(r=>'<option value="'+r.roster_id+'"'+(r.roster_id===me.roster_id?' selected':'')+'>'+esc(rosterName(r.roster_id))+'</option>').join("");
     if(sel.dataset.h!==html){ sel.innerHTML=html; sel.dataset.h=html } }
   const mine=W.matchups.find(m=>m.roster_id===me.roster_id)||{starters:[],players_points:{},points:0};
   const opp=W.matchups.find(m=>m.matchup_id===mine.matchup_id && m.roster_id!==me.roster_id);
