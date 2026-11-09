@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JRr6FOkzBdRjJSoYN4UDa3nrEb3oQ0kqkE+ZWUperFs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1Y/G1Z9S6H15aDhpF7LaxP+K9PqIop2ZAVDqsGGnaF8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1453,6 +1453,44 @@ function playSteps(st,V,s,risk=0){
     i=nx }
   return 0;
 }
+// playSteps for slots that share a bench player: the same play, plus which shared players' games it used (gain: what that game
+// was worth to this slot over doing without it, judged at his tip) and the step whose score counts (kept). blocked: games
+// another slot got in this draw, skipped like a game he misses.
+function playPath(st,V,s,risk,blocked,sharedPid){
+  const n=st.length, used=[], open=j=>{ if(blocked) while(j<n && blocked.has(st[j].key)) j++; return j };
+  let i=open(0), gain=Infinity;
+  while(i<n){ const t=st[i], nx0=open(i+1);
+    if(t.pm && uAt(t.key^0x68E31DA4,s)<t.pm){ if(nx0>=n) return {val:0, used, kept:-1}; const n2=open(nx0+1); gain=V.e[nx0]-(n2<n? V[n2] : 0); i=nx0; continue }
+    if(sharedPid.has(t.pid)) used.push({key:t.key, pid:t.pid, at:t.t||t.ord, gain});
+    const xv=stepDraw(t,s), o=V.ov&&V.ov[i]; let nx=nx0;
+    if(o){ nx=open(o.k);
+      if(o.J.length){ let p= t.cur!=null? t.cur : 0, ph= t.cur!=null? (t.f0||0) : 0, sw=-1, g=0;
+        for(let m=0;m<o.J.length;m++){ const j=o.J[m], b=st[j], psi= ph<1? Math.max(0,(o.ph[m]-ph)/(1-ph)) : 0;
+          p=bridgeStep(p,xv,psi,qnorm(uAt(t.key^(0x2545F491+m*0x61C88647),s))); ph=Math.max(ph,o.ph[m]);
+          if(blocked && blocked.has(b.key)) continue;                   // another slot has him tonight
+          if(b.pm && uAt(b.key^0x68E31DA4,s)<b.pm) continue;
+          const kv=kvAt(o.kv[m],p); if(V.e[j]+risk>kv){ sw=j; g=V.e[j]-kv; break } }
+        if(sw>=0){ i=sw; gain=g; continue } } }
+    if(nx>=n || xv>=V[nx]+risk) return {val:xv, used, kept:i};
+    { const n2=open(nx+1); gain=V.e[nx]-Math.max(xv, n2<n? V[n2] : -1e9) }
+    i=nx }
+  return {val:0, used, kept:-1};
+}
+// One draw for slots that share bench players: play each; when two used the same bench game it goes to the slot it helps most
+// and the other replays without it. A bench player whose score counts in one slot is stuck there: his later games are off
+// for the others. Settled in tip order.
+function resolveDraw(slots,s,risk,sharedPid){
+  const blk=new Array(slots.length).fill(null), res=slots.map(S=>playPath(S.st,S.V,s,risk,null,sharedPid));
+  for(let guard=0;guard<16;guard++){ let hit=null;
+    for(let a=0;a<res.length;a++) for(const u of res[a].used) for(let b=a+1;b<res.length;b++) for(const w of res[b].used)
+      if(u.key===w.key && (!hit || u.at<hit.at)) hit={at:u.at, key:u.key, lose: u.gain>=w.gain? b : a};
+    for(let a=0;a<res.length;a++){ const k=res[a].kept; if(k<0) continue; const kt=slots[a].st[k]; if(!sharedPid.has(kt.pid)) continue; const kat=kt.t||kt.ord;
+      for(let b=0;b<res.length;b++) if(b!==a) for(const w of res[b].used) if(w.pid===kt.pid && w.at>kat && (!hit || w.at<hit.at)) hit={at:w.at, key:w.key, lose:b} }
+    if(!hit) break;
+    (blk[hit.lose] ||= new Set()).add(hit.key);
+    res[hit.lose]=playPath(slots[hit.lose].st,slots[hit.lose].V,s,risk,blk[hit.lose],sharedPid) }
+  for(let a=0;a<slots.length;a++) slots[a].arr[s]=slots[a].wb+res[a].val;
+}
 function stepDraw(t,s){ const u=uAt(t.key,s), r=t.r||1; return t.cur!=null? t.cur+drawScore(Math.max(0,t.mu-t.cur),u,r) : drawScore(t.mu,u,r) }
 // V[i]: what the chain from step i is worth (his missed-game chance included); V.e[i]: the same if he plays.
 // Chains with a mid-game look take ~0.6 ms to value and repeat across the many plans compared, so those are cached.
@@ -1483,14 +1521,17 @@ function ovRho(pid,g,T){
 function teamDist(A,P,N=SIM_N,risk=0){
   if(!SHAPE) return teamDistNormal(A,P);
   let base=0; for(const x of A){ if(x.starter && x.a.lockedOn) base+=x.a.lockedOn.fp }
-  const tot=new Float64Array(N).fill(base), parts=new Map();
+  const tot=new Float64Array(N).fill(base), parts=new Map(), SL=[];
   for(const [pid,p] of P.pick){
     if(p.k==="lock"){ for(let s=0;s<N;s++) tot[s]+=p.v; parts.set(pid,{m:p.v,v:0}); continue }
-    const st=slotSteps(A,P,pid), V=stepsValue(st), arr=new Float64Array(N), wb=waitBias(st.length); let s1=0,s2=0;
-    for(let s=0;s<N;s++){ const val=wb+playSteps(st,V,s,risk);
-      tot[s]+=val; arr[s]=val; s1+=val; s2+=val*val }
-    parts.set(pid,{m:s1/N, v:Math.max(0,s2/N-(s1/N)**2), s:arr});
-  }
+    const st=slotSteps(A,P,pid); SL.push({pid, st, V:stepsValue(st), wb:waitBias(st.length), arr:new Float64Array(N)}) }
+  // A bench player can be the fallback in several slots' chains, but each of his games goes to one slot per draw (and once his
+  // score counts in a slot he's stuck there): slots that share someone are played together (resolveDraw), the rest alone.
+  const cnt=new Map(); for(const S of SL){ const seen=new Set(); for(const t of S.st) if(t.pid!==S.pid && !seen.has(t.pid)){ seen.add(t.pid); cnt.set(t.pid,(cnt.get(t.pid)||0)+1) } }
+  const sharedPid=new Set([...cnt].filter(([,n])=>n>1).map(([k])=>k)), joint=SL.filter(S=>S.st.some(t=>t.pid!==S.pid && sharedPid.has(t.pid)));
+  for(const S of SL){ if(joint.includes(S)) continue; for(let s=0;s<N;s++) S.arr[s]=S.wb+playSteps(S.st,S.V,s,risk) }
+  if(joint.length) for(let s=0;s<N;s++) resolveDraw(joint,s,risk,sharedPid);
+  for(const S of SL){ let s1=0,s2=0; for(let s=0;s<N;s++){ const v=S.arr[s]; tot[s]+=v; s1+=v; s2+=v*v } parts.set(S.pid,{m:s1/N, v:Math.max(0,s2/N-(s1/N)**2), s:S.arr}) }
   let m=0; for(let s=0;s<N;s++) m+=tot[s]; m/=N;
   // team-level spread learned from how this board's own odds have played out (calibrate_odds.py): player-by-player draws miss
   // what moves a whole roster together (pace, blowouts, late scratches), so the spread around the mean is scaled by f
@@ -1571,9 +1612,11 @@ function planWeek(A,opt={}){
   const tipOrDay=(pid,d)=>(typeof tipAt==="function"&&tipAt(pid,d))||Date.parse(d+"T12:00:00");
   // A fallback may tip while the holder's last game is still on (Lopez at 6:00 behind Pritchard's 5:00): then the holder gets
   // benched mid-game if his score so far is weak, so it's worth less than a fallback that tips after his final (rho).
+  // A bench player can back up every starter he's eligible for (user, 11-08): at his tip he goes to whichever slot he helps most,
+  // and the simulation gives his game to one slot per draw (teamDist).
   for(const h of holders){ const gs=holdGames(h.c); const last=gs.length? gs[gs.length-1] : null, lastT= last? tipOrDay(h.c.pid,last.date) : 0;
     let bestB=null;
-    for(const c of C){ if(best.pick.has(c.pid)||usedB.has(c.pid)||!elig(c.pos,SL[h.slot])) continue;
+    for(const c of C){ if(best.pick.has(c.pid)||!elig(c.pos,SL[h.slot])) continue;
       const later=c.x.a.future.filter(g=>g.mu>0 && tipOrDay(c.pid,g.date)>lastT+LOOK_GAP); if(!later.length) continue;
       const v=waitValue(later), rho=ovRho(h.c.pid,last,tipAt(c.pid,later[0].date)), hv=waitValueT(gs,v,rho);
       if(!bestB||hv>bestB.hv) bestB={pid:c.pid,v,date:later[0].date,games:later,rho,hv} }
@@ -1581,7 +1624,7 @@ function planWeek(A,opt={}){
   // ...and a second fallback that tips after the first (Claxton at 12:30, then Pritchard at 5:00 if Claxton flops)
   const backup2={};
   for(const h of holders){ const b=backup[h.c.pid]; if(!b) continue; const bt=tipOrDay(b.pid,b.date); let bb=null;
-    for(const c of C){ if(best.pick.has(c.pid)||usedB.has(c.pid)||!elig(c.pos,SL[h.slot])) continue;
+    for(const c of C){ if(best.pick.has(c.pid)||c.pid===b.pid||!elig(c.pos,SL[h.slot])) continue;
       const later=c.x.a.future.filter(g=>g.mu>0 && tipOrDay(c.pid,g.date)>bt+LOOK_GAP); if(!later.length) continue;
       const v=waitValue(later); if(!bb||v>bb.v) bb={pid:c.pid,v,date:later[0].date,games:later} }
     if(bb){ backup2[h.c.pid]=bb; usedB.add(bb.pid) } }
@@ -1615,7 +1658,7 @@ function planWeek(A,opt={}){
     for(let i=0;i<gs.length-1;i++){ const g=gs[i], gt= g.live? null : tipAt(pid,g.date), ge=gameEnd(pid,g); if(!ge || (!g.live && !gt)) continue;
       // analytic screen (the simulation values it properly): bench him at that tip only when his score so far looks weak
       const rest=waitValueT(gs.slice(i+1),term[pid],rhoT[pid]), keepM=emax(rest,g.mu,g.sd); let bm=null;
-      for(const o of C){ if(best.pick.has(o.pid)||usedB.has(o.pid)||usedP.has(o.pid)||usedM.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+      for(const o of C){ if(best.pick.has(o.pid)||usedP.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;   // shared like backups
         const og=o.x.a.future.find(h=>h.date===g.date && h.mu>0); if(!og) continue; const ot=tipAt(o.pid,og.date);
         if(!ot || ot>=ge || (gt && ot<gt+LOOK_GAP) || (g.live && ot<=(W.updated||Date.now()))) continue;
         const vB=emax(rest,og.mu,og.sd), rho=ovRho(pid,g,ot), gain=emax(vB,keepM,(g.sd||0)*Math.sqrt(rho))-keepM;
@@ -1995,7 +2038,7 @@ function todoItems(A,P){
       const live= !!(a.live && a.live.date===m.after), cur= live? (a.live.cur||0) : 0, sw=sl.bar===Infinity, bar=fx(sl.bar), ok= live && !sw && cur>=sl.bar;
       out.push({t:bt, pid, kind: sw? "move" : "check",
         title: sw? "Bench "+a.info.name+" for "+nm(m.pid)+" at "+clock(bt)+", whatever he has" : ok? "Leave "+a.info.name+" in: "+cur.toFixed(2)+" so far clears the "+bar+" he needs" : live? a.info.name+" has "+cur.toFixed(2)+" so far: keep him only at "+bar+"+" : "Keep "+a.info.name+" in only if he has "+bar+"+ so far",
-        note: ok? "" : ((sw? "" : "Otherwise bench him mid-game and start "+nm(m.pid)+".")+back).trim(),
+        note: ok||sw? "" : "Otherwise bench him mid-game and start "+nm(m.pid)+".",
         sub:(sw||ok? "" : "Check at "+clock(bt)+", "+nm(m.pid)+"'s tip. Under "+bar+", bench him and start "+nm(m.pid)+" (lock "+nm(m.pid)+"'s game only if it ends big).")+back,
         rems: ok? [] : [{id:"mid-"+pid+"-"+m.date, t:bt, lead:10, title: sw? "Start "+last(m.pid)+" for "+last(pid) : last(pid)+" under "+bar+" so far? Start "+last(m.pid)+" for him"}]}) } }
   return out.sort((a,b)=>(a.t??0)-(b.t??0));
