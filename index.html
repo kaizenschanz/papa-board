@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Ch4V6uLygaKHurtt11gV8grMrjoxjwAuCMg8F08qe9w='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YEvAw7vxvlmMSWxwzQOK5jZTF3AkiiPzHhGA4Vx223c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -901,7 +901,7 @@ async function loadWeek(force){
     const hasNext=inWk(base+1).length>0, baseDone=inWk(base).length>0 && inWk(base).every(g=>g.status==="complete");
     const pk=store.get("wk:"+lid,null), pick= pk && +pk.base===base? +pk.off : null;
     const week= base+((hasNext && (pick!=null? pick===1 : baseDone))? 1 : 0);
-    W.baseWeek=base; W.hasNext=hasNext;
+    W.baseWeek=base; W.hasNext=hasNext; W.baseDone=baseDone;
     if(W.week && W.week!==week){ LG.wt=null; LG.out=null; W._oth=null }   // another week: its own title weights and opponents
     const slow = force || !W.loaded || W.week!==week || Date.now()-W.slowAt>15*60*1000;
     // projections are big and change slowly, so they're re-read every 15 minutes; everything else on each refresh
@@ -950,6 +950,8 @@ async function loadWeek(force){
   }catch(e){ W.err=e.message; $("wkMsg").textContent="Couldn't load this week from Sleeper: "+e.message; $("wkMsg").classList.add("err") }
   finally{ W.loading=false; if(W.reloadWk){ W.reloadWk=false; setTimeout(()=>loadWeek(true),0) } }
 }
+// This page's week is over and the next one is a click away: what comes next (claims) belongs to that page.
+function weekOver(){ return W.games.length>0 && W.games.every(g=>g.status==="complete") && !!W.hasNext && W.week===W.baseWeek }
 // Week list: Sleeper's current week and the next one (only when there is a next week).
 function renderWkSel(){ const el=$("wkSel"), b=W.baseWeek; if(!el) return;
   if(!b || !W.hasNext){ el.hidden=true; return }
@@ -1003,7 +1005,9 @@ async function loadLegs(lid,week){
   } else $("tokRaw").textContent="No token saved.";
   let legs=null, snap=null, past={};
   try{ const r=await fetch("legs.json?t="+Date.now(),{cache:"no-store"}); if(r.ok){ const d=await r.json();
-    if(+d.week===+week && Array.isArray(d.legs) && d.at){ legs=d.legs; snap={at:+d.at} } past={...(d.past||{})};
+    if(+d.week===+week && Array.isArray(d.legs) && d.at){ legs=d.legs; snap={at:+d.at} }
+    else if(Array.isArray(d.past?.[week]) && d.past[week].length){ legs=d.past[week]; snap={at:Date.now(), final:true} }   // a finished week: its records are final
+    past={...(d.past||{})};
     if(+d.week<+week && Array.isArray(d.legs) && d.legs.length) past[d.week] ||= d.legs } }catch(e){}   // viewing next week: the copy's week is finished
   W.legs=legs; W.legLive=false; W.legSnap=snap; W.legsPastSnap=past;
 }
@@ -1934,8 +1938,9 @@ function todoItems(A,P){
     A.filter(x=>x.slot==="IR"&&!irOk(x.a.info.inj)).forEach((x,i)=>{ const d=drops[i];
       out.push({t:null, kind:"roster", title:(d? "Drop "+d.a.info.name+", then take "+x.a.info.name+" off IR" : "Take "+x.a.info.name+" off IR"),
         sub:(x.a.info.inj||"Healthy")+" players can't stay in IR here, and Sleeper blocks every pickup until he's activated."+(d? " "+d.a.info.name+" is your least valuable bench player (~"+dropScore(d).toFixed(1)+"/g) and isn't needed this week." : "")}) }) }
-  // waiver claim for later days (clears overnight), only if it raises title odds; the runners-up go in the note
-  { const cl=claimOptions(A,P);
+  // waiver claim for later days (clears overnight), only if it raises title odds; the runners-up go in the note.
+  // A finished week leaves claims to next week's page, which sees the games they'd play.
+  if(!weekOver()){ const cl=claimOptions(A,P);
     if(cl.length){ const c=cl[0], dl=new Date(); dl.setHours(23,30,0,0);
       out.push({t:null, kind:"roster", title:"Claim "+c.name+" tonight, drop "+c.drop.a.info.name,
         sub:"Adds "+claimGain(c)+(c.title?" title chance ("+claimSplit(c)+")":"")+": he "+c.role+". Season ~"+c.ros.toFixed(1)+"/g vs "+c.drop.a.info.name+"'s "+c.dropRos.toFixed(1)+"."+
@@ -2082,13 +2087,16 @@ function renderBoard(A,P){
   const pills=[];
   if(v){ pills.push('<span class="pill '+(v.win>=.5?'good':'bad')+'">Win <b>'+pct(v.win)+'</b></span>');
     if(v.med!=null) pills.push('<span class="pill">Median <b>'+pct(v.med)+'</b></span>');
-    if(v.title!=null) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b></span>') }
+    // title odds on one page at a time: this week while it's on, next week once this one is final (they can't disagree)
+    if(v.title!=null && !weekOver() && !(W.week>W.baseWeek && !W.baseDone)) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b></span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
   if(v) h+='<label class="oppmode">Opponent <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>Smart</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>All-in</option></select></label>';
   $("wkScore").innerHTML=h;
   const exact=legFor(me.roster_id), snapT=W.legSnap? clock(W.legSnap.at) : "";
   const fresh=W.games.length && !W.games.some(g=>g.status!=="pre_game");   // next week, nothing played yet
+  const final=W.games.length && W.games.every(g=>g.status==="complete") && exact;
   $("wkSum").innerHTML=(fresh? '<span class="ok">● Starts '+dayLabel(W.games[0].date)+'</span>'
+      : final? '<span class="ok">● Final</span>'
       : exact && W.legLive? '<span class="ok">● Exact locks · '+clock(W.updated||Date.now())+'</span>'
       : exact && !legOld()? '<span class="ok">● Exact locks · '+snapT+'</span>'
       : exact? '<span class="warn">● Locks as of '+snapT+'</span>'
@@ -2119,8 +2127,13 @@ function renderMatchup(A){
   const v=W.vs, el=$("wkMatch"); if(!v||!v.oppRows){ el.innerHTML='<div class="empty">No opponent this week.</div>'; return }
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR"), B=v.oppRows, isMe=viewingMe();
   const tipS=(pid,g)=>{ const t=tipAt(pid,g.date); return dayLabel(g.date)+(t?" "+clock(t).replace(":00","").replace(" ","").toLowerCase():"") };
+  // a slot the plan gives to someone else (Buzelis over Kuzma at F): show that player and the slot's value in the row
+  const holderAt=(Q,i)=>{ const e=Q&&[...Q.pick].find(([,q])=>q.slot===i); return e? e[0] : null };
   const cell=(x,D,mine)=>{ if(!x) return '<div class="pc"><span class="n muted">—</span></div>';
     const a=x.a; let s="", val="", vc="";
+    const hp= x.starter&&!a.lockedOn? holderAt(mine? v.plan : v.oppPlan, x.idx) : null, other= hp&&hp!==x.pid&&!D.parts.get(x.pid)? hp : null;
+    if(other){ const o=(mine? A : B).find(y=>y.pid===other), q=D.parts.get(other);
+      return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+q.m.toFixed(2)+'</span>':'')+'</div>' }
     const badge= mine&&x.starter&&!a.lockedOn&&a.call&&/^(lock|wait)$/.test(a.call.c)? '<span class="badge '+a.call.c+'">'+(a.call.c==="lock"?"Lock":"Wait")+'</span> '
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
     if(a.lockedOn){ s='Locked · '+dayLabel(a.lockedOn.date); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
@@ -2281,7 +2294,7 @@ function renderWeek(){
   { let el=document.getElementById("tlJson"); if(!el){ el=document.createElement("script"); el.type="application/json"; el.id="tlJson"; document.body.appendChild(el) }
     el.textContent= W.tlJson || JSON.stringify({week:W.week, at:Date.now(), events:[]}); W.tlJson=null }
   renderMatchup(A);
-  $("wkPoolCard").hidden=false; renderPool(me, A, P);
+  $("wkPoolCard").hidden=weekOver(); if(!weekOver()) renderPool(me, A, P);
   renderInfo();
 }
 
@@ -2549,7 +2562,8 @@ function legTotals(m,w){
     return {...x, points:+t.toFixed(2)} });
 }
 async function pastWeeks(){
-  const lid=S.league.league_id, weeks=[]; for(let w=1; w<W.week; w++) weeks.push(w);
+  // finished weeks only: looking ahead to next week mid-week, the week still being played isn't a result yet
+  const lid=S.league.league_id, weeks=[]; for(let w=1; w<W.week; w++) if(!(w===W.baseWeek && !W.baseDone)) weeks.push(w);
   const raw=store.get("slpToken",null), tok=raw? fixTok(raw) : null;
   if(tok){ try{
     const res=await Promise.all(weeks.map(async w=>{ const r=await fetch("https://sleeper.com/graphql",{method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
@@ -2576,6 +2590,7 @@ async function loadLeague(force){
       const weeks=[]; for(let w=W.week+1; w<=last; w++) weeks.push(w);
       const res=await Promise.all(weeks.map(w=>j("/league/"+S.league.league_id+"/matchups/"+w).then(m=>[w,m]).catch(()=>[w,[]])));
       LG.sched=Object.fromEntries(res); LG.schedWeek=W.week;
+      LG.baseM= W.baseWeek<W.week && !W.baseDone? await j("/league/"+S.league.league_id+"/matchups/"+W.baseWeek).catch(()=>[]) : null;
       LG.past=await pastWeeks();
     }
     computeLeague(); renderLeague();
@@ -2809,6 +2824,7 @@ async function refreshTitleWeights(){
       const weeks=[]; for(let w=W.week+1; w<=last; w++) weeks.push(w);
       const res=await Promise.all(weeks.map(w=>j("/league/"+S.league.league_id+"/matchups/"+w).then(m=>[w,m]).catch(()=>[w,[]])));
       LG.sched=Object.fromEntries(res); LG.schedWeek=W.week;
+      LG.baseM= W.baseWeek<W.week && !W.baseDone? await j("/league/"+S.league.league_id+"/matchups/"+W.baseWeek).catch(()=>[]) : null;
       LG.past=await pastWeeks();
     }
     computeLeague(); renderWeek();
@@ -2862,7 +2878,18 @@ function computeLeague(){
   // simulate the rest of the regular season and the playoffs (seeded random numbers, so re-runs with a tweak are comparable)
   const N=8000, idx=Object.fromEntries(teams.map((t,i)=>[t.rid,i])), n=teams.length, cut=S.league.settings?.playoff_teams||8;
   const median=!!S.league.settings?.league_average_match;
-  const weeks=[{w:W.week, pairs:pairsOf(W.matchups), cur:true}].concat(Object.entries(LG.sched||{}).map(([w,m])=>({w:+w,pairs:pairsOf(m)})));
+  // Sleeper's standings lag: the night a week ends they still show only the weeks before it (11-08: everyone at 4 games after
+  // week 3). Any finished week they're missing gets added from its final totals: head-to-head result, median win, points for.
+  { const g= median? 2 : 1;
+    for(let w=1; w<W.week; w++){ const m=(LG.past||[])[w-1]; if(!m||!m.some(x=>x.points>0)) continue;
+      const pts=Object.fromEntries(m.map(x=>[x.roster_id,+x.points||0])), sorted=Object.values(pts).sort((a,b)=>a-b), k=sorted.length, med= k? (k%2? sorted[(k-1)/2] : (sorted[k/2-1]+sorted[k/2])/2) : 0;
+      for(const t of teams){ if(t.w+t.l+t.t>=w*g || pts[t.rid]==null) continue;
+        const mine=m.find(x=>x.roster_id===t.rid), opp=m.find(x=>x.matchup_id===mine.matchup_id && x.roster_id!==t.rid), p=pts[t.rid], q= opp? +opp.points||0 : null;
+        if(q!=null){ if(p>q) t.w++; else if(p<q) t.l++; else t.t++ }
+        if(median){ if(p>med) t.w++; else if(p<med) t.l++; else t.t++ }
+        t.pf+=p; if(q!=null) t.pa+=q } } }
+  // looking ahead mid-week: the week still being played is simulated from team strength like later weeks
+  const weeks=(LG.baseM&&LG.baseM.length? [{w:W.baseWeek, pairs:pairsOf(LG.baseM)}] : []).concat([{w:W.week, pairs:pairsOf(W.matchups), cur:true}]).concat(Object.entries(LG.sched||{}).map(([w,m])=>({w:+w,pairs:pairsOf(m)})));
   const meI=teams.findIndex(t=>t.me);
   const sim=(addW,addPF,ti=meI,addMu=0)=>{   // addMu: team ti's weekly strength shifted for future weeks (pickups)
     let seed=12345; const rnd=()=>{ seed|=0; seed=seed+0x6D2B79F5|0; let x=Math.imul(seed^seed>>>15,1|seed); x=x+Math.imul(x^x>>>7,61|x)^x; return ((x^x>>>14)>>>0)/4294967296 };
