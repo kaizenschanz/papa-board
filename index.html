@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AYMZZrqifhoNH93ha+hQUzM3UX2n+/DdqnVPaFtFtt8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/hDouosgUBKXYuSVoxGjv1gO5xVvA6jN8h3/jsvlmxg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -208,6 +208,10 @@ details.lgm>summary::-webkit-details-marker{display:none}
 details.lgm>summary .vs::after{content:"▾";display:block;margin-top:3px;font-size:11px;opacity:.6;transition:transform .15s}
 details.lgm[open]>summary .vs::after{transform:rotate(180deg)}
 details.lgm .lgg{padding:4px 0 12px}
+.spark{display:flex;align-items:center;gap:8px;margin:0 0 6px}.spark svg{flex:1;min-width:0;height:auto;max-height:80px}
+.spark path{fill:none;stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}.spark .mid{stroke:var(--line);stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.spark text{font:600 9px var(--body);fill:var(--muted)}.spark b{font:700 16px/1 var(--display);min-width:38px;text-align:right}
+.lg-table td.good{color:var(--good)}.lg-table td.bad{color:var(--warn)}
 .wpbar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--line);overflow:hidden;display:flex}
 .wpbar i{display:block;height:100%;background:var(--accent)}
 .warn-note{background:var(--warn-soft);border-radius:4px;padding:6px 8px;margin-bottom:4px}
@@ -381,6 +385,14 @@ details.fold #poolSeg{margin-bottom:6px}
     <div class="card">
       <h2>Standings</h2>
       <div class="lg-scroll"><table class="lg-table num" id="lgTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>Luck &amp; schedule</h2>
+      <div class="lg-scroll"><table class="lg-table num" id="lgLuck"></table></div>
+    </div>
+    <div class="card">
+      <h2>Waivers</h2>
+      <div class="lg-scroll" id="lgWaiv"></div>
     </div>
     <div class="card">
       <h2>Manager tendencies</h2>
@@ -2131,7 +2143,7 @@ function renderBoard(A,P){
     // title odds on one page at a time: this week while it's on, next week once this one is final (they can't disagree)
     if(v.title!=null && !weekOver() && !(W.week>W.baseWeek && !W.baseDone)) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b></span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
-  if(v) h+='<label class="oppmode">Opponent <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>Optimal</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>Matchup focused</option></select></label>';
+  if(v) h+='<label class="oppmode">Opponent <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>Optimal</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>Matchup Focused</option></select></label>';
   $("wkScore").innerHTML=h;
   const exact=legFor(me.roster_id), snapT=W.legSnap? clock(W.legSnap.at) : "";
   const fresh=W.games.length && !W.games.some(g=>g.status!=="pre_game");   // next week, nothing played yet
@@ -2191,7 +2203,8 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA){
       if(g && !(now&&!g)) bits.push(tipS(x.pid,g)+(g.mu>0?' ~'+g.mu.toFixed(0):' out'));
       else if(!g && !a.live && !now) bits.push('done');
       s=bits.join(' · '); if(p && !val) val='~'+p.m.toFixed(2) }
-    return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
+    const back= W.injESPN?.[x.pid]?.ret && a.future[0] && W.injESPN[x.pid].ret<=a.future[0].date;   // ESPN has him back for his next game: the old tag is stale
+    return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn&&!back? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
   const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA)+cell(b,DB,QB,B,false)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null):'<div></div>')+(b?playerDetail(b,mineA? false : null):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
   let h='<div class="mhd"><span></span><span>'+esc(nameA)+'</span><span>'+esc(nameB)+'</span></div>';
@@ -2651,6 +2664,7 @@ async function loadLeague(force){
       LG.baseM= W.baseWeek<W.week && !W.baseDone? await j("/league/"+S.league.league_id+"/matchups/"+W.baseWeek).catch(()=>[]) : null;
       LG.past=await pastWeeks();
     }
+    LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);   // odds over the week (the Mac's sync)
     computeLeague(); renderLeague();
     managerTendencies().then(()=>{ renderTend(); if(W.view==="week") renderWeek() }).catch(()=>{});
   }catch(e){ $("lgSum").textContent="Couldn't build the league view: "+e.message }
@@ -2907,6 +2921,7 @@ async function refreshTitleWeights(){
       LG.baseM= W.baseWeek<W.week && !W.baseDone? await j("/league/"+S.league.league_id+"/matchups/"+W.baseWeek).catch(()=>[]) : null;
       LG.past=await pastWeeks();
     }
+    LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);
     computeLeague(); renderWeek();
     managerTendencies().then(()=>{ renderTend(); renderWeek() }).catch(()=>{});
   }catch(e){} finally{ LG.busy=false }
@@ -2971,10 +2986,10 @@ function computeLeague(){
   // looking ahead mid-week: the week still being played is simulated from team strength like later weeks
   const weeks=(LG.baseM&&LG.baseM.length? [{w:W.baseWeek, pairs:pairsOf(LG.baseM)}] : []).concat([{w:W.week, pairs:pairsOf(W.matchups), cur:true}]).concat(Object.entries(LG.sched||{}).map(([w,m])=>({w:+w,pairs:pairsOf(m)})));
   const meI=teams.findIndex(t=>t.me);
-  const sim=(addW,addPF,ti=meI,addMu=0)=>{   // addMu: team ti's weekly strength shifted for future weeks (pickups)
+  const sim=(addW,addPF,ti=meI,addMu=0,track=false)=>{   // addMu: team ti's weekly strength shifted for future weeks (pickups); track: your seed and first-round opponent
     let seed=12345; const rnd=()=>{ seed|=0; seed=seed+0x6D2B79F5|0; let x=Math.imul(seed^seed>>>15,1|seed); x=x+Math.imul(x^x>>>7,61|x)^x; return ((x^x>>>14)>>>0)/4294967296 };
     const nrm=()=>{ let u=0,v=0; while(!u) u=rnd(); while(!v) v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v) };
-    const made=new Float64Array(n), first=new Float64Array(n), champ=new Float64Array(n), winsSum=new Float64Array(n), weekWin=new Float64Array(n), pfSum=new Float64Array(n);
+    const made=new Float64Array(n), first=new Float64Array(n), champ=new Float64Array(n), winsSum=new Float64Array(n), weekWin=new Float64Array(n), pfSum=new Float64Array(n), seedC=new Float64Array(cut), oppC={};
     const off=new Float64Array(n), sc=new Float64Array(n), W_=new Float64Array(n), PF=new Float64Array(n);
     for(let s=0;s<N;s++){
       // each season run also draws how good every team really is (±10 a week: injuries, trades, pickups, projection misses), so
@@ -2988,6 +3003,7 @@ function computeLeague(){
         if(median){ const sorted=[...sc].sort((x,y)=>x-y), med=(sorted[n/2-1]+sorted[n/2])/2; for(let i=0;i<n;i++) if(sc[i]>med) W_[i]++ }
       }
       const order=[...Array(n).keys()].sort((x,y)=>W_[y]-W_[x]||PF[y]-PF[x]);
+      if(track && meI>=0){ const k=order.indexOf(meI); if(k>=0 && k<cut){ seedC[k]++; const o=order[cut-1-k]; if(o!=null && o!==meI) oppC[o]=(oppC[o]||0)+1 } }   // 1v8, 2v7, 3v6, 4v5
       order.forEach((i,k)=>{ if(k<cut) made[i]++; if(k===0) first[i]++ });
       for(let i=0;i<n;i++){ winsSum[i]+=W_[i]; pfSum[i]+=PF[i] }
       // playoffs: exact title odds for this seeding (1v8, 4v5 | 2v7, 3v6, one week per round). No random draws here, so the
@@ -3007,9 +3023,10 @@ function computeLeague(){
         if(alive.length) champ[alive[0]]++;
       }
     }
-    return {made,first,champ,winsSum,weekWin,pfSum};
+    return {made,first,champ,winsSum,weekWin,pfSum,seedC,oppC};
   };
-  const SR=sim(0,0);
+  const SR=sim(0,0,meI,0,true);
+  LG.path= meI>=0? {seed:[...SR.seedC], opp:Object.entries(SR.oppC).map(([i,c])=>[teams[+i].rid,c]).sort((x,y)=>y[1]-x[1]), N} : null;
   const games=(weeks.length)*(median?2:1);
   teams.forEach((t,i)=>{ t.po=SR.made[i]/N; t.top=SR.first[i]/N; t.ch=SR.champ[i]/N; t.xw=SR.winsSum[i]/N; t.xl=t.w+t.l+t.t+games-t.xw; t.ww=SR.weekWin[i]/N; t.xpf=SR.pfSum[i]/N });
   // what one more win, or 20 more points, does to my title odds: the weights for every lock/wait call this week
@@ -3031,7 +3048,16 @@ function computeLeague(){
 function pairsOf(m){ const by={}; (m||[]).forEach(x=>{ if(x.matchup_id!=null) (by[x.matchup_id] ||= []).push(x.roster_id) }); return Object.values(by).filter(p=>p.length===2) }
 // Both lineups of a League-tab matchup. Yours (when the Lock-in tab shows it) uses that tab's numbers exactly; any other is each
 // team's own plan and simulated week, the same way the league odds are worked out.
-function lgMatchGrid(a,b){
+// The left team's chance to win this matchup through the week, from the odds the Mac's sync logs every 10 minutes.
+function oddsSpark(a,b){ const d=LG.tl; if(!d||!d.pairs||+d.week!==+W.week) return "";
+  let i=d.pairs.findIndex(p=>p[0]===a&&p[1]===b), flip=false; if(i<0){ i=d.pairs.findIndex(p=>p[0]===b&&p[1]===a); flip=true } if(i<0) return "";
+  const P=d.pts.map(([t,v])=>[t, v[i]==null? null : (flip? 1-v[i] : v[i])]).filter(x=>x[1]!=null); if(P.length<2) return "";
+  const ds=[...new Set((W.sched||[]).filter(g=>+g.week===+W.week).map(g=>g.date))].sort(); if(!ds.length) return "";
+  const t0=Date.parse(ds[0]+"T00:00:00"), t1=Date.parse(ds[ds.length-1]+"T23:59:59"), X=t=>Math.max(0,Math.min(300,(t-t0)/(t1-t0)*300)).toFixed(1), Y=p=>(4+(1-p)*52).toFixed(1);
+  const path=P.map(([t,p],k)=>(k?'L':'M')+X(t)+' '+Y(p)).join(' '), ticks=ds.map(x=>'<text x="'+X(Date.parse(x+"T12:00:00"))+'" y="70" text-anchor="middle">'+dayLabel(x).slice(0,3)+'</text>').join("");
+  return '<div class="spark"><svg viewBox="0 0 300 74" role="img" aria-label="Win chance through the week"><line x1="0" x2="300" y1="30" y2="30" class="mid"/><path d="'+path+'"/>'+ticks+'</svg><b>'+Math.round(P[P.length-1][1]*100)+'%</b></div>' }
+function lgMatchGrid(a,b){ return oddsSpark(a,b)+lgMatchRows(a,b) }
+function lgMatchRows(a,b){
   const v=W.vs, my=myRoster()?.roster_id;
   if(v && viewingMe() && (a===my||b===my) && v.rid===(a===my? b : a))
     return a===my? gridHTML(v.rows, v.me, v.plan, v.oppRows, v.opp, v.oppPlan, "You", v.name, true) : gridHTML(v.oppRows, v.opp, v.oppPlan, v.rows, v.me, v.plan, v.name, "You", false);
@@ -3039,11 +3065,31 @@ function lgMatchGrid(a,b){
   const A=side(a), B=side(b);
   return gridHTML(A.R, A.D, A.Q, B.R, B.D, B.Q, a===my? "You" : rosterName(a), b===my? "You" : rosterName(b), false);
 }
+// How lucky each record is: head-to-head wins against an all-play record (each week's score compared with every other team's),
+// and how strong the rest of the schedule is (average strength of the teams still to play, vs the league's average team; +
+// is harder). Then the waiver order (1 picks first) with how often each team has claimed someone.
+function renderLuck(){
+  const O=LG.out; if(!O) return; const T=O.teams, n=T.length, past=(LG.past||[]).filter(m=>m&&m.some(x=>x.points>0)), avg=T.reduce((s,x)=>s+x.mu,0)/n;
+  const rows=T.map(t=>{ let ap=0, hw=0, g=0, so=0, k=0;
+    for(const m of past){ const me=m.find(x=>x.roster_id===t.rid); if(!me) continue; const others=m.filter(x=>x.roster_id!==t.rid), opp=m.find(x=>x.matchup_id===me.matchup_id&&x.roster_id!==t.rid);
+      ap+=others.filter(x=>x.points<me.points).length/Math.max(1,others.length); if(opp){ g++; if(me.points>opp.points) hw++ } }
+    for(const m of Object.values(LG.sched||{})){ const me=(m||[]).find(x=>x.roster_id===t.rid); if(!me) continue; const opp=m.find(x=>x.matchup_id===me.matchup_id&&x.roster_id!==t.rid), ot=opp&&T.find(x=>x.rid===opp.roster_id); if(ot){ so+=ot.mu-avg; k++ } }
+    return {t, hw, g, ap, luck:hw-ap, sos: k? so/k : null} }).sort((a,b)=>b.luck-a.luck);
+  const sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1);
+  $("lgLuck").innerHTML='<thead><tr><th>Team</th><th>H2H</th><th>All-play</th><th>Luck</th><th>Schedule left</th></tr></thead><tbody>'+
+    rows.map(r=>'<tr class="'+(r.t.me?'me':'')+'"><td>'+esc(r.t.name)+'</td><td>'+r.hw+'-'+(r.g-r.hw)+'</td><td>'+r.ap.toFixed(1)+'-'+(r.g-r.ap).toFixed(1)+'</td><td class="'+(r.luck>0.3?'good':r.luck<-0.3?'bad':'')+'">'+sg(r.luck)+'</td><td>'+(r.sos==null?'–':sg(r.sos))+'</td></tr>').join("")+'</tbody>';
+  const qr=claimRates(), my=myRoster()?.roster_id, R=Object.values(S.rosters).sort((a,b)=>(a.settings?.waiver_position??99)-(b.settings?.waiver_position??99));
+  $("lgWaiv").innerHTML='<table class="lg-table num"><thead><tr><th>#</th><th>Team</th><th>Claims</th></tr></thead><tbody>'+
+    R.map(r=>'<tr class="'+(r.roster_id===my?'me':'')+'"><td>'+(r.settings?.waiver_position??'–')+'</td><td>'+esc(rosterName(r.roster_id))+'</td><td>'+Math.round((qr.q[r.roster_id]??qr.qbar)*100)+'% of nights</td></tr>').join("")+'</tbody></table>';
+}
 function renderLeague(){
   const O=LG.out; if(!O) return; const T=O.teams;
   $("lgTitle").textContent=(S.league.name||"League")+" · Week "+W.week;
   const me=T.find(t=>t.me);
   $("lgSum").innerHTML= me? '<span>You: <b>'+me.w+'-'+me.l+'</b>, playoff odds <b>'+Math.round(me.po*100)+'%</b>, title odds <b>'+Math.round(me.ch*100)+'%</b>, projected finish <b>'+me.xw.toFixed(1)+'-'+me.xl.toFixed(1)+'</b></span>' : "";
+  // playoff path: your most likely seed and first-round opponent (same season simulation)
+  if(me && LG.path && me.po>=0.02){ const P=LG.path, k=P.seed.indexOf(Math.max(...P.seed)), o=P.opp[0], ord=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
+    $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+Math.round(P.seed[k]/P.N*100)+'%)'+(o?' · first round vs <b>'+esc(rosterName(o[0]))+'</b> ('+Math.round(o[1]/P.N*100)+'%)':'')+'</span>') }
   if(O.median){ const pm=pastMedians(), mp=medianOf(T.map(t=>t.proj));
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(0):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(0)+'</b>').join(", "):'')+'</span>') }
   // this week's matchups
@@ -3068,6 +3114,7 @@ function renderLeague(){
   const cut=S.league.settings?.playoff_teams||8;
   $("lgTable").innerHTML='<thead><tr><th>Proj #</th><th>Team</th><th>W-L</th><th class="c-x">PF</th><th class="c-x">PA</th><th class="c-x">Proj W-L</th><th>Playoffs</th><th>#1 seed</th><th>Title</th></tr></thead><tbody>'+
     order.map((t,k)=>'<tr class="'+(t.me?'me ':'')+(k===cut-1?'cut':'')+'"><td>'+(k+1)+'</td><td>'+esc(t.name)+'</td><td>'+t.w+'-'+t.l+(t.t?'-'+t.t:'')+'</td><td class="c-x">'+t.pf.toFixed(0)+'</td><td class="c-x">'+t.pa.toFixed(0)+'</td><td class="c-x">'+t.xw.toFixed(1)+'-'+t.xl.toFixed(1)+'</td><td class="odds">'+(t.po>0.995?'>99':t.po<0.005?'<1':Math.round(t.po*100))+'%</td><td>'+(t.top<0.005?'<1':Math.round(t.top*100))+'%</td><td class="odds">'+(t.ch<0.005?'<1':Math.round(t.ch*100))+'%</td></tr>').join("")+'</tbody>';
+  try{ renderLuck() }catch(e){}
   setLive("on");
 }
 
