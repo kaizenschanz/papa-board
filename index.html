@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-RGKKXV8JrRDenpVhiBraXC5JS0iQumddFqJceW2kzmA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-boil/xZfVmzvA8GXk7pJEhjY2sMjwPwCllIibpEr/A4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2131,7 +2131,7 @@ function renderBoard(A,P){
     // title odds on one page at a time: this week while it's on, next week once this one is final (they can't disagree)
     if(v.title!=null && !weekOver() && !(W.week>W.baseWeek && !W.baseDone)) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b></span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
-  if(v) h+='<label class="oppmode">Opponent <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>Smart</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>All-in</option></select></label>';
+  if(v) h+='<label class="oppmode">Opponent <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>Optimal</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>Matchup focused</option></select></label>';
   $("wkScore").innerHTML=h;
   const exact=legFor(me.roster_id), snapT=W.legSnap? clock(W.legSnap.at) : "";
   const fresh=W.games.length && !W.games.some(g=>g.status!=="pre_game");   // next week, nothing played yet
