@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mmQuILS2KU6yMCEyMGAtJkmScm9uJWE8q0XnamMBDFE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-NyVrVufW08MK0uPU7AU31kpDxtpWoWcDlBpGFGFaH2I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -286,6 +286,13 @@ details.fold>summary{padding:10px 0}
 .td.lock .tt{color:var(--good)}
 .td.roster{background:var(--warn-soft);border:0;border-radius:6px;padding:8px 10px;margin-bottom:6px}
 .td.roster .tt{color:var(--warn)}
+.tdx{display:grid;grid-auto-flow:column;grid-auto-columns:86%;gap:14px;overflow-x:auto;overflow-y:hidden;transition:height .2s;align-items:start;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;padding-bottom:6px;margin-top:4px}
+.tdx.one{grid-auto-columns:100%}
+.tdc{scroll-snap-align:start;align-self:start;min-width:0}
+.tdch{display:flex;justify-content:space-between;align-items:baseline;font:700 15px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;padding:8px 0 6px;border-bottom:2px solid var(--line)}
+.tdch span{color:var(--muted);font-size:13px}
+.tdc .td{grid-template-columns:58px minmax(0,1fr)}
+.tdc .td:nth-child(2){border-top:0}
 .mhd,details.mr>summary,.mtot{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center}
 .mhd{font:700 12px/1 var(--display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:2px 0 8px;border-bottom:1px solid var(--line)}
 details.mr{border-bottom:1px solid var(--line)}
@@ -2080,11 +2087,20 @@ function todoItems(A,P){
         rems: ok? [] : [{id:"mid-"+pid+"-"+m.date, t:bt, lead:10, title: sw? "Start "+last(m.pid)+" for "+last(pid) : last(pid)+" under "+bar+" so far? Start "+last(m.pid)+" for him"}]}) } }
   return out.sort((a,b)=>(a.t??0)-(b.t??0));
 }
+// One column per day in a sideways strip (swipe for later days; the next one peeks in), "Now" items above it. The strip keeps
+// its place through refreshes.
 function renderTodo(items){
   const el=$("wkTodo");
   if(!items.length){ el.innerHTML='<div class="empty">Nothing left to decide this week.</div>'; return }
-  el.innerHTML=items.map(i=>'<div class="td '+i.kind+'"><div class="td-t">'+(i.t? '<span>'+dayLabel(ymd(i.t))+'</span><b>'+(i.approx?'~':'')+clock(i.t)+'</b>' : '<b>Now</b>')+
-    '</div><div class="td-b"><div class="tt">'+esc(i.title)+'</div>'+(i.note?'<div class="ts">'+esc(i.note)+'</div>':'')+'</div></div>').join("");
+  const row=i=>'<div class="td '+i.kind+'"><div class="td-t">'+(i.t? '<b>'+(i.approx?'~':'')+clock(i.t)+'</b>' : '<b>Now</b>')+
+    '</div><div class="td-b"><div class="tt">'+esc(i.title)+'</div>'+(i.note?'<div class="ts">'+esc(i.note)+'</div>':'')+'</div></div>';
+  const now=items.filter(i=>!i.t), days=[]; for(const i of items){ if(!i.t) continue; const k=ymd(i.t), g=days[days.length-1]; if(g&&g.k===k) g.items.push(i); else days.push({k, items:[i]}) }
+  const x0=el.querySelector(".tdx")?.scrollLeft||0;
+  el.innerHTML=now.map(row).join("")+(days.length? '<div class="tdx'+(days.length<2?' one':'')+'">'+days.map(g=>'<section class="tdc"><div class="tdch">'+dayLabel(g.k)+'<span>'+g.items.length+'</span></div>'+g.items.map(row).join("")+'</section>').join("")+'</div>' : '');
+  const x=el.querySelector(".tdx"); if(!x) return; if(x0) x.scrollLeft=x0;
+  // the strip is as tall as the day on screen, not the longest day
+  const fit=()=>{ const cs=[...x.children], w=cs[0].offsetWidth+14, c=cs[Math.max(0,Math.min(cs.length-1,Math.round(x.scrollLeft/w)))]; x.style.height=(c.offsetHeight+10)+"px" };
+  x.addEventListener("scroll",()=>{ cancelAnimationFrame(x._f); x._f=requestAnimationFrame(fit) },{passive:true}); fit();
 }
 // Scoreboard: projected finals, locked so far, and the odds that matter.
 function renderBoard(A,P){
