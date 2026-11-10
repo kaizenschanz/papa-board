@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9rpSwRSqmuqmGUQ29JwQ5eMP7+jbLNszb8VtymJ3iGs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tXg5B0IPAZIJgmNdonxnzjLnoQSH4Cuc7ps62yhUjo4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1992,6 +1992,20 @@ const pct=p=>p>0.995?">99%":p<0.005?"<1%":Math.round(p*100)+"%";
 const tChance=d=>{ const v=Math.abs(d)*100; return "+"+(v<0.01? v.toFixed(3) : v.toFixed(2))+"%" };
 const fx=v=>v!=null&&isFinite(v)? v.toFixed(2) : null;
 const lockedSum=R=>R.filter(x=>x.starter&&x.a.lockedOn).reduce((t,x)=>t+x.a.lockedOn.fp,0);
+// Lock vs play on for a finished, unlocked score, in this week's odds and title odds (user, 11-10: "show the odds of a lock/no
+// lock decision... no one cares about pg vs util"). Play on = his next game played (the slot gives up the score), then the rest of
+// the slot's chain played right: the same comparison as his lock line.
+function lockOdds(A,P,x){ const v=W.vs, a=x.a; if(!v?.me?.tot||!a.latest||!a.future.length) return null;
+  const hp=[...P.pick].find(([,q])=>q.slot===x.idx)?.[0]||x.pid, part=v.me.parts.get(hp)||v.me.parts.get(x.pid); if(!part) return null;
+  const st0=chainSteps(A,P,hp,a.latest.date), k=st0.findIndex(t=>t.pid===hp||t.pid===x.pid); if(k<0) return null;
+  const st=[{...st0[k],pm:0}].concat(st0.slice(k+1)), V=stepsValue(st), N=v.me.tot.length, f=calF(), C=new Float64Array(N), keep=new Float64Array(N), go=new Float64Array(N);
+  let cm=0, rm=0; for(let s=0;s<N;s++){ C[s]=playSteps(st,V,s); cm+=C[s] } cm/=N;
+  for(let s=0;s<N;s++){ const R=v.me.tot[s]-(part.s? part.s[s] : part.m); rm+=R; keep[s]=R+a.latest.fp; go[s]=R+cm+f*(C[s]-cm) } rm/=N;
+  const o=(tot,m)=>titleObjD({tot,m},v.opp,v.tab,v.median,v.wt);
+  return {L:o(keep,rm+a.latest.fp), W:o(go,rm+cm), title:!!v.wt} }
+function oddsWhy(o){ if(!o) return ""; const d=o.L.obj-o.W.obj;
+  return "Lock vs play on: win "+pct(o.L.h)+" / "+pct(o.W.h)+(W.vs?.median? " · median "+pct(o.L.md)+" / "+pct(o.W.md) : "")+
+    (o.title? " · title "+(d>=0? "+" : "−")+tChance(d).slice(1)+(d>=0? " locking" : " playing on") : "")+"." }
 // Why lock or wait: championship odds first (from the season + playoff simulation), then this week's two wins each way.
 function callWhy(vc){
   if(!vc) return "";
@@ -2161,11 +2175,11 @@ function todoItems(A,P){
   for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||!a.future.length) continue;
     const t=lockDeadline(a); if(!t||t<=now) continue;
     const vc=v?.calls?.[x.pid], p=P.pick.get(x.pid);
-    if(a.call?.c==="lock"){ const kb=knownBy(t), ls=lockSlotFor(A,x.pid), at=ls? " at "+ls.name : "", mv= ls? (ls.how? " "+ls.how : "")+(ls.why? " "+ls.why : "") : (p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"");
-      out.push({t, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(2)+at, note:mv.trim(), sub:callWhy(vc)+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
+    if(a.call?.c==="lock"){ const kb=knownBy(t), ls=lockSlotFor(A,x.pid), at=ls&&ls.slot!==x.idx? " at "+ls.name : "",   // only when he has to move mv= ls? (ls.how? " "+ls.how : "") : (p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"");
+      out.push({t, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(2)+at, note:mv.trim(), sub:(oddsWhy(lockOdds(A,P,x))||callWhy(vc))+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
         rems:[{id:"lock-"+x.pid, t, lead:15, title:"Last call: lock "+last(x.pid)+" "+a.latest.fp.toFixed(2)+at}]}) }
     else if(p){ const nd= a.kl!=null? a.kl : (vc&&vc.at!=null? Math.max(0,vc.at) : null);   // the same line as the grid and the after-game line
-      out.push({t, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(2)+(nd!=null?" (needs "+nd.toFixed(2)+")":""), sub:callWhy(vc)}) }
+      out.push({t, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(2)+(nd!=null?" (needs "+nd.toFixed(2)+")":""), sub:oddsWhy(lockOdds(A,P,x))||callWhy(vc)}) }
   }
   // lineup changes, game day by game day (later days assume nothing else changes first)
   const days=[P.night].concat(P.days||[]).filter(Boolean);
@@ -2581,8 +2595,8 @@ function renderWeek(){
       const kl= W.vs.lineLocks?.[x.pid] ?? (a.latest && a.future.length? slotLine(A,P,x,a.latest.date) : null); a.kl=kl;
       const byLine= kl!=null && a.latest.fp>=kl, lockIt = (W.vs.force[x.pid]? W.vs.force[x.pid]==="lock" : (p&&p.k==="lock")) || byLine;
       if(isMe) store.set("call:"+(S.league?.league_id||"")+":"+W.week+":"+x.pid, lockIt?"lock":"wait");   // the guess-the-lock logic follows the board's own call
-      if(lockIt){ const ls=lockSlotFor(A,x.pid); a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(2)+(ls&&ls.slot!==x.idx? " at "+ls.name : "")}; a.why=(byLine? "Clears his "+kl.toFixed(1)+" line. " : callWhy(vc))+(ls? (ls.how?" "+ls.how:"")+(ls.why?" "+ls.why:"") : "") }
-      else { a.call={c:"wait",t:"Wait"}; a.why=(kl!=null? "Needs "+kl.toFixed(1)+". " : vc.at!=null? "Locking would need "+Math.max(0,vc.at).toFixed(2)+". " : "")+callWhy(vc) }
+      if(lockIt){ const ls=lockSlotFor(A,x.pid); a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(2)+(ls&&ls.slot!==x.idx? " at "+ls.name : "")}; a.why=(oddsWhy(lockOdds(A,P,x))||callWhy(vc))+(ls&&ls.how? " "+ls.how : "") }
+      else { a.call={c:"wait",t:"Wait"}; a.why=(kl!=null? "Needs "+kl.toFixed(1)+". " : "")+(oddsWhy(lockOdds(A,P,x))||callWhy(vc)) }
     }
     if(P.night){ const r=P.night.role[x.pid];
       if(P.night.lineup.has(x.pid) && !x.starter){ a.call={c:r==="look"?"wait":"lock",t:"Start "+dayLabel(P.night.day)}; a.why= r==="look"? "Free look: lock only at "+(fx(P.night.lookOf?.[x.pid]&&keepBar(A,P,P.night.lookOf[x.pid],P.night.day))??(P.night.at[x.pid]??0).toFixed(2))+"+." : "Takes an open slot." }
