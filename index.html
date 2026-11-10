@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YiqEMvuKOAdnyjZ7zIanMri8ksbFniOPgphhuVJ8Luo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dX6Fx3URsmIJ8JlWkgj51qXoemM7ZRLLNIcjeMl8MEk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1823,18 +1823,21 @@ function planWeek(A,opt={}){
       if(!C2.length) continue;
       if(opt.light){ for(const [pid,q] of bestAssign(C2, open.map(s=>s.slot), SL).pick){ const s=open.find(z=>z.slot===q.slot), c=C2.find(z=>z.pid===pid);
         (idle[s.hp] ||= []).push({pid, g:c.o.x.a.future.find(g=>g.date===d), date:d}) } continue }
-      // The plan shown: looks are played whenever a slot sits idle (they're free; user, 11-09: "we play the free looks anyway"),
-      // each where it adds the most to that slot played tip by tip. A look rarely helps a star's slot (holding his score beats
-      // it), so a bench player goes where he could replace someone ("he won't replace Luka but he could replace someone else").
+      // The plan shown: looks are played whenever a slot sits idle (they're free; user, 11-09: "we play the free looks anyway"). A
+      // look that pops can still be moved before it's locked (unlocked starters shuffle freely; the lock step puts him in the
+      // narrowest open slot: PG/SG/SF/PF/C, then G/F, then UTIL, user: "always lock pg, sg, sf, pf, or C first"), and the holders
+      // shuffle around it, so which idle slot he's in barely changes its worth. So: stay where he is (no move just to relabel),
+      // else the narrowest slot, then the most gain. Players with the most to gain pick first.
       const chain=(hp,extra)=>{ const c=C.find(z=>z.pid===hp); return holdGames(c).map((g,j)=>mkStep(hp,g,j)).concat((idle[hp]||[]).map(m=>mkStep(m.pid,m.g,0)), extra? [extra] : []).filter(t=>t.mu>0||t.cur!=null).sort((a,b)=>a.ord-b.ord) };
       const worth=(st,hp)=>{ const x0=heldScore(C.find(z=>z.pid===hp).x); if(!st.length) return x0; return gAt(stepsValue(st).G[0],x0) };
-      const pairs=[];
-      for(const s of open){ const v0=worth(chain(s.hp),s.hp);
-        for(const c of C2){ if(!elig(c.pos,SL[s.slot])) continue; const g=c.o.x.a.future.find(g=>g.date===d);
-          pairs.push({s, c, g, gain: worth(chain(s.hp,mkStep(c.pid,g,0)),s.hp)-v0+(c.o.x.starter && c.o.x.idx===s.slot? 0.25 : 0)}) } }   // already in that slot: no move (user, 11-09: "Move Walker to F" with both already in)
-      pairs.sort((a,b)=>b.gain-a.gain); const usedS=new Set(), usedC=new Set();
-      for(const q of pairs){ if(usedS.has(q.s.hp)||usedC.has(q.c.pid)) continue; usedS.add(q.s.hp); usedC.add(q.c.pid);
-        (idle[q.s.hp] ||= []).push({pid:q.c.pid, g:q.g, date:d}) } } }
+      const v0={}; for(const s of open) v0[s.hp]=worth(chain(s.hp),s.hp);
+      const cand=C2.map(c=>{ const g=c.o.x.a.future.find(g=>g.date===d), opts=[];
+        for(const s of open) if(elig(c.pos,SL[s.slot])) opts.push({s, gain: worth(chain(s.hp,mkStep(c.pid,g,0)),s.hp)-v0[s.hp]});
+        return {c, g, opts, best: Math.max(0,...opts.map(o=>o.gain))} }).filter(x=>x.opts.length).sort((a,b)=>b.best-a.best);
+      const tier=sn=>SLOT_RANK[sn]??1, usedS=new Set();
+      for(const x of cand){ const here=sl=>x.c.o.x.starter && x.c.o.x.idx===sl;
+        const o=x.opts.filter(o=>!usedS.has(o.s.hp)).sort((a,b)=>here(b.s.slot)-here(a.s.slot) || tier(SL[a.s.slot])-tier(SL[b.s.slot]) || b.gain-a.gain)[0];
+        if(!o) continue; usedS.add(o.s.hp); (idle[o.s.hp] ||= []).push({pid:x.c.pid, g:x.g, date:d}) } } }
   const total=[...best.pick.values()].reduce((t,p)=>t+p.v,0);
   const P={SL,slots,C,pick:best.pick,total,thr:{},night:null,term,backup,backup2,pre,seq,mid,idle};
   if(opt.light) return P;
@@ -1981,9 +1984,12 @@ function lockSlotFor(A,pid){
     const Q=planWeek(A,{...(v.planBase||{force:v.force}),light:true,pinLock:{pid,slot:i,from:x.idx}}); if(Q.pick.get(pid)?.slot!==i) continue;
     const o=titleObjD(withPickups(teamDist(A,Q),v.pkMe),v.opp,v.tab,v.median,v.wt).obj; opts.push({slot:i, name:SL[i], o, Q, occ}) }
   if(!opts.length) return v._ls[key]=null;
-  const rank=o=>(SLOT_RANK[o.name]??1)+(o.slot===x.idx?-0.1:0);
-  opts.sort((a,b)=> Math.abs(a.o-b.o)>2e-6? b.o-a.o : rank(a)-rank(b));
-  const best=opts[0], worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
+  // Lock order (user, 11-09: "always lock pg, sg, sf, pf, or C first, then g or f, then util after the options are exhausted. the
+  // only real questions are between two positions of equal footing"): the narrowest open tier wins unless a wider slot is clearly
+  // better (+0.05% title chance, the claims' noise bar); inside a tier title odds decide, his current slot breaking exact ties.
+  const rank=o=>(SLOT_RANK[o.name]??1), lo=Math.min(...opts.map(rank));
+  const narrow=opts.filter(o=>rank(o)===lo).sort((a,b)=> Math.abs(a.o-b.o)>2e-6? b.o-a.o : (b.slot===x.idx)-(a.slot===x.idx)), wide=opts.filter(o=>rank(o)>lo).sort((a,b)=>b.o-a.o);
+  const best= wide.length && wide[0].o>narrow[0].o+(v.wt? 0.0005 : 0.01)? wide[0] : narrow[0], worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
   // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
   let how="";
   if(best.slot!==x.idx){ const o=best.occ, to=o? best.Q.pick.get(o.pid)?.slot : null;
