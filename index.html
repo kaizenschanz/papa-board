@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nePAawfRZgyWt2NXvv+Bns9YwEThjz5wrve4QeHPXUk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-P6zg4IZqR11HkQQuQ4yAwhSplV8c2masbJpZiry4KP0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2494,7 +2494,9 @@ function buildMatchup(me, isMe, main, pre){
         const roles=R=>{ const z=new Set(); for(const [p2,q2] of R.pick) if(q2.k==="hold") z.add(p2); for(const B of [R.backup,R.backup2]) for(const h in (B||{})) z.add(B[h].pid); return z };
         const r0=roles(PL), by=[...roles(Q)].find(p2=>!r0.has(p2))||null;
         alt[pid]={d:b0-o, by};
-        if(o>best+1e-6){ best=o; exclude=pid } }
+        // only on a clear gain (the claims' bar): a noise-level edge used to drop a bench player from the whole plan, looks
+        // included (user, 11-10: McCain had no To do line all week)
+        if(o>best+(wtMe? 0.0005 : 0.01)){ best=o; exclude=pid } }
       if(exclude){ P=planWeek(A,{...base,exclude:new Set([...drop,exclude])}); const r=alt[exclude]; if(r&&r.by) alt[r.by]={d:-r.d, by:exclude, flipped:true}
         for(const pid of drop){ const xi=A.find(y=>y.pid===pid)?.idx, q=[...P.pick].find(([p2,q2])=>q2.slot===xi && q2.k==="hold"); keepCalls[pid].by= q? q[0] : null } } }
     const planBase={...base, exclude:new Set([...drop, ...(exclude?[exclude]:[])])};   // what lockSlotFor must plan with too
