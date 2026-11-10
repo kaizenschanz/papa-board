@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dX6Fx3URsmIJ8JlWkgj51qXoemM7ZRLLNIcjeMl8MEk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D0eoBdfvoirc2IQ320Rf4AY7DDxXCwg1undHt8Ew+T8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1974,6 +1974,7 @@ function callWhy(vc){
 // the best title odds. When slots tie (nobody left needs the flexibility, as far as the projections can see), take the
 // narrowest one: PG/SG/SF/PF/C before G/F before UTIL, which keeps the wide slots open for whatever comes up.
 const SLOT_RANK={PG:0,SG:0,SF:0,PF:0,C:0,G:1,F:1,UTIL:2};
+const SLOT_ACC={PG:["PG"],SG:["SG"],SF:["SF"],PF:["PF"],C:["C"],G:["PG","SG"],F:["SF","PF"],UTIL:["PG","SG","SF","PF","C"]};   // positions each slot takes
 function lockSlotFor(A,pid){
   const v=W.vs, x=A.find(y=>y.pid===pid); if(!v||!x||!x.starter||!x.a.latest) return null;
   const key="ls|"+pid; v._ls ||= {}; if(key in v._ls) return v._ls[key];
@@ -1984,12 +1985,15 @@ function lockSlotFor(A,pid){
     const Q=planWeek(A,{...(v.planBase||{force:v.force}),light:true,pinLock:{pid,slot:i,from:x.idx}}); if(Q.pick.get(pid)?.slot!==i) continue;
     const o=titleObjD(withPickups(teamDist(A,Q),v.pkMe),v.opp,v.tab,v.median,v.wt).obj; opts.push({slot:i, name:SL[i], o, Q, occ}) }
   if(!opts.length) return v._ls[key]=null;
-  // Lock order (user, 11-09: "always lock pg, sg, sf, pf, or C first, then g or f, then util after the options are exhausted. the
-  // only real questions are between two positions of equal footing"): the narrowest open tier wins unless a wider slot is clearly
-  // better (+0.05% title chance, the claims' noise bar); inside a tier title odds decide, his current slot breaking exact ties.
-  const rank=o=>(SLOT_RANK[o.name]??1), lo=Math.min(...opts.map(rank));
-  const narrow=opts.filter(o=>rank(o)===lo).sort((a,b)=> Math.abs(a.o-b.o)>2e-6? b.o-a.o : (b.slot===x.idx)-(a.slot===x.idx)), wide=opts.filter(o=>rank(o)>lo).sort((a,b)=>b.o-a.o);
-  const best= wide.length && wide[0].o>narrow[0].o+(v.wt? 0.0005 : 0.01)? wide[0] : narrow[0], worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
+  // Lock order (user, 11-09): narrow first, but only where the narrow slot's pool sits inside the wider one's (PG or SG inside G,
+  // SF or PF inside F, everything inside UTIL): leaving the wider slot open can only leave more options, so it wins unless the
+  // wider slot is clearly better (+0.05% title chance, the claims' noise bar). Slots that don't nest (Duncan Robinson, SG/SF: SG
+  // or F) are decided by title odds alone, i.e. by which slot the players left cover better ("you might want to lock a guy like
+  // duncan robinson in F instead of sg... if you feel like you have sg covered better than f"). Exact ties: his current slot.
+  opts.sort((a,b)=> Math.abs(a.o-b.o)>2e-6? b.o-a.o : (b.slot===x.idx)-(a.slot===x.idx));
+  const nests=(a,b)=> a!==b && (SLOT_ACC[a]||[]).every(p=>(SLOT_ACC[b]||[]).includes(p)), bar= v.wt? 0.0005 : 0.01;
+  let best=opts[0]; for(let moved=true; moved;){ moved=false; for(const o of opts) if(nests(o.name,best.name) && o.o>=best.o-bar){ best=o; moved=true; break } }
+  const worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
   // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
   let how="";
   if(best.slot!==x.idx){ const o=best.occ, to=o? best.Q.pick.get(o.pid)?.slot : null;
