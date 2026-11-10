@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JHkluPN+Do0B4uo21CMXF/2iQPeZun/x9XE2Qy/vYD0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nFataBq0oNZp95FoJnvNAxCYp1JQuF0cWEpqgX9Fccc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2032,18 +2032,22 @@ function chainSteps(A,P,pid,after){
   for(const m of (P.idle?.[pid]||[])) if(after==null || m.date>after) st.push(mkStep(m.pid,m.g,0));
   return st.filter(t=>t.mu>0 || t.cur!=null).sort((a,b)=>a.ord-b.ord);
 }
-function titleBar(slotPid, st){
+// side "opp": the same line for the opponent's slot, from his side (user, 11-09: "show it for the opponent too so i can judge
+// them"): his title odds against your team with his median table and weights, or the head-to-head alone when he's set to all-in.
+function titleBar(slotPid, st, side="me"){
   const v=W.vs; if(!v||!v.me?.tot||!st.length) return null;
-  const part=v.me.parts.get(slotPid); if(!part||!part.s) return null;
-  const key=slotPid+"|"+st.map(t=>t.key+":"+(t.pm||0)).join(","); v._bars ||= {}; if(key in v._bars) return v._bars[key];
-  const N=v.me.tot.length, R=new Float64Array(N), C=new Float64Array(N), V=stepsValue(st), f=calF();
+  const opp= side==="opp", D= opp? v.opp : v.me; if(!D?.tot) return null;
+  const part=D.parts?.get(slotPid); if(!part||!part.s) return null;
+  const key=side+"|"+slotPid+"|"+st.map(t=>t.key+":"+(t.pm||0)).join(","); v._bars ||= {}; if(key in v._bars) return v._bars[key];
+  const N=D.tot.length, R=new Float64Array(N), C=new Float64Array(N), V=stepsValue(st), f=calF();
   let Rm=0, Cm=0;
-  for(let s=0;s<N;s++){ R[s]=v.me.tot[s]-part.s[s]; Rm+=R[s];
+  for(let s=0;s<N;s++){ R[s]=D.tot[s]-part.s[s]; Rm+=R[s];
     const val=playSteps(st,V,s); C[s]=val; Cm+=val }
   Rm/=N; Cm/=N; if(f!==1) for(let s=0;s<N;s++) C[s]=Cm+f*(C[s]-Cm);
   const wb=waitBias(st.length); if(wb){ for(let s=0;s<N;s++) C[s]+=wb; Cm+=wb }
   const pass=new Float64Array(N); for(let s=0;s<N;s++) pass[s]=R[s]+C[s];
-  const obj=(tot,m)=>titleObjD({tot,m},v.opp,v.tab,v.median,v.wt).obj, wait=obj(pass,Rm+Cm), keep=new Float64Array(N);
+  const allIn=!!W.oppAllIn, obj=(tot,m)=> opp? titleObjD({tot,m},v.me, allIn? null : v.tabOpp, allIn? false : v.median, allIn? null : v.wtOpp).obj : titleObjD({tot,m},v.opp,v.tab,v.median,v.wt).obj;
+  const wait=obj(pass,Rm+Cm), keep=new Float64Array(N);
   let lo=0, hi=100;
   for(let i=0;i<20;i++){ const mid=(lo+hi)/2; for(let s=0;s<N;s++) keep[s]=R[s]+mid; if(obj(keep,Rm+mid)>=wait) hi=mid; else lo=mid }
   return v._bars[key]=hi;
@@ -2053,9 +2057,9 @@ function titleBar(slotPid, st){
 function keepBar(A,P,slotPid,after){ return titleBar(slotPid, chainSteps(A,P,slotPid,after)) }
 // The keep line once his next game's status is known (the call waits for that tip): plays = he's in for it, sits = he's out and
 // the chain goes on without it. Free looks before it are passed up to hold the score (the decision is at his tip).
-function keepBars(A,P,pid,after){
+function keepBars(A,P,pid,after,side="me"){
   const st=chainSteps(A,P,pid,after), k=st.findIndex(t=>t.pid===pid); if(k<0) return null;
-  const tail=st.slice(k), plays=titleBar(pid, [{...tail[0], pm:0}].concat(tail.slice(1))), sits= tail.length>1? titleBar(pid, tail.slice(1)) : null;
+  const tail=st.slice(k), plays=titleBar(pid, [{...tail[0], pm:0}].concat(tail.slice(1)), side), sits= tail.length>1? titleBar(pid, tail.slice(1), side) : null;
   return plays==null? null : {plays, sits, day: dayLabel(tail[0].date)} }
 // Mid-game switch line: his score so far, at the tip of the player who'd replace him (step j), at which keeping him (step i) in
 // gives the same championship odds as benching him for that player. Same simulated week as every other line. Returns lo when
@@ -2334,7 +2338,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA){
   const tipS=(pid,g)=>{ const t=tipAt(pid,g.date); return dayLabel(g.date)+(t?" "+clock(t).replace(":00","").replace(" ","").toLowerCase():"") };
   const holderAt=(Q,i)=>{ const e=Q&&[...Q.pick].find(([,q])=>q.slot===i); return e? e[0] : null };
   const cell=(x,D,Q,R,mine)=>{ if(!x) return '<div class="pc"><span class="n muted">—</span></div>';
-    const a=x.a; let s="", val="", vc="";
+    const a=x.a; let s="", val="", vc="", side= mine? "me" : (W.vs && R===W.vs.oppRows? "opp" : null);   // lock lines: your matchup only
     const hp= x.starter&&!a.lockedOn? holderAt(Q, x.idx) : null, other= hp&&hp!==x.pid&&!D.parts.get(x.pid)? hp : null;
     if(other){ const o=R.find(y=>y.pid===other), q=D.parts.get(other);
       return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+q.m.toFixed(2)+'</span>':'')+'</div>' }
@@ -2344,9 +2348,9 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA){
     else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp, p=x.starter&&D.parts.get(x.pid);
       if(a.live) bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):''));
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
-      else if(now) bits.push('Can lock '+a.latest.fp.toFixed(2));
+      else if(now){ const kb= side && g? keepBars(R,Q,x.pid,a.latest.date,side) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(kb && kb.plays!=null? ' · lock at '+kb.plays.toFixed(1)+'+' : '')) }
       if(a.live){ bits.push('~'+a.live.mu.toFixed(0));   // his game now, not the next one (user, 11-09: "why display their next game projection when they're mid game?")
-        if(mine && x.starter && a.future.length){ const kb=keepBars(R,Q,x.pid,a.live.date); if(kb && kb.plays!=null) bits.push('lock '+kb.plays.toFixed(1)+'+') } }
+        if(side && x.starter && a.future.length){ const kb=keepBars(R,Q,x.pid,a.live.date,side); if(kb && kb.plays!=null) bits.push('lock '+kb.plays.toFixed(1)+'+') } }
       else if(g && !(now&&!g)) bits.push(tipS(x.pid,g)+(g.mu>0?' ~'+g.mu.toFixed(0):' out'));
       else if(!g && !a.live && !now) bits.push('done');
       s=bits.join(' · '); if(p && !val) val='~'+p.m.toFixed(2) }
@@ -2467,7 +2471,7 @@ function renderWeek(){
     for(const [pid,c] of Object.entries(calls)) if(c.wpts!=null) P.thr[pid]=c.wpts;
     const fin=titleObjD(myD,oD,tabMe,median,wtMe), worst=titleObjD(myD,Ow.D,null,false);
     const gamble=B.filter(x=>O.dec.includes(x.pid) && O.Q.pick.get(x.pid)?.k!=="lock").map(x=>x.a.info.name);
-    W.vs={rows:A, plan:P, alt, exclude, keepCalls, planBase, tab:tabMe, wt:wtMe, oppRows:B, oppPlan:O.Q, term:P.term, oth, median, med: median? fin.md : null, medProj: medianOf(oth.map(o=>o.m).concat(myD.m)),
+    W.vs={rows:A, plan:P, alt, exclude, keepCalls, planBase, tab:tabMe, wt:wtMe, tabOpp: median? pTopTable(othFor(myD)) : null, wtOpp, oppRows:B, oppPlan:O.Q, term:P.term, oth, median, med: median? fin.md : null, medProj: medianOf(oth.map(o=>o.m).concat(myD.m)),
       name:rosterName(opp.roster_id), rid:opp.roster_id, me:myD, opp:oD, win:fin.h, winWorst:worst.h, calls, force, gamble, title: wtMe? wtMe.base : null,
       oppLocked:B.filter(x=>x.starter&&x.a.lockedOn).length, oppExact:legOk(opp.roster_id), pkMe, pkOpp, oppRid:oppRoster.roster_id};
   }
