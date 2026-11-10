@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tXg5B0IPAZIJgmNdonxnzjLnoQSH4Cuc7ps62yhUjo4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-102o2NS/6ZKXWQw8MhJSscz8CqMDj3N/kLw/yEzLh9I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2175,7 +2175,7 @@ function todoItems(A,P){
   for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||!a.future.length) continue;
     const t=lockDeadline(a); if(!t||t<=now) continue;
     const vc=v?.calls?.[x.pid], p=P.pick.get(x.pid);
-    if(a.call?.c==="lock"){ const kb=knownBy(t), ls=lockSlotFor(A,x.pid), at=ls&&ls.slot!==x.idx? " at "+ls.name : "",   // only when he has to move mv= ls? (ls.how? " "+ls.how : "") : (p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"");
+    if(a.call?.c==="lock"){ const kb=knownBy(t), ls=lockSlotFor(A,x.pid), at=ls&&ls.slot!==x.idx? " at "+ls.name : "", mv= ls? (ls.how? " "+ls.how : "") : (p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"");
       out.push({t, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(2)+at, note:mv.trim(), sub:(oddsWhy(lockOdds(A,P,x))||callWhy(vc))+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
         rems:[{id:"lock-"+x.pid, t, lead:15, title:"Last call: lock "+last(x.pid)+" "+a.latest.fp.toFixed(2)+at}]}) }
     else if(p){ const nd= a.kl!=null? a.kl : (vc&&vc.at!=null? Math.max(0,vc.at) : null);   // the same line as the grid and the after-game line
