@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nFataBq0oNZp95FoJnvNAxCYp1JQuF0cWEpqgX9Fccc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0raL6MfTHjukb9tqy40DIn01KETtOcMe/eFV/998wmU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2467,7 +2467,10 @@ function renderWeek(){
       if(exclude){ P=planWeek(A,{...base,exclude:new Set([...drop,exclude])}); const r=alt[exclude]; if(r&&r.by) alt[r.by]={d:-r.d, by:exclude, flipped:true}
         for(const pid of drop){ const xi=A.find(y=>y.pid===pid)?.idx, q=[...P.pick].find(([p2,q2])=>q2.slot===xi && q2.k==="hold"); keepCalls[pid].by= q? q[0] : null } } }
     const planBase={...base, exclude:new Set([...drop, ...(exclude?[exclude]:[])])};   // what lockSlotFor must plan with too
-    const myD=TD(A,P), O=respond(myD), oD=O.D, Ow=respond(myD,true);
+    const myD=TD(A,P), O0=respond(myD), Ow=respond(myD,true);
+    // his final plan the full way (free looks placed, mid-game looks), keeping the calls and play style his best response chose,
+    // so his lines and odds match his own view of the board (user, 11-09: "why are there gaps?" Murray-Boyles' line was 1.0 off)
+    const Qf=planWeek(B,{force:O0.force}), O={...O0, Q:Qf, D:withPickups(teamDist(B,Qf,SIM_N,O0.risk),pkOpp)}, oD=O.D;
     for(const [pid,c] of Object.entries(calls)) if(c.wpts!=null) P.thr[pid]=c.wpts;
     const fin=titleObjD(myD,oD,tabMe,median,wtMe), worst=titleObjD(myD,Ow.D,null,false);
     const gamble=B.filter(x=>O.dec.includes(x.pid) && O.Q.pick.get(x.pid)?.k!=="lock").map(x=>x.a.info.name);
