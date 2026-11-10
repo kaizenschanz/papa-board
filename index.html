@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3Wk8U6KPAm6j4955V+43lqZcIDhU4aJEzK0k7hTQ33Y='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JHkluPN+Do0B4uo21CMXF/2iQPeZun/x9XE2Qy/vYD0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2214,12 +2214,14 @@ function todoItems(A,P){
     const g= lv || a.future[0], rest= lv? a.future : a.future.slice(1), tip= lv? null : tipAt(pid,g.date); if(!lv && !tip) continue;
     const end= lv? (gameEnd(pid,lv) || now+3600e3) : tip+GAME_MS; if(end<=now) continue;
     const N=days.find(d=>d.day===g.date), b=P.backup?.[pid];
-    // the call waits for his next tip: one line if he's in for it, a lower one if he's out (then the rest of the chain decides)
-    const kb= rest.length? keepBars(A,P,pid,g.date) : null, alt= kb && kb.sits!=null && kb.plays-kb.sits>=0.5? fx(kb.sits) : null;
+    // the call waits for his next tip, when his status is known
+    // one line, as if he plays his next game: if he's ruled out that game drops off and the line is recomputed by title odds
+    // (user, 11-09: "you don't need to put the 'if he's out' logic, just adjust it based on title odds if he is in fact out")
+    const kb= rest.length? keepBars(A,P,pid,g.date) : null;
     const thr= fx(kb? kb.plays : keepBar(A,P,pid,g.date)) || (rest.length? (N? fx(vsTonight(pid,N.day)??N.at[pid]) : null) : fx(chainValue(A,P,pid,true) ?? (N? N.at[pid] : null) ?? P.term?.[pid] ?? b?.v));
-    if(rest.length) out.push({t:end, approx:!lv, kind:"check", title:"After "+a.info.name+"'s game: lock it if he scores "+(thr||"big")+"+"+(alt? " ("+alt+"+ if he's out "+kb.day+")" : ""),
+    if(rest.length) out.push({t:end, approx:!lv, kind:"check", title:"After "+a.info.name+"'s game: lock it if he scores "+(thr||"big")+"+",
       sub:"Otherwise keep playing him ("+rest.length+" more game"+(rest.length>1?"s":"")+").",
-      rems:[{id:"done-"+pid, t:end, lead:-10, title:last(pid)+" done: lock if "+(thr||"?")+"+"+(alt? " ("+alt+"+ if out "+kb.day+")" : "")}]});
+      rems:[{id:"done-"+pid, t:end, lead:-10, title:last(pid)+" done: lock if "+(thr||"?")+"+"}]});
     else if(lv) continue;                                       // his last game is on: the live switch lines cover it
     else if(b){ const bt=tipAt(b.pid,b.date);
       // the fallback tips while he's still playing: the call is made at that tip, on his score so far
