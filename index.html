@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qV1Kv+6V2R3f9sQUlvVPvjBVxAdnmcg6AJiDt6OSSGg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1lPeJeSyXL8R9RwBrz0qzcSHnwsuSoJ7LF/PDAt7l1A='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1909,8 +1909,12 @@ function planWeek(A,opt={}){
       if(!open.length) continue;
       const C2=C.filter(o=>!best.pick.has(o.pid) && !o.x.a.live && !usedP.has(o.pid) && o.x.a.future.some(g=>g.date===d && g.mu>0)).map(o=>({pid:o.pid, pos:o.pos, cur:-1, ch:[{k:"look", v:o.x.a.future.find(g=>g.date===d).mu}], o}));
       if(!C2.length) continue;
-      if(opt.light){ for(const [pid,q] of bestAssign(C2, open.map(s=>s.slot), SL).pick){ const s=open.find(z=>z.slot===q.slot), c=C2.find(z=>z.pid===pid);
-        (idle[s.hp] ||= []).push({pid, g:c.o.x.a.future.find(g=>g.date===d), date:d}) } continue }
+      // The quick plan (other teams' totals): the best looks first, each into the weakest idle slot he fits, where a look adds
+      // the most (the same idea as the full plan's gain, without simulating every option). Before 11-10 the slot was whichever
+      // the assignment happened to pick, so a ~21 could sit behind a ~30 star while a ~15 slot went without.
+      if(opt.light){ const usedL=new Set(), val=s=>best.pick.get(s.hp)?.v??0;
+        for(const c of [...C2].sort((a,b)=>b.ch[0].v-a.ch[0].v)){ const s=open.filter(z=>!usedL.has(z.hp) && elig(c.pos,SL[z.slot])).sort((a,b)=>val(a)-val(b))[0]; if(!s) continue;
+          usedL.add(s.hp); (idle[s.hp] ||= []).push({pid:c.pid, g:c.o.x.a.future.find(g=>g.date===d), date:d}) } continue }
       // The plan shown: looks are played whenever a slot sits idle (they're free; user, 11-09: "we play the free looks anyway"). A
       // look that pops can still be moved before it's locked (unlocked starters shuffle freely; the lock step puts him in the
       // narrowest open slot: PG/SG/SF/PF/C, then G/F, then UTIL, user: "always lock pg, sg, sf, pf, or C first"), and the holders
@@ -3826,7 +3830,12 @@ if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W
       slots:[...H.P.pick].map(([pid,q])=>({slot:SLn[q.slot]+"#"+q.slot, holder:nm(pid), k:q.k, v:+q.v.toFixed(2), now:nm(H.A.find(x=>x.starter&&x.idx===q.slot)?.pid),
         chain: q.k==="lock"? [] : slotSteps(H.A,H.P,pid).map(t=>nm(t.pid)+" "+t.date.slice(5)+" ~"+t.mu.toFixed(1)+(t.cur!=null?" (live "+t.cur.toFixed(1)+")":"")+(t.pm?" sit"+Math.round(t.pm*100)+"%":"")) })),
       bench:H.A.filter(x=>!x.starter).map(x=>x.a.info.name+" ["+x.a.info.pos.join("/")+"] "+x.a.future.map(g=>g.date.slice(5)+"~"+(g.mu||0).toFixed(0)).join(",")+(H.P.pick.has(x.pid)? " -> "+SLn[H.P.pick.get(x.pid).slot] : "")),
-      idle:Object.fromEntries(Object.entries(H.P.idle||{}).map(([hp,L])=>[nm(hp),L.map(m=>nm(m.pid)+" "+m.date.slice(5)+(m.post?" post":""))])) } } finally{ W.vs=save } return out },
+      idle:Object.fromEntries(Object.entries(H.P.idle||{}).map(([hp,L])=>[nm(hp),L.map(m=>nm(m.pid)+" "+m.date.slice(5)+(m.post?" post":""))])) };
+      // check: a bench game no slot is using, on a night a slot it fits sits idle, projected above that slot's lock line
+      const L=linesOfView(H.A,H.P), used=new Set(); const chains=[...H.P.pick].filter(([,q])=>q.k!=="lock").map(([pid,q])=>({pid, q, st:slotSteps(H.A,H.P,pid)})); chains.forEach(c=>c.st.forEach(t=>used.add(t.pid+"|"+t.date)));
+      out.flags=[]; for(const b of H.A.filter(x=>!x.starter && x.slot!=="IR" && !H.P.pick.has(x.pid))) for(const g of b.a.future){ if(!(g.mu>0) || used.has(b.pid+"|"+g.date)) continue;
+        for(const c of chains){ if(!elig(b.a.info.pos, SLn[c.q.slot]) || c.st.some(t=>t.date===g.date)) continue; const occ=H.A.find(x=>x.starter&&x.idx===c.q.slot), ln= occ? L[occ.pid] : null;
+          if(ln!=null && g.mu>ln+1) out.flags.push(b.a.info.name+" "+g.date.slice(5)+" ~"+g.mu.toFixed(0)+" unused; fits idle "+SLn[c.q.slot]+" (line "+ln.toFixed(1)+")") } } } finally{ W.vs=save } return out },
   // diagnostic: how long the main pieces take here (compare ?worker=0 with the worker)
   prof:()=>{ const r=myRoster(), m=W.matchups.find(x=>x.roster_id===r.roster_id), T={}; const tm=(n,f)=>{ const t=performance.now(); const v=f(); T[n]=Math.round(performance.now()-t); return v };
     const rows=tm("rowsFor",()=>rowsFor(r,m,true)); const P=tm("planLight",()=>planWeek(rows,{light:true})); TD_CACHE.clear(); tm("teamDist800",()=>teamDist(rows,P,800));
