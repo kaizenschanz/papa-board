@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zrg120Mk6D6KUOlwyCPD0YxOwBWBegkrJBQN62dEM/o='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-soeD8UOwL8n1QbPdnwT8yGRF94vSX3JXEkPDegfqe6k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,6 +43,11 @@ button,input,select{font:inherit;color:inherit}
 .clock b{color:var(--accent);font-weight:700}
 .live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;opacity:.85}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--taken)}
+/* the wheel while the board fetches or calculates (user, 11-10: "so people don't think it's broken"). A transform animation runs
+   off the page's main thread, so it keeps turning while the simulation has the page busy. */
+.spin{display:none;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;will-change:transform;animation:spin .7s linear infinite}
+body.busy .spin{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
 .dot.on{background:var(--good)} .dot.err{background:var(--bad)}
 .youup{background:var(--accent);color:var(--accent-ink);padding:2px 8px;border-radius:3px}
 
@@ -362,6 +367,7 @@ details.fold #poolSeg{margin-bottom:6px}
 <header class="bar" id="bar">
   <h1>Papa Rebirth Board</h1>
   <div class="clock" id="clock">Not connected</div>
+  <span class="spin" id="spin" role="status" aria-label="Updating"></span>
   <div class="live"><span class="dot" id="dot"></span><span id="liveTxt">Offline</span></div>
 </header>
 
@@ -518,6 +524,13 @@ const SLOT_OK = {PG:["PG"],SG:["SG"],SF:["SF"],PF:["PF"],C:["C"],G:["PG","SG"],F
 
 // browser storage, with an in-memory fallback so picks still work this visit when storage is blocked (private mode)
 const MEM={};
+let BUSY=0;
+function busyOn(){ if(++BUSY===1) document.body.classList.add("busy") }
+function busyOff(){ if(BUSY>0 && --BUSY===0) document.body.classList.remove("busy") }
+const paintNow=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));   // let the wheel show before the work starts
+// a redraw from a tap (team, opponent mode): wheel first, then the work
+function bootDone(){ if(W._bootBusy){ W._bootBusy=false; busyOff() } }   // the wheel from page open, until the first board is up
+function renderWeekBusy(){ busyOn(); paintNow().then(()=>{ try{ renderWeek() } finally{ busyOff() } }) }
 const store = {
   get(k,d){try{const v=localStorage.getItem("prb:"+k);if(v!=null) return JSON.parse(v)}catch(e){} return k in MEM? MEM[k] : d},
   set(k,v){MEM[k]=v; try{localStorage.setItem("prb:"+k,JSON.stringify(v))}catch(e){}},
@@ -649,8 +662,8 @@ async function connect(){
     let saved=qv || store.get("view",null);   // a ?view= link wins
     if(inSeason && saved==="draft" && qv!=="draft") saved="week";
     showView(saved || (inSeason?"week":"draft"));
-    if(W.view==="week") loadWeek(true);
-  }catch(e){ setMsg("Couldn't reach Sleeper: "+e.message+". Check your connection and try again.",true); setLive("err"); }
+    if(W.view==="week") loadWeek(true); else bootDone();
+  }catch(e){ bootDone(); setMsg("Couldn't reach Sleeper: "+e.message+". Check your connection and try again.",true); setLive("err"); }
 }
 function describeStart(){
   const d=S.draft; if(!d) return "";
@@ -926,9 +939,9 @@ function viewingMe(){ const v=viewRoster(), m=myRoster(); return !!(v&&m&&v.rost
 async function loadWeek(force){
   if(!S.league || W.loading) return;
   if(!["in_season","post_season","complete"].includes(S.league.status)){
-    $("wkSum").textContent="The lock-in helper starts once the season does."; $("wkMatch").innerHTML=""; return;
+    $("wkSum").textContent="The lock-in helper starts once the season does."; $("wkMatch").innerHTML=""; bootDone(); return;
   }
-  W.loading=true; $("wkMsg").textContent="Updating…"; $("wkMsg").classList.remove("err");
+  W.loading=true; $("wkMsg").textContent="Updating…"; $("wkMsg").classList.remove("err"); busyOn();
   try{
     const lid=S.league.league_id;
     const state=await j("/state/nba");
@@ -1000,8 +1013,8 @@ async function loadWeek(force){
     await new Promise(r=>setTimeout(r,0)); try{ calibrateField() }catch(e){} await new Promise(r=>setTimeout(r,0));
     renderWeek(); renderClock();
     if(!LG.busy && W.view==="week" && (!LG.wt || Date.now()-LG.wt.at>15*60e3)) refreshTitleWeights();
-  }catch(e){ W.err=e.message; $("wkMsg").textContent="Couldn't load this week from Sleeper: "+e.message; $("wkMsg").classList.add("err") }
-  finally{ W.loading=false; if(W.reloadWk){ W.reloadWk=false; setTimeout(()=>loadWeek(true),0) } }
+  }catch(e){ bootDone(); W.err=e.message; $("wkMsg").textContent="Couldn't load this week from Sleeper: "+e.message; $("wkMsg").classList.add("err") }
+  finally{ busyOff(); W.loading=false; if(W.reloadWk){ W.reloadWk=false; setTimeout(()=>loadWeek(true),0) } }
 }
 // This page's week is over and the next one is a click away: what comes next (claims) belongs to that page.
 function weekOver(){ return W.games.length>0 && W.games.every(g=>g.status==="complete") && !!W.hasNext && W.week===W.baseWeek }
@@ -2621,7 +2634,9 @@ function oppLinesLater(){
   const v=W.vs; if(!v||!v.oppRows||v.oppLines) return;
   const sig=oppSig(v), c=W._oppL||store.get("oppLines",null);
   if(c && c.sig===sig){ W._oppL=c; v.oppLines=c.lines; renderMatchup(v.rows); return }
-  setTimeout(()=>{ if(W.vs!==v) return; const R=S.rosters[v.oppRid]; if(!R) return;
+  busyOn();
+  setTimeout(()=>{ try{ oppLinesRun(v,sig) } finally{ busyOff() } }, 30) }
+function oppLinesRun(v,sig){ if(W.vs!==v) return; const R=S.rosters[v.oppRid]; if(!R) return;
     let H; try{ H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false) }catch(e){ return }
     if(W.vs!==v || !H.vs) return;
     const lines={}; W.vs=H.vs;
@@ -2629,7 +2644,7 @@ function oppLinesLater(){
         const date= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!date) continue;
         const ln=slotLine(H.A,H.P,x,date); if(ln!=null) lines[x.pid]=ln } }
     finally{ W.vs=v }
-    v.oppLines=lines; W._oppL={sig, lines}; if(!(LOGX||NOASSUME)) store.set("oppLines",W._oppL); renderMatchup(v.rows) }, 30) }
+    v.oppLines=lines; W._oppL={sig, lines}; if(!(LOGX||NOASSUME)) store.set("oppLines",W._oppL); renderMatchup(v.rows) }
 function renderMatchup(A){
   const v=W.vs, el=$("wkMatch"); if(!v||!v.oppRows){ el.innerHTML='<div class="empty">No opponent this week.</div>'; return }
   keepOpen(el, gridHTML(A, v.me, v.plan, v.oppRows, v.opp, v.oppPlan, viewingMe()?'You':rosterName(viewRoster().roster_id), v.name, true));
@@ -2714,7 +2729,7 @@ function renderWeek(){
   renderMatchup(A); oppLinesLater();
   $("wkPoolCard").hidden=weekOver(); if(!weekOver()) renderPool(me, A, P);
   renderInfo();
-  $("weekView").classList.remove("stale");
+  $("weekView").classList.remove("stale"); bootDone();
   if(isMe) savePaint();
 }
 // ---- Opening the page smoothly (user, 11-10: "it's buggy when it loads"). The board needs ~3 s of data and a few seconds of
@@ -3087,7 +3102,7 @@ async function pastWeeks(){
 }
 async function loadLeague(force){
   if(!S.league || LG.busy) return;
-  LG.busy=true; $("lgSum").textContent="Updating…";
+  LG.busy=true; busyOn(); $("lgSum").textContent="Updating…";
   try{
     await loadWeek(force);
     if(!W.loaded){ $("lgSum").textContent="Couldn't load this week from Sleeper."; return }
@@ -3103,7 +3118,7 @@ async function loadLeague(force){
     computeLeague(); renderLeague();
     managerTendencies().then(()=>renderTend()).catch(()=>{});
   }catch(e){ $("lgSum").textContent="Couldn't build the league view: "+e.message }
-  finally{ LG.busy=false }
+  finally{ LG.busy=false; busyOff() }
 }
 // How each manager plays lock-in, from finished weeks: Sleeper's exact lock records with the login, else the public feed
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
@@ -3392,7 +3407,7 @@ function leagueOdds(){
 }
 // The most a team could have locked this week with hindsight: each player's best finished game, fitted into the lineup.
 async function refreshTitleWeights(){
-  if(LG.busy) return; LG.busy=true;
+  if(LG.busy) return; LG.busy=true; busyOn();
   try{
     const last=(S.league.settings?.playoff_week_start||22)-1;
     if(!LG.sched || LG.schedWeek!==W.week){
@@ -3408,7 +3423,7 @@ async function refreshTitleWeights(){
     if(wtsMoved()) renderWeek();
     // the managers' replay (~9 s) is for the League tab only: it runs when that tab is opened
     if(W.view==="league") managerTendencies().then(()=>renderTend()).catch(()=>{});
-  }catch(e){} finally{ LG.busy=false }
+  }catch(e){} finally{ LG.busy=false; busyOff() }
 }
 function hindsight(rows){
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR"), slots=SL.map((_,i)=>i);
@@ -3622,10 +3637,10 @@ function showView(v,persist){
 }
 $("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b) showView(b.dataset.view,true)});
 $("wkRefresh").addEventListener("click",()=>loadWeek(true));
-$("teamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) return; if(!myRoster()){ setMe(v); return } W.viewRid=v; renderWeek() });
+$("teamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) return; if(!myRoster()){ setMe(v); return } W.viewRid=v; renderWeekBusy() });
 $("wkSel").addEventListener("change",e=>{ const w=+e.target.value; if(!w||!W.baseWeek) return; store.set("wk:"+S.league.league_id,{base:W.baseWeek, off: w>W.baseWeek? 1 : 0});
   $("wkMsg").textContent="Updating…"; if(W.loading) W.reloadWk=true; else loadWeek(true) });
-document.addEventListener("change",e=>{ if(e.target.id==="oppMode" && W.oppKey){ store.set(W.oppKey,e.target.value); renderWeek() } });
+document.addEventListener("change",e=>{ if(e.target.id==="oppMode" && W.oppKey){ store.set(W.oppKey,e.target.value); renderWeekBusy() } });
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-open]"); if(!b) return; const d=$(b.dataset.open); if(d){ d.open=true; d.scrollIntoView({behavior:"smooth",block:"start"}) } });
 $("setupEdit").addEventListener("click",()=>$("setup").classList.remove("compact"));
 const cleanTok=v=>fixTok(v);
@@ -3658,8 +3673,8 @@ press("srcSeg","src",S.src); press("posSeg","pos",S.pos==="FIT"?"ALL":S.pos); if
 $("user").value=store.get("user","zenkai5");
 const qs=new URLSearchParams(location.search); if(qs.get("draft")) $("draftOverride").value=qs.get("draft");
 syncBarHeight(); render(); showView(qs.get("view")||store.get("view",null)||"draft");
-try{ showPaint() }catch(e){}
-lookupLeagues().then(ok=>{ if(ok) connect() }).catch(e=>{setMsg("Couldn't reach Sleeper: "+e.message+". The rankings still work offline.",true);setLive("err")});
+busyOn(); W._bootBusy=true; try{ showPaint() }catch(e){}
+lookupLeagues().then(ok=>{ if(ok) connect(); else bootDone() }).catch(e=>{bootDone();setMsg("Couldn't reach Sleeper: "+e.message+". The rankings still work offline.",true);setLive("err")});
 </script>
 </body>
 </html>
