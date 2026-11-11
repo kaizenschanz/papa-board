@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/Vp9ex2kLGJpCBciVjJUt17U1VinGscW4m/8XeEEYXg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7qZjPZ1a9Ql68S68MjoA2dPjFXEy+XDZoCZ2uJn5DV8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2303,6 +2303,9 @@ function todoItems(A,P){
   }
   // lineup changes, game day by game day (later days assume nothing else changes first)
   const days=[P.night].concat(P.days||[]).filter(Boolean);
+  // who is really in each slot right now: a reminder only goes out when there's something to do (user, 11-10: reminded to start
+  // Hartenstein in UTIL when "he's already there")
+  const realAt=new Map(A.filter(x=>x.starter).map(x=>[x.idx,x.pid]));
   let prev=new Map(A.filter(x=>x.starter&&!x.a.lockedOn).map(x=>[x.idx,x.pid]));
   days.forEach((N,di)=>{
     const plan=new Map(prev), later=di? " (if nothing changes before then)" : "";
@@ -2338,14 +2341,14 @@ function todoItems(A,P){
         out.push({t:E.tip, pid:E.pid, kind:"look", title: already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
           note:so, sub:so+(lastG? " If he stays in, it's his last game, so it counts without a lock." : " If he stays in, lock it if it ends big.")+later,
           rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
-            .concat(keepAll? [] : [{id:"back-"+E.then, t:E.thenTip, lead:10, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+(back? "" : " unless "+nm(E.pid)+" has "+bar+"+ so far")}])});
+            .concat(keepAll || realAt.get(+slot)!==E.pid? [] : [{id:"back-"+E.then, t:E.thenTip, lead:10, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+(back? "" : " unless "+nm(E.pid)+" has "+bar+"+ so far")}])});
         continue }
       const bar=fx(keepBar(A,P,E.then,null)??chainValue(A,P,E.then)??N.at[E.pid])||"big";
       out.push({t: started? E.thenTip : E.tip, pid:E.pid, kind:"look", title: started? nm(E.pid)+" is playing in "+P.SL[slot]+" (free look): keep him only at "+bar+"+" : already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
         note: started? "" : "Keep his score only if it's "+bar+"+; otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+".",
         sub:"Keep his score only if it's "+bar+"+ (what "+nm(E.then)+"'s game plus your Sunday fallbacks are worth)"+(lastG?"; it's his last game, so it counts without a lock while he stays in":"; lock it if so")+". Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
         rems:(already||started? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
-          .concat(E.thenTip>now? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+bar+"+"}] : [])});
+          .concat(E.thenTip>now && realAt.get(+slot)===E.pid? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+bar+"+"}] : [])});
     }
     prev=plan;
   });
@@ -2385,6 +2388,7 @@ function todoItems(A,P){
       rems: keep? [] : [{id:"back-"+hp, t:ht, lead:20, title:"Put "+nm(hp)+" back in "+P.SL[x.idx]+" unless "+a.info.name+" scored "+(fx(bar)||"?")+"+"}]}) }
   // same-night looks after an earlier game in the slot (planWeek's post looks), at the looker's tip; gone once that score is locked
   for(const [hp,L] of Object.entries(P.idle||{})) for(const m of L){ if(!m.post || m.post<=now) continue; const q=P.pick.get(hp); if(!q) continue;
+    if(realAt.get(q.slot)===m.pid) continue;   // he's already in that slot: nothing to do
     const bar=lookBar(A,P,q.slot,m.pid,m.date), lb=fx(bar), ds=doneScore(A,m.after,m.date);
     if(ds!=null && bar!=null && ds>=bar) continue;   // his score clears the line: it's a lock (its own item), not a swap
     out.push({t:m.post, pid:m.pid, kind:"look", title:"Start "+nm(m.pid)+" to "+P.SL[q.slot]+" ("+nm(m.after)+" out)", note: ds!=null? "" : lb? "only if "+last(m.after)+" scores under "+lb+" (he plays first)" : "",
@@ -2562,7 +2566,11 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     const badge= oppLock? '<span class="badge lock">Lock</span> ' : mine&&x.starter&&!a.lockedOn&&a.call&&/^(lock|wait)$/.test(a.call.c)? '<span class="badge '+a.call.c+'">'+(a.call.c==="lock"?"Lock":"Wait")+'</span> '
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
     if(a.lockedOn){ const gl=lockGrade(x.rid,x.pid); s='Locked · '+dayLabel(a.lockedOn.date)+(gl? ' · line '+gl.line.toFixed(1)+(gl.ok? ' ✓' : ' ✗') : ''); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
-    else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp, p=x.starter&&D.parts.get(x.pid);
+    else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp;
+      // his slot value belongs on the row of the slot the plan has him in: if that's another slot and nobody is planned here,
+      // this row says where he's headed and shows no value (so one value never shows on two rows)
+      const pq=Q?.pick?.get(x.pid), away= x.starter && pq && pq.slot!==x.idx, p= x.starter && !away && D.parts.get(x.pid);
+      if(away) bits.push('→ '+SL[pq.slot]);
       if(a.live) bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):''));
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
       else if(now){ const ln= g? lnOf(a.latest.date) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(ln!=null? ' · lock at '+ln.toFixed(1)+'+' : '')) }
