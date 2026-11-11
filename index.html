@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7A+8Ys6lgZz2a9SgGUiALDkxbIQgKVGFHKBt9OMjijk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/oBjkheHSqEWvzomLGKRyAiGPbA9X2WXfqJjVIASUf0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2008,7 +2008,7 @@ function calibrateField(){
   const raw=[], myR=myRoster()?.roster_id; CAL_OFF=true;
   try{ for(const r of Object.values(S.rosters)){ const m=W.matchups.find(x=>x.roster_id===r.roster_id)||{players_points:{}};
       const rows=rowsFor(r,m,r.roster_id===myR), Q=planWeek(rows,{light:true}), D0=teamDist(rows,Q,800,0,true), D=withPickups(D0, pickupFor(r.roster_id,{rows}));
-      raw.push({rid:r.roster_id, m:D.m, v:D.v, pk:D.pk||0, own:D0.own, base:D0.base||0}) } }
+      raw.push({rid:r.roster_id, m:D.m, v:D.v, pk:D.pk||0, own:D0.own, base:D0.base||0, tot:D.tot}) } }
   finally{ CAL_OFF=false }
   const C=(typeof CALIB!=="undefined"&&CALIB&&CALIB.med)||{}, sd0=C.sd0||MED_SD0, bias=C.bias||0;
   const sim=medianOf(raw.map(t=>t.m)), tot=raw.reduce((a,t)=>a+t.m,0), open=raw.reduce((a,t)=>a+Math.max(0,t.m-t.base),0), phi= tot>0? open/tot : 1;
@@ -2515,7 +2515,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     if(other){ const o=R.find(y=>y.pid===other), q=D.parts.get(other);
       return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
     // the opponent's plan locks it (Flagg's 49.20): say so plainly instead of "Can lock · next game" (user, 11-10)
-    const oppLock= !mine && x.starter && !a.lockedOn && a.latest && W.vs && R===W.vs.oppRows && Q?.pick?.get(x.pid)?.k==="lock";
+    const oppLock= !mine && x.starter && !a.lockedOn && a.latest && (L? (L.locks||[]).includes(x.pid) : W.vs && R===W.vs.oppRows && Q?.pick?.get(x.pid)?.k==="lock");   // any team's plan (League tab: from its own view)
     const badge= oppLock? '<span class="badge lock">Lock</span> ' : mine&&x.starter&&!a.lockedOn&&a.call&&/^(lock|wait)$/.test(a.call.c)? '<span class="badge '+a.call.c+'">'+(a.call.c==="lock"?"Lock":"Wait")+'</span> '
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
     if(a.lockedOn){ s='Locked · '+dayLabel(a.lockedOn.date); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
@@ -2647,15 +2647,16 @@ function teamSig(rid){ const r=S.rosters[rid], m=W.matchups.find(x=>x.roster_id=
   const rows=x=>rowsFor(S.rosters[x.roster_id], x, false).map(rowSig).join("|"); return [S.league?.league_id, W.week, rid, (W._cal?.k||1).toFixed(3), rows(m), o? rows(o) : ""].join("#") }
 function linesOfView(A,P){ const out={}; for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue;
     const date= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!date) continue; const ln=slotLine(A,P,x,date); if(ln!=null) out[x.pid]=ln } return out }
-function teamLines(rid){ const v=W.vs, my=myRoster()?.roster_id;
-  if(v && viewingMe()){ if(rid===my){ const o={}; for(const x of v.rows){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue; const d= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!d) continue; const ln=lineOf(x,v.rows,v.plan,"me",d); if(ln!=null) o[x.pid]=ln } return o }
-    if(rid===v.oppRid && v.oppLines) return v.oppLines }
+function teamLines(rid){ const v=W.vs, my=myRoster()?.roster_id, lk=Q=>[...(Q?.pick||[])].filter(([,q])=>q.k==="lock").map(([p])=>p);
+  if(v && viewingMe()){ if(rid===my){ const o={locks:lk(v.plan)}; for(const x of v.rows){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue; const d= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!d) continue; const ln=lineOf(x,v.rows,v.plan,"me",d); if(ln!=null) o[x.pid]=ln } return o }
+    if(rid===v.oppRid && v.oppLines) return {...v.oppLines, locks:lk(v.oppPlan)} }
   const c=TL[rid]; if(c && c.at===W.updated) return c.lines;
   if(c){ const sg=teamSig(rid); if(sg===c.sig){ c.at=W.updated; return c.lines } }
   return null }
 function teamLinesRun(rid){ const R=S.rosters[rid]; if(!R) return null; const sig=teamSig(rid);
   let H; try{ H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false) }catch(e){ return null } if(!H||!H.vs) return null;
   const save=W.vs; W.vs=H.vs; let lines; try{ lines=linesOfView(H.A,H.P) } finally{ W.vs=save }
+  lines.locks=[...H.P.pick].filter(([,q])=>q.k==="lock").map(([p])=>p);   // his plan locks these: no line to show, the call is Lock
   TL[rid]={at:W.updated, sig, lines}; return lines }
 // work out the given teams' lines (wheel on), then redraw: done() runs after
 function ensureLines(rids, done){ const need=rids.filter(r=>teamLines(r)==null); if(!need.length){ done(); return }
@@ -2741,6 +2742,8 @@ function renderWeek(){
     a.value = p? p.v : (x.starter? 0 : a.value);
   }
   if(isMe && W.vs){ W.myScore={me:lockedSum(A), opp:lockedSum(W.vs.oppRows), name:W.vs.name}; renderClock() }
+  // On the League tab only the matchup numbers are needed: the To do, claims and pickups (~1.5 s) wait until Lock-in is shown
+  W.weekDirty=false; if(W.view!=="week" && !(LOGX||NOASSUME)){ W.weekDirty=true; bootDone(); return }
   renderBoard(A,P);
   const items=todoItems(A,P);
   renderTodo(items);
@@ -3145,7 +3148,7 @@ async function loadLeague(force){
       LG.past=await pastWeeks();
     }
     LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);   // odds over the week (the Mac's sync)
-    computeLeague(); renderLeague();
+    await computeLeague(); await paintNow(); renderLeague();   // breaks between steps: taps get through
     managerTendencies().then(()=>renderTend()).catch(()=>{});
   }catch(e){ $("lgSum").textContent="Couldn't build the league view: "+e.message }
   finally{ LG.busy=false; busyOff() }
@@ -3155,6 +3158,9 @@ async function loadLeague(force){
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 async function managerTendencies(){
   if(LG.tend && LG.tendWeek===W.week) return LG.tend;
+  if(LG.tendRun) return LG.tendRun;   // already running (League tab opened twice): share it
+  LG.tendRun=managerTendencies0().finally(()=>{ LG.tendRun=null }); return LG.tendRun }
+async function managerTendencies0(){
   const lid=S.league.league_id, raw=store.get("slpToken",null), tok=raw? fixTok(raw) : null, per={}; LG.waitChk=[];
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   let exact=!!tok || Object.keys(W.legsPastSnap||{}).length>0;
@@ -3171,7 +3177,7 @@ async function managerTendencies(){
           if(lastP>=0){ if(r.sg && r.sg[pid]!=null) idx=g.findIndex(x=>x.id===String(r.sg[pid]));
             else { idx=lastP; (r.open ||= new Set()).add(pid) } }      // not locked yet: his latest score is still a live decision
           r.slots.push({pid,si,g,idx}) }) }
-      gradeWeek(w, cur, logs, SL, per);
+      await gradeWeek(w, cur, logs, SL, per);
       continue;
     }
     // Finished weeks: Sleeper's lock records (with your login) are right; the public feed reports each player's latest game,
@@ -3208,7 +3214,7 @@ async function managerTendencies(){
           if(r.sg){ const gid=r.sg[pid]; idx= gid!=null? g.findIndex(x=>x.id===String(gid)) : g.map(x=>x.fp!=null).lastIndexOf(true) }   // not in Sleeper's lock list = rode it out (his last game played)
           else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) } }
         r.slots.push({pid,si,g,idx}) }) }
-    gradeWeek(w, rows, logs, SL, per);
+    await gradeWeek(w, rows, logs, SL, per);
   }
   LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
 }
@@ -3238,7 +3244,7 @@ function startedThatDay(rid, pid, date){
   for(const [t,st] of H){ if(t<d0) prev=st; else if(t<d1){ if(st.includes(pid)) any=true } else break }
   return any || (prev? prev.includes(pid) : true);
 }
-function gradeWeek(w, rows, logs, SL, per){
+async function gradeWeek(w, rows, logs, SL, per){
   const N=400, median=!!S.league.settings?.league_average_match;
   // waiting is played the way the board plays it: each call at the next tip, holding the slot's unlocked score (x0)
   const steps=(st,x0=0)=>{ const V=stepsValue(st); return q=>playSteps(st,V,q,0,x0) };
@@ -3256,6 +3262,7 @@ function gradeWeek(w, rows, logs, SL, per){
   const tipOf=x=>x.t||Date.parse(x.date+"T19:00:00"), endOf=x=>tipOf(x)+GAME_MS;
   const deadlines=new Set(); rows.forEach(r=>r.slots.forEach(sl=>sl.g.forEach((x,i)=>{ if(i>0) deadlines.add(tipOf(x)) })));
   for(const D of [...deadlines].sort((a,b)=>a-b)){
+    await new Promise(r=>setTimeout(r,0));   // a breath between deadlines: the page stays tappable (user, 11-10: "doesn't let me switch between tabs")
     // every team at deadline D: per-slot samples and totals
     const teams=rows.map(r=>{ const slotS=new Map(), tot=new Float64Array(N);
       for(const sl of r.slots){ const g=sl.g, arr=new Float64Array(N);
@@ -3367,8 +3374,8 @@ function renderTend(){
           // low stakes / close: credit the side the replay leaned to (Trae, locked 21.54 on a "coin flip, lean lock" with a big lead)
           (c.moot? (c.best?' <span class="ok">✓</span> <span class="muted">low stakes</span>':' <span class="muted">low stakes</span>') : c.close? (c.best?' <span class="ok">✓</span> <span class="muted">close</span>':' <span class="muted">close call</span>') : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
       const later=d.early? d.games.slice(d.k).filter(v=>v!=null) : [], left=d.games.slice(d.k).filter(v=>v==null).length;
-      const lnow= d.open? (teamLines(x.rid)||{})[d.pid] : null;   // this week, still open: his lock line now, from that team's own view
-      const outcome= d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(lnow!=null? ' · lock at '+lnow.toFixed(1)+'+' : '')+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
+      const TLx=teamLines(x.rid)||{}, lnow= d.open? TLx[d.pid] : null, plk= d.open && (TLx.locks||[]).includes(d.pid);   // this week, still open: his lock line now, from that team's own view
+      const outcome= d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(plk? ' · best play: lock it' : lnow!=null? ' · lock at '+lnow.toFixed(1)+'+' : '')+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
         : d.early? 'He locked '+final.toFixed(2)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(2)).join(', ') : '')+(left?' ('+left+' still to play)':'')
         : 'Rode it to the last game: '+final.toFixed(2);
       items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
@@ -3421,7 +3428,13 @@ function renderAcc(){ const el=$("lgAcc"); if(!el) return; const C=(typeof SCORE
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
 function leagueOdds(){
   const out=[], D={};
-  for(const m of W.matchups){ const r=S.rosters[m.roster_id]; if(!r) continue; const R=rowsFor(r,m,false), Q=planWeek(R,{light:true}), pk=pickupFor(m.roster_id,{rows:R}); D[m.roster_id]={D:withPickups(teamDist(R,Q,1500),pk), R, Q, pk} }
+  // the page itself (League tab) reuses the league calibration's simulated weeks; the Mac's log (?log=1) runs its own at 1,500
+  // draws with every slot, for calibrate_odds.py
+  const F=W._cal, reuse=!(LOGX||NOASSUME) && F && F.at===calKey();
+  for(const m of W.matchups){ const r=S.rosters[m.roster_id]; if(!r) continue; const R=rowsFor(r,m,false);
+    const c= reuse? F.raw.find(t=>t.rid===m.roster_id) : null;
+    if(c&&c.tot){ const d=F.d[m.roster_id]||0; D[m.roster_id]={D:{m:c.m+d, v:c.v, tot:c.tot.map(x=>x+d), pk:c.pk, parts:new Map()}, R, Q:{pick:new Map()}, pk:null}; continue }
+    const Q=planWeek(R,{light:true}), pk=pickupFor(m.roster_id,{rows:R}); D[m.roster_id]={D:withPickups(teamDist(R,Q,1500),pk), R, Q, pk} }
   // every slot's predicted final (and, once locked, its actual value), logged so calibrate_odds.py can check what waiting is really worth
   const slotsOf=id=>{ const e=D[id]; if(!e) return null; const out=[];
     for(const x of e.R) if(x.starter&&x.a.lockedOn) out.push([x.idx, x.pid, +x.a.lockedOn.fp.toFixed(2)]);
@@ -3429,8 +3442,8 @@ function leagueOdds(){
       out.push([q.slot, pid, +part.m.toFixed(2), +Math.sqrt(part.v).toFixed(2), n, +waitBias(n).toFixed(3)]) }   // 6th: the wait bias already applied
     return out };
   const ids=Object.keys(D).map(Number), half=Math.floor((ids.length-1)/2), med={};
-  for(const id of ids){ let c=0; const x=D[id].D.tot;
-    for(let q=0;q<1500;q++){ let up=0; for(const o of ids) if(o!==id && D[o].D.tot[q]>x[q]) up++; if(up<=half) c++ } med[id]=c/1500 }
+  for(const id of ids){ let c=0; const x=D[id].D.tot, NQ=x.length;
+    for(let q=0;q<NQ;q++){ let up=0; for(const o of ids){ if(o===id) continue; const y=D[o].D.tot; if(y[q%y.length]>x[q]) up++ } if(up<=half) c++ } med[id]=c/NQ }
   for(const [a,b] of pairsOf(W.matchups)){ const ra=S.rosters[a], rb=S.rosters[b]; if(!ra||!rb) continue;
     const ma=W.matchups.find(m=>m.roster_id===a), mb=W.matchups.find(m=>m.roster_id===b);
     const A=D[a]?.R||rowsFor(ra,ma,false), B=D[b]?.R||rowsFor(rb,mb,false), DA=D[a]?.D||teamDist(A,planWeek(A,{light:true}),1500), DB=D[b]?.D||teamDist(B,planWeek(B,{light:true}),1500);
@@ -3454,7 +3467,7 @@ async function refreshTitleWeights(){
       LG.past=await pastWeeks();
     }
     LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);
-    computeLeague(); saveWts();
+    await computeLeague(); saveWts(); await paintNow();
     // redraw only if the title weights moved enough to change something shown (the first draw used the saved ones)
     if(wtsMoved()) renderWeek();
     // the managers' replay (~9 s) is for the League tab only: it runs when that tab is opened
@@ -3481,12 +3494,16 @@ function strength(roster){
   for(const [pid] of b.pick) v+=C.find(c=>c.pid===pid).var;
   return {m:b.total, v};
 }
-function computeLeague(){
+async function computeLeague(){   // async: it pauses between its season runs so the page stays tappable
   try{ calibrateField() }catch(e){}
   const R=Object.values(S.rosters), me=myRoster();
   const teams=R.map(r=>{
     const m=W.matchups.find(x=>x.roster_id===r.roster_id)||{players_points:{},points:0};
-    const rows=rowsFor(r,m,r.owner_id===S.userId), P=planWeek(rows,{light:true}), D=withPickups(teamDist(rows,P), pickupFor(r.roster_id,{rows, from: r.roster_id===me?.roster_id? 1 : 0}));
+    const rows=rowsFor(r,m,r.owner_id===S.userId);
+    // each team's simulated week: the one the league calibration just ran (same plans, on the calibrated scale), so it isn't
+    // simulated a second time (~7 s on a fresh open; user, 11-10: "sometimes it doesn't let me switch between tabs")
+    const F=W._cal, c=F&&F.raw.find(t=>t.rid===r.roster_id), d=c? (F.d[r.roster_id]||0) : 0;
+    const D= c&&c.tot? {m:c.m+d, v:c.v, tot:c.tot.map(x=>x+d), pk:c.pk} : withPickups(teamDist(rows,planWeek(rows,{light:true})), pickupFor(r.roster_id,{rows, from: r.roster_id===me?.roster_id? 1 : 0}));
     const s=r.settings||{};
     return {rid:r.roster_id, name:rosterName(r.roster_id), me:r.roster_id===me?.roster_id, mid:m.matchup_id, now:lockedSum(rows), proj:D.m, pv:D.v, tot:D.tot, exact:legOk(r.roster_id),
       locked:rows.filter(x=>x.starter&&x.a.lockedOn).length,
@@ -3561,20 +3578,25 @@ function computeLeague(){
     }
     return {made,first,champ,winsSum,weekWin,pfSum,seedC,oppC};
   };
-  const SR=sim(0,0,meI,0,true);
+  await paintNow(); const SR=sim(0,0,meI,0,true);
   LG.path= meI>=0? {seed:[...SR.seedC], opp:Object.entries(SR.oppC).map(([i,c])=>[teams[+i].rid,c]).sort((x,y)=>y[1]-x[1]), N} : null;
   const games=(weeks.length)*(median?2:1);
   teams.forEach((t,i)=>{ t.po=SR.made[i]/N; t.top=SR.first[i]/N; t.ch=SR.champ[i]/N; t.xw=SR.winsSum[i]/N; t.xl=t.w+t.l+t.t+games-t.xw; t.ww=SR.weekWin[i]/N; t.xpf=SR.pfSum[i]/N });
   // what one more win, or 20 more points, does to my title odds: the weights for every lock/wait call this week
   if(meI>=0){
     // central differences (one win either way, 60 points either way) on paired runs: steadier than one-sided steps
-    const c0=SR.champ[meI]/N, cw=(sim(1,0).champ[meI]-sim(-1,0).champ[meI])/(2*N), cp=(sim(0,60).champ[meI]-sim(0,-60).champ[meI])/(120*N);
+    const runs=[]; for(const [w_,p_] of [[1,0],[-1,0],[0,60],[0,-60]]){ await paintNow(); runs.push(sim(w_,p_).champ[meI]) }
+    const c0=SR.champ[meI]/N, cw=(runs[0]-runs[1])/(2*N), cp=(runs[2]-runs[3])/(120*N);
     LG.wt={perWin:Math.max(1e-5,cw), perPt:Math.max(0,cp), base:c0, at:Date.now()};
   }
   const wtCache={};
   LG.wtFor=rid=>{ const i=idx[rid]; if(i==null) return null; if(wtCache[rid]) return wtCache[rid];
     const c0=SR.champ[i]/N, cw=(sim(1,0,i).champ[i]-sim(-1,0,i).champ[i])/(2*N), cp=(sim(0,60,i).champ[i]-sim(0,-60,i).champ[i])/(120*N);
     return wtCache[rid]={perWin:Math.max(1e-5,cw), perPt:Math.max(0,cp), base:c0} };
+  // your opponent's weights are needed by the next Lock-in draw: worked out here, with pauses, instead of all at once there
+  { const my=myRoster()?.roster_id, mm=W.matchups.find(x=>x.roster_id===my), om=mm&&W.matchups.find(x=>x.matchup_id===mm.matchup_id && x.roster_id!==my), oi=om? idx[om.roster_id] : null;
+    if(oi!=null && !wtCache[om.roster_id]){ const r=[]; for(const [w_,p_] of [[1,0],[-1,0],[0,60],[0,-60]]){ await paintNow(); r.push(sim(w_,p_,oi).champ[oi]) }
+      wtCache[om.roster_id]={perWin:Math.max(1e-5,(r[0]-r[1])/(2*N)), perPt:Math.max(0,(r[2]-r[3])/(120*N)), base:SR.champ[oi]/N} } }
   // title value of one point of weekly team strength for the rest of the season (prices a pickup's later weeks)
   const strCache={};
   LG.strFor=rid=>{ const i=idx[rid]; if(i==null) return null; if(rid in strCache) return strCache[rid];
@@ -3669,7 +3691,7 @@ function renderLeague(){
 function showView(v,persist){
   W.view=v; document.body.dataset.view=v; if(persist) store.set("view",v); press("viewSeg","view",v);
   $("weekView").hidden = v!=="week"; $("draftView").hidden = v!=="draft"; $("leagueView").hidden = v!=="league";
-  if(v==="week"){ loadWeek(false) }
+  if(v==="week"){ if(W.weekDirty && W.loaded){ W.weekDirty=false; renderWeekBusy() } loadWeek(false) }
   if(v==="league"){ loadLeague(false) }
   if(v==="draft" && !S.draft && S.league) loadDraft().catch(()=>{});
   setLive(S.err?"err":"on"); renderClock();
