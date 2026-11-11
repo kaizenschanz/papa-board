@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9qLlLlET8JGwkTdWc962vRhsYXm2yj6PUz0OS4ThDrY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UhhJ/gqynd29JErprXuWl6rGaAfO7ZCRxfVF2USch8I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -692,7 +692,7 @@ function setMsg(t,err){const m=$("setupMsg");m.textContent=t;m.classList.toggle(
 function setLive(state){
   $("dot").className="dot"+(state==="on"?" on":state==="err"?" err":"");
   if(state==="err"){ $("liveTxt").textContent="Can't reach Sleeper, retrying"; return }
-  if((W.view==="week"||W.view==="league") && W.updated){ const m=Math.round((Date.now()-W.updated)/60000); $("liveTxt").textContent = W.err? "Can't reach Sleeper, retrying" : (m<1?"Week updated just now":"Week updated "+m+" min ago"); return }
+  if((W.view==="week"||W.view==="league") && W.updated){ const m=Math.round((Date.now()-(W.checked||W.updated))/60000); $("liveTxt").textContent = W.err? "Can't reach Sleeper, retrying" : (m<1?"Week updated just now":"Week updated "+m+" min ago"); return }
   if(!S.lastOk){ $("liveTxt").textContent="Offline"; return }
   const s=Math.round((Date.now()-S.lastOk)/1000);
   $("liveTxt").textContent = S.draft?.status==="complete" ? "Draft complete" : (s<3?"Live":"Updated "+s+"s ago");
@@ -983,8 +983,20 @@ async function loadWeek(force){
     // data lands; and the last title weights, until the season simulation refreshes them
     if(!LG.past || LG.pastKey!==lid+"|"+week){ try{ LG.past=await pastWeeks(); LG.pastKey=lid+"|"+week }catch(e){} }
     if(!LG.wt) loadWts(lid,week);
-    W.loaded=true; W.updated=Date.now(); W.err=null;
+    // A refresh that brought nothing new (same scores, locks, live clocks, injuries, lineups; projections not re-read) doesn't
+    // redraw: a redraw is a few seconds of simulation the page can't scroll through. Still redrawn at least every 10 minutes and
+    // whenever a game has tipped since the last draw (deadlines move then).
+    const dsig=[week, slow? Date.now() : "", JSON.stringify(matchups.map(m=>[m.roster_id,m.starters,m.players_points,m.points])), stats.length,
+      stats.reduce((t,r)=>t+(r.stats?.pts||0)*7+(r.stats?.min||0),0).toFixed(1), JSON.stringify(W.legs||null), JSON.stringify(W.clock||{}),
+      JSON.stringify(W.injESPN||{}), Object.keys(LINEUPS).length, W.games.map(g=>g.status).join("")].join("#");   // game statuses: a tip or a final redraws
+    const tipped= W.updated && W.games.some(g=>{ const t=Date.parse(g.start_time||g.date+"T19:00:00"); return t>W.updated && t<=Date.now() });
+    const same= W.loaded && W.dsig===dsig && !force && !tipped && Date.now()-(W.drawnAt||0)<10*60e3;
+    W.dsig=dsig; W.loaded=true; W.err=null; W.checked=Date.now();
     $("wkMsg").textContent="";
+    if(same){ W.lastOk=Date.now(); renderClock(); return }
+    W.updated=Date.now(); W.drawnAt=Date.now();
+    // the league calibration (~1.5 s) on its own turn, so the page can scroll between it and the draw
+    await new Promise(r=>setTimeout(r,0)); try{ calibrateField() }catch(e){} await new Promise(r=>setTimeout(r,0));
     renderWeek(); renderClock();
     if(!LG.busy && W.view==="week" && (!LG.wt || Date.now()-LG.wt.at>15*60e3)) refreshTitleWeights();
   }catch(e){ W.err=e.message; $("wkMsg").textContent="Couldn't load this week from Sleeper: "+e.message; $("wkMsg").classList.add("err") }
@@ -2594,8 +2606,17 @@ function buildMatchup(me, isMe, main, pre){
   return {A, P, vs};
 }
 // The opponent's lock lines from his own view's calculation (the same buildMatchup, him as the team), run after the page is up.
+// His view is a whole second matchup build (~2-3 s, and the page can't scroll meanwhile: user, 11-10, "it gets stuck for a few
+// seconds"), so its lines are kept, on this device too, until something they depend on changes: either team's scores, live
+// games, locks, games left or projections (to the point), the calibration, his title weights.
+function rowSig(x){ const a=x.a; return [x.pid, x.starter?1:0, x.idx, a.lockedOn?.id||"", a.latest&&!a.latest.dnp? a.latest.fp.toFixed(1) : "", a.live? "L"+Math.round((a.live.cur||0)/5) : "",   // live: to the nearest 5 points (his lines barely move with every basket)
+  a.future.map(g=>g.date+":"+Math.round(g.mu||0)).join(";"), a.info.inj||""].join(",") }
+function oppSig(v){ const w=LG.wtFor? LG.wtFor(v.oppRid) : null;
+  return [S.league?.league_id, W.week, v.oppRid, (W._cal?.k||1).toFixed(3), w? w.perWin.toPrecision(3) : "", v.oppRows.map(rowSig).join("|"), v.rows.map(rowSig).join("|")].join("#") }
 function oppLinesLater(){
   const v=W.vs; if(!v||!v.oppRows||v.oppLines) return;
+  const sig=oppSig(v), c=W._oppL||store.get("oppLines",null);
+  if(c && c.sig===sig){ W._oppL=c; v.oppLines=c.lines; renderMatchup(v.rows); return }
   setTimeout(()=>{ if(W.vs!==v) return; const R=S.rosters[v.oppRid]; if(!R) return;
     let H; try{ H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false) }catch(e){ return }
     if(W.vs!==v || !H.vs) return;
@@ -2604,7 +2625,7 @@ function oppLinesLater(){
         const date= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!date) continue;
         const ln=slotLine(H.A,H.P,x,date); if(ln!=null) lines[x.pid]=ln } }
     finally{ W.vs=v }
-    v.oppLines=lines; renderMatchup(v.rows) }, 30) }
+    v.oppLines=lines; W._oppL={sig, lines}; if(!(LOGX||NOASSUME)) store.set("oppLines",W._oppL); renderMatchup(v.rows) }, 30) }
 function renderMatchup(A){
   const v=W.vs, el=$("wkMatch"); if(!v||!v.oppRows){ el.innerHTML='<div class="empty">No opponent this week.</div>'; return }
   keepOpen(el, gridHTML(A, v.me, v.plan, v.oppRows, v.opp, v.oppPlan, viewingMe()?'You':rosterName(viewRoster().roster_id), v.name, true));
