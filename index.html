@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-NtS7O2Sj1HzsxcqK7zCk3em+qcu/3UkYOgl5DV8Hvtg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lUwqxTI2UYlA/2bObjP7KqaFWVyjMAtpdlpaj7vti5g='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2558,14 +2558,19 @@ function postLook(Q,pid,date){ const now=Date.now(); for(const L of Object.value
 // other UTIL; Clingan's line also counted backup games without checking their dates). The call is made at the next tip in that
 // chain, when that player's status is known, so the first game after his counts as played.
 // his line in each open slot of his slot's kind he fits: {slot: line}
+// Locking him gives up one slot's rest of the week, and the other slots keep theirs. That only works if the slots kept don't
+// need his own later games (they die with the lock): giving up Hartenstein's UTIL to keep Clingan's doesn't work when Clingan's
+// UTIL is Clingan's own games (user, 11-11). Rollins, whose UTIL the plan hands to Embiid and Clingan, gives up the weaker of those.
 function slotLinesFor(A,P,x,date){
-  const SLn=P.SL, mine=SLn[x.idx], tipMine= tipAt(x.pid,date) || Date.parse(date+"T19:00:00"), pos=x.a.info.pos, out=new Map();
+  const SLn=P.SL, mine=SLn[x.idx], tipMine= tipAt(x.pid,date) || Date.parse(date+"T19:00:00"), pos=x.a.info.pos, out=new Map(), ch=[];
   for(const [hp,q] of P.pick){ if(q.k!=="hold" || !(q.slot===x.idx || (SLn[q.slot]===mine && elig(pos,SLn[q.slot])))) continue;
     const occ=A.find(y=>y.starter && y.idx===q.slot)?.pid;
     const st=slotSteps(A,P,hp).filter(t=> (t.t || Date.parse(t.date+"T19:00:00"))>tipMine && !(t.date===date && (t.pid===x.pid || t.pid===occ)) && t.date>=date);
-    if(!st.length) continue;
-    const b=titleBar(hp, [{...st[0], pm:0}].concat(st.slice(1)));
-    if(b!=null && !(out.has(q.slot) && out.get(q.slot)<=b)) out.set(q.slot,b) }
+    if(st.length) ch.push({hp, slot:q.slot, st, his: st.some(t=>t.pid===x.pid)}) }
+  for(const c of ch){ if(ch.some(o=>o!==c && o.his)) continue;   // a slot kept would still lean on his later games
+    const b=titleBar(c.hp, [{...c.st[0], pm:0}].concat(c.st.slice(1)));
+    if(b!=null && !(out.has(c.slot) && out.get(c.slot)<=b)) out.set(c.slot,b) }
+  if(!out.size){ const c=ch.find(c=>c.slot===x.idx) || ch[0]; const b= c? titleBar(c.hp, [{...c.st[0], pm:0}].concat(c.st.slice(1))) : null; if(b!=null) out.set(c.slot,b) }
   return out }
 // Twin slots claimed by each other (user, 11-11: "fix the gap"): two finished scores can't both take the weaker UTIL. The
 // finished, lockable scores in slots of his kind are matched to those slots to lock as many as clear (then the most margin);
@@ -3872,7 +3877,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
   WR.forEach(([n,g,set])=>{ const f=g(); set(function(...a){ if(depth[n]) return f.apply(this,a); depth[n]=1; const t=performance.now(); try{ return f.apply(this,a) } finally{ depth[n]=0; const o=(acc[n] ||= [0,0]); o[0]+=performance.now()-t; o[1]++ } }) }) }
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
-if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={lineFor,slotLinesFor} }
+if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD} }
 if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
