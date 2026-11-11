@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4w+dj3GXRfryTLbWN3wnes6S7bC1bNk/SGeJFScbSs8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OA+MKLG4NQcX8yMP+tKorrOMf4UWUR6kfsgxoJdEVeQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2123,6 +2123,9 @@ const lockedSum=R=>R.filter(x=>x.starter&&x.a.lockedOn).reduce((t,x)=>t+x.a.lock
 // lock decision... no one cares about pg vs util"). Play on = his next game played (the slot gives up the score), then the rest of
 // the slot's chain played right: the same comparison as his lock line.
 function lockOdds(A,P,x){ const v=W.vs, a=x.a; if(!v?.me?.tot||!a.latest||!a.future.length) return null;
+  // from his lock line's own two plans (user, 11-11: Robinson's line sat right at his 19.56 while these odds, still on the old
+  // slot chain, said locking was worth 2 points of win chance and 4 of median); the chain below is only the fallback
+  if(x.idx!=null && lineFor(A,P,x,a.latest.date)!=null){ const o=v._lfo?.get(x.pid+"|"+a.latest.date+"|"+x.idx+"|1"); if(o) return {L:o.L, W:o.W, title:!!v.wt} }
   const hp=[...P.pick].find(([,q])=>q.slot===x.idx)?.[0]||x.pid, part=v.me.parts.get(hp)||v.me.parts.get(x.pid); if(!part) return null;
   const st0=chainSteps(A,P,hp,a.latest.date), k=st0.findIndex(t=>t.pid===hp||t.pid===x.pid); if(k<0) return null;
   const st=[{...st0[k],pm:0}].concat(st0.slice(k+1)), V=stepsValue(st), N=v.me.tot.length, f=calF(), C=new Float64Array(N), keep=new Float64Array(N), go=new Float64Array(N);
@@ -2625,16 +2628,17 @@ function replanLine(A,P,x,date,claims){
   // every open slot he fits, the same ones the lock step picks from (lockSlotFor): a forward sitting in UTIL gets locked at
   // SF/PF/F, which keeps the UTILs for the centers, so that's the lock his line has to price (Walker in UTIL was priced as a
   // UTIL lock, 22.4, 11-11). The cheapest slot counts.
-  const lk=new Set(B.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx)), from= lk.has(xi)? null : xi; let best=null, at=null;
+  const lk=new Set(B.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx)), from= lk.has(xi)? null : xi; let best=null, at=null, DLb=null;
   for(let i=0;i<SLn.length;i++){ if(lk.has(i) || !elig(a.info.pos,SLn[i])) continue;
     const occ= i===xi? null : B.find(y=>y.starter&&y.idx===i&&y.pid!==x.pid); if(occ && occ.a.live && !(from!=null && elig(occ.a.info.pos,SLn[from]))) continue;   // can't free that slot mid-game
     const QL=planWeek(AL,{...base, light:true, pinLock:{pid:x.pid, slot:i, from}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
-    const l=lockBarD(withPickups(teamDist(AL,QL),v.pkMe), fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i } }
-  return best==null? null : {l:best, slot:at} }
+    const DLi=withPickups(teamDist(AL,QL),v.pkMe), l=lockBarD(DLi, fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi } }
+  // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
+  return best==null? null : {l:best, slot:at, odds: known? {L:titleObjD(DLb,v.opp,v.tab,v.median,v.wt), W:titleObjD(DW,v.opp,v.tab,v.median,v.wt)} : null} }
 function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
   const v=W.vs, key=x.pid+"|"+date+"|"+x.idx+"|"+(noClaims?0:1); if(v){ v._lf ||= new Map(); if(v._lf.has(key)) return v._lf.get(key) }
-  let b=null; try{ const r=replanLine(A,P,x,date,!noClaims); if(r){ b=r.l; if(v) (v._lfs ||= new Map()).set(key,r.slot) } }catch(e){ b=null }
+  let b=null; try{ const r=replanLine(A,P,x,date,!noClaims); if(r){ b=r.l; if(v){ (v._lfs ||= new Map()).set(key,r.slot); (v._lfo ||= new Map()).set(key,r.odds) } } }catch(e){ b=null }
   if(b==null){ const own=slotLinesFor(A,P,x,date); b= own.size? (own.get(x.idx) ?? Math.min(...own.values())) : null }   // fallback: his slot's chain
   if(v) v._lf.set(key,b); return b }
 function slotLine(R,Q,x,date){ return lineFor(R,Q,x,date) }
