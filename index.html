@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-WcXH+Yd0y1yGsTikFkk2e2FbocwBs0i0nlKnYw1pqwI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qV1Kv+6V2R3f9sQUlvVPvjBVxAdnmcg6AJiDt6OSSGg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1930,7 +1930,12 @@ function planWeek(A,opt={}){
         return {c, g, opts, best: Math.max(0,...opts.map(o=>o.gain))} }).filter(x=>x.opts.length).sort((a,b)=>b.best-a.best);
       const tier=sn=>SLOT_RANK[sn]??1, usedS=new Set();
       for(const x of cand){ const here=sl=>x.c.o.x.starter && x.c.o.x.idx===sl;
-        const o=x.opts.filter(o=>!usedS.has(o.s.hp)).sort((a,b)=>here(b.s.slot)-here(a.s.slot) || tier(SL[a.s.slot])-tier(SL[b.s.slot]) || b.gain-a.gain)[0];
+        // Where the look adds the most (user, 11-10: "why should saucydalton lock in jalen green at 17.7+?": Michael Porter's ~21 and
+        // ~23 sat as looks behind Jalen Johnson's ~30 in SF, the narrowest slot, so Green's F slot was priced on Green alone). Each
+        // slot's chain is valued by itself, so the look has to sit where it's worth something. Among slots within 0.25 of the best:
+        // stay where he is, then the narrowest (the lock step's order).
+        const free=x.opts.filter(o=>!usedS.has(o.s.hp)), top=Math.max(-Infinity,...free.map(o=>o.gain));
+        const o=free.filter(o=>o.gain>=top-0.25).sort((a,b)=>here(b.s.slot)-here(a.s.slot) || tier(SL[a.s.slot])-tier(SL[b.s.slot]) || b.gain-a.gain)[0];
         if(!o) continue; usedS.add(o.s.hp); (idle[o.s.hp] ||= []).push({pid:x.c.pid, g:x.g, date:d}) } }
     // Same-night looks, after another game in the slot is over: the holder played early, or an off-day look did, and a bench
     // player tips once that game has ended (user, 11-10: Hartenstein and McCain at 8 PM, behind Embiid's and Rollins' early
@@ -2214,8 +2219,11 @@ function keepBar(A,P,slotPid,after){ return titleBar(slotPid, chainSteps(A,P,slo
 // the chain goes on without it. Free looks before it are passed up to hold the score (the decision is at his tip).
 function keepBars(A,P,pid,after,side="me"){
   const st=chainSteps(A,P,pid,after), k=st.findIndex(t=>t.pid===pid); if(k<0) return null;
-  const tail=st.slice(k), plays=titleBar(pid, [{...tail[0], pm:0}].concat(tail.slice(1)), side), sits= tail.length>1? titleBar(pid, tail.slice(1), side) : null;
-  return plays==null? null : {plays, sits, day: dayLabel(tail[0].date)} }
+  // Against everything the slot still has coming, bench looks before his next game included (user, 11-10: "why should saucydalton
+  // lock in jalen green at 17.7+?": the line skipped Michael Porter's ~21 the next night and priced Green's score against Green's
+  // own ~16 and ~14). A score under this line is given up for the next look; at or over it, it's kept and the looks are skipped.
+  const rest=st.filter((t,i)=>i!==k), plays=titleBar(pid, st.map((t,i)=> i===k? {...t, pm:0} : t), side), sits= rest.length? titleBar(pid, rest, side) : null;
+  return plays==null? null : {plays, sits, day: dayLabel(st[k].date)} }
 // Mid-game switch line: his score so far, at the tip of the player who'd replace him (step j), at which keeping him (step i) in
 // gives the same championship odds as benching him for that player. Same simulated week as every other line. Returns lo when
 // keeping wins whatever he has, Infinity when the switch wins whatever he has, null without a simulated week.
@@ -3811,6 +3819,14 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
 if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S }
 if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
+  // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
+  team:rid=>{ const R=S.rosters[rid]; if(!R) return {err:"no such team"}; const H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false); if(!H||!H.vs) return {err:"no matchup"};
+    const nm=pid=>H.A.find(x=>x.pid===pid)?.a.info.name||pid, SLn=H.P.SL, save=W.vs; W.vs=H.vs; let out;
+    try{ out={ name:rosterName(rid), lines:Object.fromEntries(Object.entries(linesOfView(H.A,H.P)).map(([p,v])=>[nm(p),+v.toFixed(2)])),
+      slots:[...H.P.pick].map(([pid,q])=>({slot:SLn[q.slot]+"#"+q.slot, holder:nm(pid), k:q.k, v:+q.v.toFixed(2), now:nm(H.A.find(x=>x.starter&&x.idx===q.slot)?.pid),
+        chain: q.k==="lock"? [] : slotSteps(H.A,H.P,pid).map(t=>nm(t.pid)+" "+t.date.slice(5)+" ~"+t.mu.toFixed(1)+(t.cur!=null?" (live "+t.cur.toFixed(1)+")":"")+(t.pm?" sit"+Math.round(t.pm*100)+"%":"")) })),
+      bench:H.A.filter(x=>!x.starter).map(x=>x.a.info.name+" ["+x.a.info.pos.join("/")+"] "+x.a.future.map(g=>g.date.slice(5)+"~"+(g.mu||0).toFixed(0)).join(",")+(H.P.pick.has(x.pid)? " -> "+SLn[H.P.pick.get(x.pid).slot] : "")),
+      idle:Object.fromEntries(Object.entries(H.P.idle||{}).map(([hp,L])=>[nm(hp),L.map(m=>nm(m.pid)+" "+m.date.slice(5)+(m.post?" post":""))])) } } finally{ W.vs=save } return out },
   // diagnostic: how long the main pieces take here (compare ?worker=0 with the worker)
   prof:()=>{ const r=myRoster(), m=W.matchups.find(x=>x.roster_id===r.roster_id), T={}; const tm=(n,f)=>{ const t=performance.now(); const v=f(); T[n]=Math.round(performance.now()-t); return v };
     const rows=tm("rowsFor",()=>rowsFor(r,m,true)); const P=tm("planLight",()=>planWeek(rows,{light:true})); TD_CACHE.clear(); tm("teamDist800",()=>teamDist(rows,P,800));
@@ -3874,7 +3890,7 @@ function makeWorkerEnv(INIT, post){
     if(m.t==="ev"){ setVals(m.vals); document.hidden=!!m.hidden;
       const ev={type:m.type, target:FT(m.chain||[],0)||{matches:()=>false, closest:()=>null, dataset:{}}, preventDefault(){}, stopPropagation(){}};
       for(const fn of (LISTEN[m.key]||[])){ try{ fn(ev) }catch(e){ post({t:"warn", msg:String(e&&e.stack||e)}) } } }
-    else if(m.t==="status"){ let st=null; try{ st=api&&(m.q==="prof"? api.prof() : api.status()) }catch(e){ st={err:String(e&&e.stack||e)} } post({t:"status", id:m.id, st}) } };
+    else if(m.t==="status"){ let st=null; try{ st=api&&(m.q==="prof"? api.prof() : /^team:/.test(m.q||"")? api.team(+m.q.slice(5)) : api.status()) }catch(e){ st={err:String(e&&e.stack||e)} } post({t:"status", id:m.id, st}) } };
   return { env:{document, window, localStorage, location, fetch, IN_WORKER:true, requestAnimationFrame:fn=>setTimeout(()=>fn(Date.now()),16), cancelAnimationFrame:id=>clearTimeout(id), onReady:a=>{ api=a }}, dispatch };
 }
 
@@ -3883,7 +3899,7 @@ function pageBoot(){
   const qs=new URLSearchParams(location.search), ls=(()=>{ try{ return window.localStorage }catch(e){ return null } })();
   const classic=()=>APP({document, window, localStorage:ls, location, IN_WORKER:false, fetch:window.fetch.bind(window),
     requestAnimationFrame:window.requestAnimationFrame.bind(window), cancelAnimationFrame:window.cancelAnimationFrame.bind(window),
-    onReady:a=>{ window.__board=q=>Promise.resolve({mode:"page", ...(q==="prof"? a.prof() : a.status())}) }});
+    onReady:a=>{ window.__board=q=>Promise.resolve({mode:"page", ...(q==="prof"? a.prof() : /^team:/.test(q||"")? a.team(+q.slice(5)) : a.status())}) }});
   const want= typeof Worker!=="undefined" && typeof Blob!=="undefined" && ls && qs.get("log")!=="1" && qs.get("noassume")!=="1" && qs.get("worker")!=="0" && qs.get("view")!=="draft" && qs.get("login")!=="1";
   const lsGet=(k,d)=>{ try{ const v=ls.getItem("prb:"+k); if(v!=null) return JSON.parse(v) }catch(e){} return d };
   if(!want || (lsGet("noworker",0)>Date.now() && qs.get("worker")!=="1")){ classic(); return }   // noworker: the worker let this device down in the last day (see the watchdog)
