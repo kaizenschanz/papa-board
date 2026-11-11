@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9iGr9XNdhvUww7NgSIl/Gguciz0/dKIP5u92qGB0qKw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-X73XJXnosGcrUbyc3oqAWL5LHDfC7BVoDa55Uqf9gOA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2508,6 +2508,8 @@ function lineLocks(A,P){ const out={};
   return out }
 // a player's lock line in the grid: yours from this view, the opponent's from his own view's run (oppLinesLater)
 function lineOf(x,R,Q,side,date){ if(side==="opp") return W.vs?.oppLines? (W.vs.oppLines[x.pid] ?? null) : null; return W.vs?.lineLocks?.[x.pid] ?? slotLine(R,Q,x,date) }
+// this week's lock, as the managers' replay graded it: the line it had to clear and whether it was the right call
+function lockGrade(rid,pid){ const L=LG.tend?.[rid]?.log; if(!L||LG.tendWeek!==W.week) return null; const d=L.find(d=>d.current && d.pid===pid); const c=d&&d.steps.find(c=>c.locked); return c&&c.line!=null? {line:c.line, ok:c.ok} : null }
 function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   const tipS=(pid,g)=>{ const t=tipAt(pid,g.date); return dayLabel(g.date)+(t?" "+clock(t).replace(":00","").replace(" ","").toLowerCase():"") };
@@ -2522,7 +2524,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     const oppLock= !mine && x.starter && !a.lockedOn && a.latest && (L? (L.locks||[]).includes(x.pid) : W.vs && R===W.vs.oppRows && Q?.pick?.get(x.pid)?.k==="lock");   // any team's plan (League tab: from its own view)
     const badge= oppLock? '<span class="badge lock">Lock</span> ' : mine&&x.starter&&!a.lockedOn&&a.call&&/^(lock|wait)$/.test(a.call.c)? '<span class="badge '+a.call.c+'">'+(a.call.c==="lock"?"Lock":"Wait")+'</span> '
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
-    if(a.lockedOn){ s='Locked · '+dayLabel(a.lockedOn.date); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
+    if(a.lockedOn){ const gl=lockGrade(x.rid,x.pid); s='Locked · '+dayLabel(a.lockedOn.date)+(gl? ' · line '+gl.line.toFixed(1)+(gl.ok? ' ✓' : ' ✗') : ''); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
     else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp, p=x.starter&&D.parts.get(x.pid);
       if(a.live) bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):''));
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
@@ -3286,10 +3288,13 @@ async function gradeWeek(w, rows, logs, SL, per){
         const i=g.findIndex((x,k)=>k<g.length-1 && tipOf(g[k+1])===D); if(i<0 || i>sl.idx) continue;
         if(g[i].fp==null) continue;
         const started=startedThatDay(r.rid, sl.pid, g[i].date); if(started===false) continue;   // he wasn't in the lineup for that game (lineup history)
-        if(r.current && tipOf(g[i+1])>Date.now()) continue;                     // deadline not reached yet
-        const isOpen= r.current && r.open && r.open.has(sl.pid);
-        if(isOpen && i===sl.idx) continue;                                       // his latest score is still undecided
-        const s=g[i].fp, locked= i===sl.idx && !isOpen, unproven= started===null && !locked;   // a lock proves he started; a 'wait' needs the history
+        // This week (user, 11-10: "neither section includes players they've actually locked... doesn't include players they've
+        // passed"): a lock is final the moment it's made, so it's graded then; a pass only once his next game has tipped (a
+        // player whose latest score is still lockable hasn't decided yet).
+        const isOpen= r.current && r.open && r.open.has(sl.pid), nextTipped= tipOf(g[i+1])<=Date.now();
+        const s=g[i].fp, locked= i===sl.idx && !isOpen, unproven= started===null && !locked;
+        if(r.current && !nextTipped && !locked) continue;                        // not decided yet
+   // a lock proves he started; a 'wait' needs the history
         // waiting: his games from the deadline on, then the best bench player who plays later in a spot this slot allows
         const st=g.slice(i+1).map((x,k)=>[x,k]).filter(([x,k])=>!(k===0 && x.dnp)).map(([x,k])=>gstep(sl.pid,x,k===0)), last=g[g.length-1].date;   // sat at the deadline tip: known
         let bk=null; for(const bp of r.players){ if(r.starters.includes(bp)) continue; if(!elig(playerInfo(bp).pos, SL[sl.si])) continue;
@@ -3329,7 +3334,8 @@ async function gradeWeek(w, rows, logs, SL, per){
       const pl=g.filter(x=>x.fp!=null), avg=pl.length? pl.reduce((t,x)=>t+x.fp,0)/pl.length : 0, isOpen= r.current && r.open && r.open.has(sl.pid);
       const early= !isOpen && sl.idx<g.length-1;
       if(!r.current){ P.slots++; if(early){ P.early++; if(avg>0) P.ratios.push(g[sl.idx].fp/avg); P.left.push(g.length-1-sl.idx) } }
-      P.log.push({w, pid:sl.pid, k:sl.idx+1, n:g.length, fp:g[sl.idx].fp, avg, early, open:isOpen, current:!!r.current,
+      const liveNow= isOpen && sl.idx<g.length-1 && tipOf(g[sl.idx+1])<=Date.now();   // his next game has tipped: the last score was passed up
+      P.log.push({w, pid:sl.pid, k:sl.idx+1, n:g.length, fp:g[sl.idx].fp, avg, early, open:isOpen, live:liveNow, current:!!r.current,
         games:g.map(x=>x.dnp? 0 : x.fp), steps:(sl.steps||[]).sort((a,b)=>a.i-b.i)}) } }
 }
 // Unverified waits phase out on their own: once a manager has TEND_VERIFIED graded calls from the lineup-tracked era, only
@@ -3379,7 +3385,8 @@ function renderTend(){
           (c.moot? (c.best?' <span class="ok">✓</span> <span class="muted">low stakes</span>':' <span class="muted">low stakes</span>') : c.close? (c.best?' <span class="ok">✓</span> <span class="muted">close</span>':' <span class="muted">close call</span>') : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
       const later=d.early? d.games.slice(d.k).filter(v=>v!=null) : [], left=d.games.slice(d.k).filter(v=>v==null).length;
       const TLx=teamLines(x.rid)||{}, lnow= d.open? TLx[d.pid] : null, plk= d.open && (TLx.locks||[]).includes(d.pid);   // this week, still open: his lock line now, from that team's own view
-      const outcome= d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(plk? ' · best play: lock it' : lnow!=null? ' · lock at '+lnow.toFixed(1)+'+' : '')+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
+      const outcome= d.open&&d.live? 'Playing now'+(lnow!=null? ' · lock at '+lnow.toFixed(1)+'+ after it' : '')
+        : d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(plk? ' · best play: lock it' : lnow!=null? ' · lock at '+lnow.toFixed(1)+'+' : '')+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
         : d.early? 'He locked '+final.toFixed(2)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(2)).join(', ') : '')+(left?' ('+left+' still to play)':'')
         : 'Rode it to the last game: '+final.toFixed(2);
       items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
