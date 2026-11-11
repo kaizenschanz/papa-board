@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BESz940NrswCXVXbzfMImb5sA6yWKPEf8E+uCq1NW8Q='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9qLlLlET8JGwkTdWc962vRhsYXm2yj6PUz0OS4ThDrY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -353,6 +353,8 @@ details.fold #poolSeg{margin-bottom:6px}
   .pc .n{font-size:13.5px}.pc .v{font-size:16px}
   .sb .big{font-size:34px}
 }
+#weekView.stale #wkScore,#weekView.stale #wkTodo,#weekView.stale #wkMatch,#weekView.stale #wkSum{opacity:.55;transition:opacity .3s}
+#weekView #wkScore,#weekView #wkTodo,#weekView #wkMatch,#weekView #wkSum{transition:opacity .3s}
 </style>
 </head>
 <body>
@@ -977,6 +979,10 @@ async function loadWeek(force){
     try{ const lu=await fetch("lineups.json?t="+Date.now(),{cache:"no-store"}); if(lu.ok){ const d=await lu.json(); for(const k in d) LINEUPS[k]=d[k] } }catch(e){}
     await loadLegs(lid,week);
     await loadClocks();
+    // finished weeks' totals before the first draw (the league median leans on them), so numbers don't jump when the League
+    // data lands; and the last title weights, until the season simulation refreshes them
+    if(!LG.past || LG.pastKey!==lid+"|"+week){ try{ LG.past=await pastWeeks(); LG.pastKey=lid+"|"+week }catch(e){} }
+    if(!LG.wt) loadWts(lid,week);
     W.loaded=true; W.updated=Date.now(); W.err=null;
     $("wkMsg").textContent="";
     renderWeek(); renderClock();
@@ -2615,6 +2621,7 @@ function renderInfo(){
 
 function renderWeek(){
   if(!W.loaded) return;
+  W.wtUsed=wtSnap();
   renderWho();
   const cards=["wkTodoCard","wkMatchCard","wkPoolCard"].map(id=>$(id)).filter(Boolean);
   if(!myRoster() && W.viewRid==null && Object.keys(S.rosters||{}).length){
@@ -2668,7 +2675,8 @@ function renderWeek(){
   const items=todoItems(A,P);
   renderTodo(items);
   $("wkTodoH").textContent= isMe? "To do" : rosterName(me.roster_id)+"'s moves";
-  if(isMe) W.tlJson=JSON.stringify({week:W.week, at:Date.now(), exact:!!(W.legLive && legFor(myRoster()?.roster_id)),
+  // the Mac's sync reads this (?log=1&noassume=1): the league-wide odds in it take ~0.3 s, so a normal visit skips it
+  if(isMe && (LOGX||NOASSUME)) W.tlJson=JSON.stringify({week:W.week, at:Date.now(), exact:!!(W.legLive && legFor(myRoster()?.roster_id)),
     legs: W.legLive? (W.legs||[]).map(pickLeg) : null, legsAt: W.legLive? W.legAt : null, past: W.legLive? (W.legsPast||null) : null,
     league: (()=>{ try{ return leagueOdds() }catch(e){ return null } })(),
     calls: W.vs? Object.entries(W.vs.calls).map(([pid,c])=>{ const x=A.find(y=>y.pid===pid); return {pid, name:x?.a.info.name, fp:x?.a.latest?+x.a.latest.fp.toFixed(2):null, wait:c.wpts!=null?+c.wpts.toFixed(2):null, bar:c.at!=null?+c.at.toFixed(2):null, call:(x?.a.call?.c)||null} }) : null,
@@ -2681,7 +2689,33 @@ function renderWeek(){
   renderMatchup(A); oppLinesLater();
   $("wkPoolCard").hidden=weekOver(); if(!weekOver()) renderPool(me, A, P);
   renderInfo();
+  $("weekView").classList.remove("stale");
+  if(isMe) savePaint();
 }
+// ---- Opening the page smoothly (user, 11-10: "it's buggy when it loads"). The board needs ~3 s of data and a few seconds of
+// simulation before it can draw, so the last board drawn on this device shows at once, dimmed, until the new one is ready.
+const PAINT_IDS=["wkScore","wkSum","wkInfo","wkMatch","wkTodo","wkTodoH"];
+function savePaint(){ if(LOGX||NOASSUME||!S.league) return; const h={}; for(const id of PAINT_IDS){ const el=$(id); if(el) h[id]=el.innerHTML }
+  store.set("paint",{lid:S.league.league_id, week:W.week, at:Date.now(), h}) }
+function showPaint(){ const c=store.get("paint",null), v=store.get("view","week"), qv=new URLSearchParams(location.search).get("view");
+  if(!c||!c.h||(qv&&qv!=="week")||(!qv&&v!=="week")||Date.now()-c.at>18*3600e3||c.lid!==store.get("league",null)) return;
+  W.view="week"; document.body.dataset.view="week"; press("viewSeg","view","week");
+  $("weekView").hidden=false; $("draftView").hidden=true; $("leagueView").hidden=true;
+  for(const id of PAINT_IDS){ const el=$(id); if(el&&c.h[id]!=null) el.innerHTML=c.h[id] }
+  ["wkTodoCard","wkMatchCard"].forEach(id=>{ const el=$(id); if(el) el.hidden=false });
+  $("weekView").classList.add("stale"); $("wkMsg").textContent="Updating…" }
+// title weights: the season simulation's value of a win and a point, saved per league and week for the next visit's first draw
+function wtSnap(){ const o=W.vs? S.rosters?.[W.matchups?.find(m=>m.matchup_id===W.matchups.find(x=>x.roster_id===myRoster()?.roster_id)?.matchup_id && m.roster_id!==myRoster()?.roster_id)?.roster_id] : null;
+  return {me:LG.wt? {...LG.wt} : null, opp: o&&LG.wtFor? LG.wtFor(o.roster_id) : null} }
+function saveWts(){ if(!S.league||!LG.wt) return; const o=wtSnap(); store.set("wts",{lid:S.league.league_id, week:W.week, at:Date.now(), me:o.me, opp:o.opp, oppRid: W.vs? W.matchups.find(m=>m.matchup_id===W.matchups.find(x=>x.roster_id===myRoster()?.roster_id)?.matchup_id && m.roster_id!==myRoster()?.roster_id)?.roster_id : null}) }
+function loadWts(lid,week){ const c=store.get("wts",null); if(!c||c.lid!==lid||c.week!==week||!c.me||Date.now()-c.at>12*3600e3) return;
+  LG.wt={...c.me, at:0};   // at 0: the season simulation still refreshes them right after the first draw
+  if(c.opp&&c.oppRid!=null){ const f=c.opp, r=c.oppRid; LG.wtFor=rid=> rid===r? f : null } }
+function wtsMoved(){ const a=W.wtUsed, b=wtSnap(); if(!a||!a.me||!b.me) return true;
+  const rel=(x,y)=>Math.abs(x-y)/Math.max(Math.abs(x),Math.abs(y),1e-9);
+  if(rel(a.me.perWin,b.me.perWin)>0.05 || Math.abs((a.me.base||0)-(b.me.base||0))>0.002) return true;
+  if(!!a.opp!==!!b.opp) return true; if(a.opp&&b.opp&&rel(a.opp.perWin,b.opp.perWin)>0.05) return true;
+  return false }
 
 // Is this injury status allowed in an IR slot under the league's settings?
 function irOk(inj){
@@ -2839,7 +2873,9 @@ function claimFrom(pid){ const tom=addDay(todayStr(),1), cd=+(S.league?.settings
 function takenChance(pid){ const my=myRoster()?.roster_id, gd=[...new Set(W.games.filter(g=>g.date>todayStr()).map(g=>g.date))].length; let keep=1;
   for(const r of Object.values(S.rosters)){ if(r.roster_id===viewRoster()?.roster_id) continue; const pk=pickupFor(r.roster_id); const w=pk?.top?.find(x=>x.pid===pid)?.w||0; if(w>0) keep*=Math.pow(1-pk.q*w, Math.max(1,gd)) }
   return Math.min(1, Math.max(0.15, 1-keep)) }
-function claimOptions(A,P){
+const CLM=new WeakMap();   // one run per plan (the To do and Pickups both ask for it)
+function claimOptions(A,P){ const c=CLM.get(P); if(c&&c.A===A&&c.v===W.vs) return c.r; const r=claimOptions0(A,P); CLM.set(P,{A,v:W.vs,r}); return r }
+function claimOptions0(A,P){
   const v=W.vs; if(!v||!v.me?.tot||!A.length) return [];
   // nothing until the league simulation's title weights are in: judged first on expected wins, a move could show for a few
   // seconds on load and then vanish (user, 11-09: "Drop McCain, take Powell off IR" flashed on refresh)
@@ -3040,7 +3076,7 @@ async function loadLeague(force){
     }
     LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);   // odds over the week (the Mac's sync)
     computeLeague(); renderLeague();
-    managerTendencies().then(()=>{ renderTend(); if(W.view==="week") renderWeek() }).catch(()=>{});
+    managerTendencies().then(()=>renderTend()).catch(()=>{});
   }catch(e){ $("lgSum").textContent="Couldn't build the league view: "+e.message }
   finally{ LG.busy=false }
 }
@@ -3342,8 +3378,11 @@ async function refreshTitleWeights(){
       LG.past=await pastWeeks();
     }
     LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);
-    computeLeague(); renderWeek();
-    managerTendencies().then(()=>{ renderTend(); renderWeek() }).catch(()=>{});
+    computeLeague(); saveWts();
+    // redraw only if the title weights moved enough to change something shown (the first draw used the saved ones)
+    if(wtsMoved()) renderWeek();
+    // the managers' replay (~9 s) is for the League tab only: it runs when that tab is opened
+    if(W.view==="league") managerTendencies().then(()=>renderTend()).catch(()=>{});
   }catch(e){} finally{ LG.busy=false }
 }
 function hindsight(rows){
@@ -3596,6 +3635,7 @@ press("srcSeg","src",S.src); press("posSeg","pos",S.pos==="FIT"?"ALL":S.pos); if
 $("user").value=store.get("user","zenkai5");
 const qs=new URLSearchParams(location.search); if(qs.get("draft")) $("draftOverride").value=qs.get("draft");
 syncBarHeight(); render(); showView(qs.get("view")||store.get("view",null)||"draft");
+try{ showPaint() }catch(e){}
 lookupLeagues().then(ok=>{ if(ok) connect() }).catch(e=>{setMsg("Couldn't reach Sleeper: "+e.message+". The rankings still work offline.",true);setLive("err")});
 </script>
 </body>
