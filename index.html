@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6rVp3UFLE+mfIbEt/WYdNKA2P3zvZWtHlednlXn3Dn8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C7uUG9NHbesSDfzFjSprALnbkK5SVLKo1x3PjVHwqTE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2403,9 +2403,14 @@ function todoItems(A,P){
     const kb= rest.length? keepBars(A,P,pid,g.date) : null;
     const pl= postLook(P,pid,g.date), plb= pl? lookBar(A,P,p.slot,pl.pid,pl.date) : null;   // a look after his game tonight: the same line as its swap
     const thr= fx(plb ?? (kb? kb.plays : keepBar(A,P,pid,g.date))) || (rest.length? (N? fx(vsTonight(pid,N.day)??N.at[pid]) : null) : fx(chainValue(A,P,pid,true) ?? (N? N.at[pid] : null) ?? P.term?.[pid] ?? b?.v));
+    // The reminder only goes out while he can still get there (user, 11-10: reminded to lock Embiid at 27+ after he'd scored
+    // 21: "you know he didn't score that"): his chance of reaching the line, from his projection before tip and from his pace
+    // and the time left during the game. Under 5%, no reminder (the sync takes it back as the game goes); the To do keeps its line.
+    const thrN= plb ?? (kb? kb.plays : keepBar(A,P,pid,g.date)), gmu= lv? lv.mu : g.mu, gsd= lv? (lv.sd??0) : sdFor(pid,g.mu);
+    const reach= thrN==null || !(gmu>0)? 1 : gsd>0.3? 1-Phi((thrN-gmu)/gsd) : (gmu>=thrN? 1 : 0);
     if(rest.length) out.push({t:end, approx:!lv, kind:"check", title:"After "+a.info.name+"'s game: lock it if he scores "+(thr||"big")+"+",
       sub:"Otherwise keep playing him ("+rest.length+" more game"+(rest.length>1?"s":"")+").",
-      rems:[{id:"done-"+pid, t:end, lead:-10, title:last(pid)+" done: lock if "+(thr||"?")+"+"}]});
+      rems: reach>=0.05? [{id:"done-"+pid, t:end, lead:-10, title:last(pid)+" done: lock if "+(thr||"?")+"+"}] : []});
     else if(lv) continue;                                       // his last game is on: the live switch lines cover it
     else if(b){ const bt=tipAt(b.pid,b.date);
       // the fallback tips while he's still playing: the call is made at that tip, on his score so far
