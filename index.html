@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UhhJ/gqynd29JErprXuWl6rGaAfO7ZCRxfVF2USch8I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xjYi02SHyQl/jip+W62pJShbkYIwbYtD0oO508k8EK4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -137,6 +137,7 @@ button,input,select{font:inherit;color:inherit}
 .games{display:flex;flex-wrap:wrap;gap:4px}
 .g{display:inline-grid;justify-items:center;min-width:46px;padding:2px 6px 3px;border:1px solid var(--line);border-radius:4px;font-size:11px;line-height:1.2;color:var(--muted)}
 .g b{font:700 15px/1.1 var(--display);color:var(--ink)}
+.g i{font-style:normal;font-size:10px;color:var(--muted);letter-spacing:.02em}
 .g.future{border-style:dashed}
 button.g{font:inherit;font-size:11px;background:transparent;cursor:pointer}
 button.g:hover{border-color:var(--ink)}
@@ -2438,11 +2439,14 @@ function projLine(pid,g){
   return out.length? out.join(" · ") : null }
 function playerDetail(x,mine){
   const a=x.a, pid=x.pid;
+  // who he plays (user, 11-10: "put who they're facing for each game"): vs at home, @ away
+  const tm=a.info.team, vs=g=>{ const G=W.games.find(y=>y.game_id===g.id) || W.games.find(y=>y.date===g.date && (y.home?.team===tm || y.away?.team===tm)); if(!G) return "";
+    const home=G.home?.team===tm, o= home? G.away?.team : G.home?.team; return o? '<i>'+(home? 'vs ' : '@ ')+esc(o)+'</i>' : "" };
   const chips=a.games.map(g=>{
     const counted = a.lockedOn ? g.id===a.lockedOn.id : (x.starter && g===a.latest && !a.future.length);
-    if(g.done) return '<span class="g'+(counted?' counted':'')+'"><span>'+dayLabel(g.date)+'</span><b>'+(g.dnp?'DNP':g.fp.toFixed(2))+'</b></span>';
-    if(g.live) return '<span class="g live"><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(0)+'</b></span>';
-    return '<span class="g future'+(g.src==="dk"?' dk':'')+'"><span>'+dayLabel(g.date)+tipLabel(pid,g.date)+'</span><b>'+(g.mu>0?'~'+g.mu.toFixed(0):'out')+'</b></span>';
+    if(g.done) return '<span class="g'+(counted?' counted':'')+'"><span>'+dayLabel(g.date)+'</span><b>'+(g.dnp?'DNP':g.fp.toFixed(2))+'</b>'+vs(g)+'</span>';
+    if(g.live) return '<span class="g live"><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(0)+'</b>'+vs(g)+'</span>';
+    return '<span class="g future'+(g.src==="dk"?' dk':'')+'"><span>'+dayLabel(g.date)+tipLabel(pid,g.date)+'</span><b>'+(g.mu>0?'~'+g.mu.toFixed(0):'out')+'</b>'+vs(g)+'</span>';
   }).join("") || '<span class="muted">No games this week</span>';
   const r4=recent(pid,4), st=[];
   if(a.avg!=null) st.push('Season <b>'+a.avg.toFixed(2)+'</b>');
