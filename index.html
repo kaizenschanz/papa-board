@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xjYi02SHyQl/jip+W62pJShbkYIwbYtD0oO508k8EK4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zrg120Mk6D6KUOlwyCPD0YxOwBWBegkrJBQN62dEM/o='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3545,15 +3545,13 @@ function oddsSpark(a,b,RA,RB){ const d=LG.tl; if(!d||!d.pairs||+d.week!==+W.week
   const path=P.map(([t,p],k)=>(k?'L':'M')+X(t)+' '+Y(p)).join(' '), ticks=ds.map(x=>'<text x="'+X(Date.parse(x+"T12:00:00"))+'" y="70" text-anchor="middle">'+dayLabel(x).slice(0,3)+'</text>').join("");
   const my=myRoster()?.roster_id, nA= a===my? "You" : rosterName(a), nB= b===my? "You" : rosterName(b), now=Date.now();
   const at=t=>{ if(t<=P[0][0]) return P[0][1]; let k=0; while(k<P.length-1 && P[k+1][0]<=t) k++; if(k>=P.length-1) return P[k][1]; const A0=P[k], B0=P[k+1]; return A0[1]+(B0[1]-A0[1])*(t-A0[0])/((B0[0]-A0[0])||1) };
-  const locks=(R,side)=>(R||[]).filter(x=>x.starter && x.a.lockedOn).map(x=>{ const L=x.a.lockedOn, tp=tipAt(x.pid,L.date);
-    return {t: tp? tp+GAME_MS : Date.parse(L.date+"T22:30:00"), side, txt: x.a.info.name+" locked "+(+L.fp).toFixed(1)+" ("+dayLabel(L.date)+")"} });
-  const dots=locks(RA,"a").concat(locks(RB,"b")).filter(o=>o.t<=now).map(o=>'<circle class="lk '+o.side+'" cx="'+X(o.t)+'" cy="'+Y(at(o.t))+'" r="3"><title>'+esc(o.txt)+'</title></circle>').join("");
+  const dots="";   // lock dots taken out (user, 11-10: "it's cluttering")
   const days=ds.slice(1).map(x=>{ const xx=X(Date.parse(x+"T00:00:00")); return '<line class="day" x1="'+xx+'" x2="'+xx+'" y1="4" y2="56"/>' }).join("");
   const nowL= now>t0 && now<t1? '<line class="now" x1="'+X(now)+'" x2="'+X(now)+'" y1="4" y2="56"/>' : "";
   const p0=P[0][1], start='<text class="end" x="'+(Math.min(280,+X(P[0][0])+3)).toFixed(1)+'" y="'+Math.max(11,+Y(p0)-4).toFixed(1)+'">'+Math.round(p0*100)+'%</text>';
   return '<div class="spark"><svg viewBox="0 0 300 74" role="img" aria-label="'+esc(nA)+' win chance through the week">'+days+'<line x1="0" x2="300" y1="30" y2="30" class="mid"/><text class="lbl" x="298" y="27" text-anchor="end">50%</text>'+nowL+
     '<path d="'+path+'"/>'+dots+start+ticks+'</svg><b>'+Math.round(P[P.length-1][1]*100)+'%</b></div>'+
-    '<div class="spark-key">'+esc(nA)+' win %<span><i class="k a"></i>'+esc(nA)+' locks</span><span><i class="k b"></i>'+esc(nB)+'</span></div>' }
+    '<div class="spark-key">'+esc(nA)+' win %</div>' }
 function lgMatchGrid(a,b){
   const v=W.vs, my=myRoster()?.roster_id;
   if(v && viewingMe() && (a===my||b===my) && v.rid===(a===my? b : a)){ const RA= a===my? v.rows : v.oppRows, RB= a===my? v.oppRows : v.rows;
