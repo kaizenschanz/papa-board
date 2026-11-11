@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-esCqXhqsN4KfBLOGbWbkoHAZ5P0iokRqphpa6ZHLMNE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6rVp3UFLE+mfIbEt/WYdNKA2P3zvZWtHlednlXn3Dn8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2262,8 +2262,11 @@ function chainValue(A,P,pid,fallbacksOnly){
 // The keep line for an earlier game in a slot that a later player takes over the same night: the score that's worth as much as
 // the slot's chain from the later player's game on (user, 11-10: "it's fine rn because Rollins plays before McCain"). Null when
 // the plan has no holder for the slot or no simulated week.
+// The earlier game in the slot is over: his score, or null while it's still to play or live. The board then knows the call itself
+// (user, 11-10: take out "unless X is locked", "you know whether you want to lock them or not").
+function doneScore(A,pid,date){ const a=A.find(x=>x.pid===pid)?.a; return a && !a.live && a.latest && !a.latest.dnp && a.latest.date===date? a.latest.fp : null }
 function lookBar(A,P,slot,pid,date){ const hp=[...P.pick].find(([,q])=>q.slot===slot && q.k==="hold")?.[0]; if(!hp) return null;
-  const st=slotSteps(A,P,hp), j=st.findIndex(t=>t.pid===pid && t.date===date); return j>0? titleBar(hp, st.slice(j)) : null }
+  const st=slotSteps(A,P,hp), j=st.findIndex(t=>t.pid===pid && t.date===date); return j>=0? titleBar(hp, st.slice(j)) : null }
 // Every move left this week for the team shown, in time order. Also what the Reminders sync turns into reminders.
 function todoItems(A,P){
   const now=Date.now(), out=[], v=W.vs, isMe=viewingMe();
@@ -2319,10 +2322,11 @@ function todoItems(A,P){
       const ts=[tw, had? ht : null].filter(Boolean).sort((a,b)=>a-b), t= early? tw : (ts[0]||null);
       if(t&&t<=now) continue;
       const from=[...prev].find(([,q])=>q===pid)?.[0], verb=from!=null? "Move" : "Start";
-      const lb= early? fx(lookBar(A,P,slot,pid,N.day)) : null, lap= early && (ht+GAME_MS>tw);   // lap: his game is still on at that tip
-      const eNote= !early? "" : lap? "only if "+last(had)+" is having a weak game (he tips first)" : lb? "only if "+last(had)+" scores under "+lb+" (he plays first)" : "unless "+last(had)+" is locked";
+      const bar= early? lookBar(A,P,slot,pid,N.day) : null, lb=fx(bar), lap= early && (ht+GAME_MS>tw), ds= early? doneScore(A,had,N.day) : null;   // lap: his game is still on at that tip
+      if(ds!=null && bar!=null && ds>=bar) continue;   // the earlier score clears the line: it's a lock (its own item), not a swap
+      const eNote= !early||ds!=null? "" : lap? "only if "+last(had)+" is having a weak game (he tips first)" : lb? "only if "+last(had)+" scores under "+lb+" (he plays first)" : "";
       out.push({t, kind:"move", title:verb+" "+nm(pid)+" to "+P.SL[slot]+(had?" ("+nm(had)+" out)":""), note:eNote,
-        sub:((early? nm(had)+" plays first, so leave him in for his "+clock(ht)+" game"+(lb&&!lap? " and keep his score if it's "+lb+"+ (lock it then)" : "")+". " : "")+roleNote(N,pid,P,A)+edgeNote(pid,nm)+later).trim(),
+        sub:((early&&ds!=null? nm(had)+" finished with "+ds.toFixed(2)+(lb? ", under the "+lb+" worth keeping. " : ". ") : early? nm(had)+" plays first, so leave him in for his "+clock(ht)+" game"+(lb&&!lap? " and keep his score if it's "+lb+"+ (lock it then)" : "")+". " : "")+roleNote(N,pid,P,A)+edgeNote(pid,nm)+later).trim(),
         rems:[{id:"start-"+pid+"-"+N.day, t, lead:15, title:verb+" "+last(pid)+(had?" for "+last(had):"")+" ("+P.SL[slot]+")"}]});
     }
     for(const [slot,E] of Object.entries(N.early||{})){ if(!(E.thenTip>now)) continue;
@@ -2381,10 +2385,11 @@ function todoItems(A,P){
       rems: keep? [] : [{id:"back-"+hp, t:ht, lead:20, title:"Put "+nm(hp)+" back in "+P.SL[x.idx]+" unless "+a.info.name+" scored "+(fx(bar)||"?")+"+"}]}) }
   // same-night looks after an earlier game in the slot (planWeek's post looks), at the looker's tip; gone once that score is locked
   for(const [hp,L] of Object.entries(P.idle||{})) for(const m of L){ if(!m.post || m.post<=now) continue; const q=P.pick.get(hp); if(!q) continue;
-    const lb=fx(lookBar(A,P,q.slot,m.pid,m.date));
-    out.push({t:m.post, pid:m.pid, kind:"look", title:"Start "+nm(m.pid)+" to "+P.SL[q.slot]+" ("+nm(m.after)+" out)", note: lb? "only if "+last(m.after)+" scores under "+lb+" (he plays first)" : "unless "+last(m.after)+" is locked",
-      sub: nm(m.after)+" plays first, so leave him in for his game."+(lb? " If he scores "+lb+"+, keep it (lock it) and skip this." : " Skip this if you lock "+nm(m.after)+"."),
-      rems:[{id:"post-"+m.pid+"-"+m.date, t:m.post, lead:20, title:"Start "+last(m.pid)+" at "+P.SL[q.slot]+(lb? " if "+last(m.after)+" under "+lb : " unless "+last(m.after)+" is locked")}]}) }
+    const bar=lookBar(A,P,q.slot,m.pid,m.date), lb=fx(bar), ds=doneScore(A,m.after,m.date);
+    if(ds!=null && bar!=null && ds>=bar) continue;   // his score clears the line: it's a lock (its own item), not a swap
+    out.push({t:m.post, pid:m.pid, kind:"look", title:"Start "+nm(m.pid)+" to "+P.SL[q.slot]+" ("+nm(m.after)+" out)", note: ds!=null? "" : lb? "only if "+last(m.after)+" scores under "+lb+" (he plays first)" : "",
+      sub: ds!=null? nm(m.after)+" finished with "+ds.toFixed(2)+(lb? ", under the "+lb+" worth keeping." : ".") : nm(m.after)+" plays first, so leave him in for his game."+(lb? " If he scores "+lb+"+, keep it (lock it) and skip this." : ""),
+      rems:[{id:"post-"+m.pid+"-"+m.date, t:m.post, lead:20, title:"Start "+last(m.pid)+" at "+P.SL[q.slot]+(ds==null&&lb? " if "+last(m.after)+" under "+lb : "")}]}) }
   // after a slot holder's game: lock or keep, and when a bench player has to come in if he flopped
   for(const [pid,p] of P.pick){ if(p.k!=="hold") continue; const a=X(pid)?.a; if(!a) continue;
     // his game is on: the line for after it stays up (user, 11-09: "why don't i see my players lock thresholds" mid-game)
@@ -3490,7 +3495,8 @@ function leagueOdds(){
   for(const [a,b] of pairsOf(W.matchups)){ const ra=S.rosters[a], rb=S.rosters[b]; if(!ra||!rb) continue;
     const ma=W.matchups.find(m=>m.roster_id===a), mb=W.matchups.find(m=>m.roster_id===b);
     const A=D[a]?.R||rowsFor(ra,ma,false), B=D[b]?.R||rowsFor(rb,mb,false), DA=D[a]?.D||teamDist(A,planWeek(A,{light:true}),1500), DB=D[b]?.D||teamDist(B,planWeek(B,{light:true}),1500);
-    out.push({a, b, an:rosterName(a), bn:rosterName(b), pa:+titleObjD(DA,DB,null,false).h.toFixed(4), ma:+DA.m.toFixed(2), mb:+DB.m.toFixed(2), sa:+Math.sqrt(DA.v).toFixed(2), sb:+Math.sqrt(DB.v).toFixed(2), fu:calF(), meda:+(med[a]??0).toFixed(3), medb:+(med[b]??0).toFixed(3),
+    const myR=myRoster()?.roster_id, mine= W.vs && viewingMe() && (a===myR||b===myR) && W.vs.rid===(a===myR? b : a) && W.vs.win!=null;
+    out.push({a, b, an:rosterName(a), bn:rosterName(b), pa: mine? +(a===myR? W.vs.win : 1-W.vs.win).toFixed(4) : +titleObjD(DA,DB,null,false).h.toFixed(4), ma:+DA.m.toFixed(2), mb:+DB.m.toFixed(2), sa:+Math.sqrt(DA.v).toFixed(2), sb:+Math.sqrt(DB.v).toFixed(2), fu:calF(), meda:+(med[a]??0).toFixed(3), medb:+(med[b]??0).toFixed(3),
       la:+lockedSum(A).toFixed(2), lb:+lockedSum(B).toFixed(2), sla:slotsOf(a), slb:slotsOf(b),
       pka:+(D[a]?.D.pk||0).toFixed(2), pkb:+(D[b]?.D.pk||0).toFixed(2), qa:+(D[a]?.pk?.q||0).toFixed(3), qb:+(D[b]?.pk?.q||0).toFixed(3),
       ra:(ra.players||[]).slice(), rb:(rb.players||[]).slice()}) }
@@ -3656,6 +3662,9 @@ function pairsOf(m){ const by={}; (m||[]).forEach(x=>{ if(x.matchup_id!=null) (b
 function oddsSpark(a,b,RA,RB){ const d=LG.tl; if(!d||!d.pairs||+d.week!==+W.week) return "";
   let i=d.pairs.findIndex(p=>p[0]===a&&p[1]===b), flip=false; if(i<0){ i=d.pairs.findIndex(p=>p[0]===b&&p[1]===a); flip=true } if(i<0) return "";
   const P=d.pts.map(([t,v])=>[t, v[i]==null? null : (flip? 1-v[i] : v[i])]).filter(x=>x[1]!=null); if(P.length<2) return "";
+  // your own matchup ends on the number the page shows right now (user, 11-10: "odds are different here": the pill said 20%,
+  // the chart's last logged point 31%)
+  { const myR=myRoster()?.roster_id; if(W.vs && viewingMe() && (a===myR||b===myR) && W.vs.rid===(a===myR? b : a) && W.vs.win!=null) P.push([Math.max(Date.now(), P[P.length-1][0]+1), a===myR? W.vs.win : 1-W.vs.win]) }
   const ds=[...new Set((W.sched||[]).filter(g=>+g.week===+W.week).map(g=>g.date))].sort(); if(!ds.length) return "";
   const t0=Date.parse(ds[0]+"T00:00:00"), t1=Date.parse(ds[ds.length-1]+"T23:59:59"), X=t=>Math.max(0,Math.min(300,(t-t0)/(t1-t0)*300)).toFixed(1), Y=p=>(4+(1-p)*52).toFixed(1);
   const path=P.map(([t,p],k)=>(k?'L':'M')+X(t)+' '+Y(p)).join(' '), ticks=ds.map(x=>'<text x="'+X(Date.parse(x+"T12:00:00"))+'" y="70" text-anchor="middle">'+dayLabel(x).slice(0,3)+'</text>').join("");
