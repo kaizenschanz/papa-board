@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-soeD8UOwL8n1QbPdnwT8yGRF94vSX3JXEkPDegfqe6k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7A+8Ys6lgZz2a9SgGUiALDkxbIQgKVGFHKBt9OMjijk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -527,7 +527,8 @@ const MEM={};
 let BUSY=0;
 function busyOn(){ if(++BUSY===1) document.body.classList.add("busy") }
 function busyOff(){ if(BUSY>0 && --BUSY===0) document.body.classList.remove("busy") }
-const paintNow=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));   // let the wheel show before the work starts
+// let the wheel show before the work starts (a frame, or 60 ms when the page is in the background and frames don't come)
+const paintNow=()=>new Promise(r=>{ let d=false; const f=()=>{ if(!d){ d=true; setTimeout(r,0) } }; requestAnimationFrame(f); setTimeout(f,60) });
 // a redraw from a tap (team, opponent mode): wheel first, then the work
 function bootDone(){ if(W._bootBusy){ W._bootBusy=false; busyOff() } }   // the wheel from page open, until the first board is up
 function renderWeekBusy(){ busyOn(); paintNow().then(()=>{ try{ renderWeek() } finally{ busyOff() } }) }
@@ -633,6 +634,14 @@ async function lookupLeagues(){
   sel.value=pick.league_id;
   return true;
 }
+async function loadDraft(){ const league=S.league; if(!league) return;
+  const did=$("draftOverride").value.trim()||league.draft_id;
+  S.draft=await j("/draft/"+did);
+  try{S.traded=await j("/draft/"+did+"/traded_picks")}catch(e){S.traded=[]}
+  S.picks=[];
+  setMsg("Connected to "+league.name+(did!==league.draft_id?" (mock draft "+did+")":"")+". "+describeStart()+(S.scoringChanged?" League scoring changed since this board was built; FP/G now uses the new settings.":""));
+  await pollOnce(true);
+  startPolling() }
 async function connect(){
   stopPolling();
   try{
@@ -647,16 +656,13 @@ async function connect(){
     }
     S.users=Object.fromEntries(users.map(u=>[u.user_id,u]));
     S.rosters=Object.fromEntries(rosters.map(r=>[r.roster_id,r]));
-    const did=$("draftOverride").value.trim()||league.draft_id;
-    S.draft=await j("/draft/"+did);
-    try{S.traded=await j("/draft/"+did+"/traded_picks")}catch(e){S.traded=[]}
-    S.picks=[];
-    setMsg("Connected to "+league.name+(did!==league.draft_id?" (mock draft "+did+")":"")+". "+describeStart()+(S.scoringChanged?" League scoring changed since this board was built; FP/G now uses the new settings.":""));
-    $("setup").classList.add("compact");
-    await pollOnce(true);
-    startPolling();
-    W.loaded=false;
     const qv=new URLSearchParams(location.search).get("view"), inSeason=["in_season","post_season","complete"].includes(league.status);
+    // the draft is archived once the season is on (user, 11-10: "archive the draft part"): not loaded, polled or mentioned unless
+    // the draft board is opened with ?view=draft
+    if(!inSeason || qv==="draft") await loadDraft();
+    else { S.draft=null; S.picks=[]; setMsg("Connected to "+league.name+"."+(S.scoringChanged?" League scoring changed since this board was built; FP/G now uses the new settings.":"")) }
+    $("setup").classList.add("compact");
+    W.loaded=false;
     // once the season is on, the draft board tab is tucked away (it still opens with ?view=draft)
     document.querySelector('#viewSeg [data-view="draft"]').hidden = inSeason && qv!=="draft";
     let saved=qv || store.get("view",null);   // a ?view= link wins
@@ -698,7 +704,7 @@ function startPolling(){
 function stopPolling(){ if(S.polling){clearInterval(S.polling);S.polling=null} }
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S.draft){ pollOnce(false).then(()=>{ if((S.polling?1:0)!==(interval()?1:0)) startPolling() }) } });
 setInterval(()=>{ // refresh "updated Ns ago" and adjust cadence if status changed
-  if(!S.lastOk) return; setLive(S.err?"err":"on");
+  if(!S.lastOk && !W.updated) return; setLive(S.err?"err":"on");   // in season there's no draft polling: the week's own update counts
   if(S.draft && S.polling===null && interval()) startPolling();
 },1000);
 
@@ -707,6 +713,7 @@ function setLive(state){
   $("dot").className="dot"+(state==="on"?" on":state==="err"?" err":"");
   if(state==="err"){ $("liveTxt").textContent="Can't reach Sleeper, retrying"; return }
   if((W.view==="week"||W.view==="league") && W.updated){ const m=Math.round((Date.now()-(W.checked||W.updated))/60000); $("liveTxt").textContent = W.err? "Can't reach Sleeper, retrying" : (m<1?"Week updated just now":"Week updated "+m+" min ago"); return }
+  if(W.view==="week"||W.view==="league"){ $("liveTxt").textContent="Loading…"; return }   // the draft is archived in season: its status isn't shown
   if(!S.lastOk){ $("liveTxt").textContent="Offline"; return }
   const s=Math.round((Date.now()-S.lastOk)/1000);
   $("liveTxt").textContent = S.draft?.status==="complete" ? "Draft complete" : (s<3?"Live":"Updated "+s+"s ago");
@@ -2497,12 +2504,13 @@ function lineLocks(A,P){ const out={};
   return out }
 // a player's lock line in the grid: yours from this view, the opponent's from his own view's run (oppLinesLater)
 function lineOf(x,R,Q,side,date){ if(side==="opp") return W.vs?.oppLines? (W.vs.oppLines[x.pid] ?? null) : null; return W.vs?.lineLocks?.[x.pid] ?? slotLine(R,Q,x,date) }
-function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA){
+function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   const tipS=(pid,g)=>{ const t=tipAt(pid,g.date); return dayLabel(g.date)+(t?" "+clock(t).replace(":00","").replace(" ","").toLowerCase():"") };
   const holderAt=(Q,i)=>{ const e=Q&&[...Q.pick].find(([,q])=>q.slot===i); return e? e[0] : null };
-  const cell=(x,D,Q,R,mine)=>{ if(!x) return '<div class="pc"><span class="n muted">—</span></div>';
-    const a=x.a; let s="", val="", vc="", side= mine? "me" : (W.vs && R===W.vs.oppRows? "opp" : null);   // lock lines: your matchup only
+  const cell=(x,D,Q,R,mine,L)=>{ if(!x) return '<div class="pc"><span class="n muted">—</span></div>';
+    const a=x.a; let s="", val="", vc="", side= mine? "me" : (W.vs && R===W.vs.oppRows? "opp" : null);
+    const lnOf=date=> L? (L[x.pid]??null) : side? lineOf(x,R,Q,side,date) : null;   // L: that team's own lines (League tab), else your matchup's
     const hp= x.starter&&!a.lockedOn? holderAt(Q, x.idx) : null, other= hp&&hp!==x.pid&&!D.parts.get(x.pid)? hp : null;
     if(other){ const o=R.find(y=>y.pid===other), q=D.parts.get(other);
       return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
@@ -2514,15 +2522,15 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA){
     else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp, p=x.starter&&D.parts.get(x.pid);
       if(a.live) bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):''));
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
-      else if(now){ const ln= side && g? lineOf(x,R,Q,side,a.latest.date) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(ln!=null? ' · lock at '+ln.toFixed(1)+'+' : '')) }
+      else if(now){ const ln= g? lnOf(a.latest.date) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(ln!=null? ' · lock at '+ln.toFixed(1)+'+' : '')) }
       if(a.live){ bits.push('~'+a.live.mu.toFixed(0));   // his game now, not the next one (user, 11-09: "why display their next game projection when they're mid game?")
-        if(side && x.starter && a.future.length){ const ln=lineOf(x,R,Q,side,a.live.date); if(ln!=null) bits.push('lock '+ln.toFixed(1)+'+') } }
+        if(x.starter && a.future.length){ const ln=lnOf(a.live.date); if(ln!=null) bits.push('lock '+ln.toFixed(1)+'+') } }
       else if(g && !(now&&!g) && !(mine && now && a.call?.c==="lock") && !oppLock) bits.push(tipS(x.pid,g)+(g.mu>0?' ~'+g.mu.toFixed(0):' out'));   // a lock call: his next game is beside the point
       else if(!g && !a.live && !now) bits.push('done');
       s=bits.join(' · '); if(p && !val) val='~'+slotShown(p).toFixed(2) }
     const back= W.injESPN?.[x.pid]?.ret && a.future[0] && W.injESPN[x.pid].ret<=a.future[0].date;   // ESPN has him back for his next game: the old tag is stale
     return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn&&!back? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
-  const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA)+cell(b,DB,QB,B,false)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null):'<div></div>')+(b?playerDetail(b,mineA? false : null):'<div></div>')+'</div></details>';
+  const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA,LA)+cell(b,DB,QB,B,false,LB)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null):'<div></div>')+(b?playerDetail(b,mineA? false : null):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
   let h='<div class="mhd"><span></span><span>'+esc(nameA)+'</span><span>'+esc(nameB)+'</span></div>';
   SL.forEach((s,i)=>{ h+=row(s,at(A,i),at(B,i)) });
@@ -2630,6 +2638,28 @@ function rowSig(x){ const a=x.a; return [x.pid, x.starter?1:0, x.idx, a.lockedOn
   a.future.map(g=>g.date+":"+Math.round(g.mu||0)).join(";"), a.info.inj||""].join(",") }
 function oppSig(v){ const w=LG.wtFor? LG.wtFor(v.oppRid) : null;
   return [S.league?.league_id, W.week, v.oppRid, (W._cal?.k||1).toFixed(3), w? w.perWin.toPrecision(3) : "", v.oppRows.map(rowSig).join("|"), v.rows.map(rowSig).join("|")].join("#") }
+// Every team's lock lines from its own view (user, 11-10: "why is there no lock lines in the league matchup section or in the
+// manager tendency section"). Yours and your opponent's come from the Lock-in tab; anyone else's take one matchup build from that
+// team's side (~1-3 s), so they're worked out when you open their matchup or their manager row, then kept until something they
+// depend on changes (the same signature as your opponent's lines).
+const TL={};
+function teamSig(rid){ const r=S.rosters[rid], m=W.matchups.find(x=>x.roster_id===rid); if(!r||!m) return null; const o=W.matchups.find(x=>x.matchup_id===m.matchup_id && x.roster_id!==rid);
+  const rows=x=>rowsFor(S.rosters[x.roster_id], x, false).map(rowSig).join("|"); return [S.league?.league_id, W.week, rid, (W._cal?.k||1).toFixed(3), rows(m), o? rows(o) : ""].join("#") }
+function linesOfView(A,P){ const out={}; for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue;
+    const date= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!date) continue; const ln=slotLine(A,P,x,date); if(ln!=null) out[x.pid]=ln } return out }
+function teamLines(rid){ const v=W.vs, my=myRoster()?.roster_id;
+  if(v && viewingMe()){ if(rid===my){ const o={}; for(const x of v.rows){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue; const d= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!d) continue; const ln=lineOf(x,v.rows,v.plan,"me",d); if(ln!=null) o[x.pid]=ln } return o }
+    if(rid===v.oppRid && v.oppLines) return v.oppLines }
+  const c=TL[rid]; if(c && c.at===W.updated) return c.lines;
+  if(c){ const sg=teamSig(rid); if(sg===c.sig){ c.at=W.updated; return c.lines } }
+  return null }
+function teamLinesRun(rid){ const R=S.rosters[rid]; if(!R) return null; const sig=teamSig(rid);
+  let H; try{ H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false) }catch(e){ return null } if(!H||!H.vs) return null;
+  const save=W.vs; W.vs=H.vs; let lines; try{ lines=linesOfView(H.A,H.P) } finally{ W.vs=save }
+  TL[rid]={at:W.updated, sig, lines}; return lines }
+// work out the given teams' lines (wheel on), then redraw: done() runs after
+function ensureLines(rids, done){ const need=rids.filter(r=>teamLines(r)==null); if(!need.length){ done(); return }
+  busyOn(); paintNow().then(()=>{ try{ for(const r of need) teamLinesRun(r) } finally{ busyOff() } done() }) }
 function oppLinesLater(){
   const v=W.vs; if(!v||!v.oppRows||v.oppLines) return;
   const sig=oppSig(v), c=W._oppL||store.get("oppLines",null);
@@ -3262,6 +3292,8 @@ function gradeWeek(w, rows, logs, SL, per){
             if(median){ let up=0; for(const x of others) if(x.tot[q]>me) up++; if(up<=Math.floor(others.length/2)){ md++; w[q]++ } } }
           return {h:h/N, md:median? md/N : 0, m:m/N, w} };
         const L=ev(s), Wt=ev(waitS), obj=o=> wt? wt.perWin*(o.h+o.md)+wt.perPt*o.m : o.h+o.md;
+        // the lock line this call was graded against: the score where locking and waiting come out even (shown in the managers' list)
+        let line=null; { const tg=obj(Wt); let lo=0, hi=Math.max(90,s+40); if(obj(ev(lo))>=tg) line=0; else if(obj(ev(hi))>=tg){ for(let it=0;it<14;it++){ const mid=(lo+hi)/2; if(obj(ev(mid))>=tg) hi=mid; else lo=mid } line=hi } }
         const tol= wt? wt.perWin*0.01 : 0.01, bestL= obj(L)>=obj(Wt); let ok= locked? obj(L)>=obj(Wt)-tol : obj(Wt)>=obj(L)-tol;
         // too close to call: the gap is inside this replay's own margin (2 standard errors of the paired draws), so either call
         // was fine (user, 11-08: Trae, locked at 21.54 on the board's word, came out 1.70 vs 1.72 wins and got an x)
@@ -3277,7 +3309,7 @@ function gradeWeek(w, rows, logs, SL, per){
             let pm=0; for(let q=0;q<N;q++) pm+=po(q); pm/=N;
             let got=fut[fut.length-1].fp; for(let k=0;k<fut.length-1;k++) if(fut[k].fp>=Vo[k+1]){ got=fut[k].fp; break }
             (LG.waitChk ||= []).push({rid:r.rid, w, s, said: bestL?"lock":"wait", did: locked?"lock":"wait", promised:pm, got, moot}) } }
-        (sl.steps ||= []).push({i, sc:s, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven});
+        (sl.steps ||= []).push({i, sc:s, line, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven});
       } }
   }
   // per-slot summary rows (what was locked, what was passed up)
@@ -3328,19 +3360,23 @@ function renderTend(){
     const log=per[x.rid].log.slice().sort((a,b)=>b.w-a.w||b.steps.length-a.steps.length);
     const wkLabel=w=>{ const d=LG.weekDates?.[w]; const f=x=>new Date(x+"T12:00:00").toLocaleDateString([], {month:"short", day:"numeric"}); return 'Week '+w+(d?' · '+f(d[0])+' – '+f(d[1]):'') };
     let items='', lastW=null;
-    for(const d of log.filter(d=>d.steps.length)){
+    for(const d of log.filter(d=>d.steps.length || (d.open && d.current))){   // this week's open calls too, with their line now
       if(d.w!==lastW){ items+='<div class="twk">'+wkLabel(d.w)+(d.current?' · so far':'')+'</div>'; lastW=d.w }
       const nm=playerInfo(d.pid).name, final=d.fp;
-      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(2) : 'Passed up '+c.sc.toFixed(2))+' after game '+(c.i+1)+': <b>'+(c.L.h+c.L.md).toFixed(2)+'</b> wins if locked vs <b>'+(c.Wt.h+c.Wt.md).toFixed(2)+'</b> if not'+
+      const calls=d.steps.map(c=>(c.locked? 'Locked '+c.sc.toFixed(2) : 'Passed up '+c.sc.toFixed(2))+' after game '+(c.i+1)+(c.line!=null? ' (line '+c.line.toFixed(1)+')' : '')+': <b>'+(c.L.h+c.L.md).toFixed(2)+'</b> wins if locked vs <b>'+(c.Wt.h+c.Wt.md).toFixed(2)+'</b> if not'+
           // low stakes / close: credit the side the replay leaned to (Trae, locked 21.54 on a "coin flip, lean lock" with a big lead)
           (c.moot? (c.best?' <span class="ok">✓</span> <span class="muted">low stakes</span>':' <span class="muted">low stakes</span>') : c.close? (c.best?' <span class="ok">✓</span> <span class="muted">close</span>':' <span class="muted">close call</span>') : c.ok?' <span class="ok">✓</span>':' <span class="bad">✗</span>')).join('<br>');
       const later=d.early? d.games.slice(d.k).filter(v=>v!=null) : [], left=d.games.slice(d.k).filter(v=>v==null).length;
-      const outcome= d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
+      const lnow= d.open? (teamLines(x.rid)||{})[d.pid] : null;   // this week, still open: his lock line now, from that team's own view
+      const outcome= d.open? 'Still open: '+final.toFixed(2)+' is his latest score'+(lnow!=null? ' · lock at '+lnow.toFixed(1)+'+' : '')+(left?', '+left+' game'+(left>1?'s':'')+' to go':'')
         : d.early? 'He locked '+final.toFixed(2)+(later.length?'; the games after scored '+later.map(v=>v.toFixed(2)).join(', ') : '')+(left?' ('+left+' still to play)':'')
         : 'Rode it to the last game: '+final.toFixed(2);
       items+='<div class="tl"><span></span><span><b>'+esc(nm)+'</b> · '+d.games.length+' games that week</span><span></span><span>'+calls+'<br><span class="muted">'+outcome+'</span></span></div>' }
     h+='<details class="tr'+(x.rid===me?.roster_id?' me':'')+'" data-k="t'+x.rid+'"><summary><span><b>'+esc(rosterName(x.rid))+'</b>'+(st?' <span class="chip '+(st==="Sharp"?'val':st==="Average"?'src':'reach')+'">'+st+'</span>':'')+(tm?'<small>'+tm.w+'-'+tm.l+(tm.t?'-'+tm.t:'')+' · '+t.dec+' calls</small>':'')+'</span>'+
       '<span>'+Math.round(t.acc*100)+'%</span><span>'+(t.lostPer*100).toFixed(2)+'</span><span>'+t.waitMiss+' waited'+(t.waitUnv?' <i title="before lineup tracking: could have been a bench game">('+t.waitUnv+'?)</i>':'')+'<br>'+t.lockMiss+' locked</span></summary><div class="tls">'+items+'</div></details>' }
+  // opening a manager: his open calls get their lines (worked out then if needed)
+  if(!el.dataset.tl){ el.dataset.tl=1; el.addEventListener("toggle",e=>{ const t=e.target; if(!t.matches||!t.matches("details.tr")||!t.open) return; const rid=+String(t.dataset.k||"").slice(1);
+    if(rid && LG.tend?.[rid]?.log?.some(d=>d.open) && teamLines(rid)==null) ensureLines([rid], ()=>renderTend()) }, true) }
   h+='<div class="tdh lgrow"><span><i>League</i></span><span>'+(lg&&lg.acc!=null?Math.round(lg.acc*100)+'%':'–')+'</span><span>'+(lg&&lg.lostPer!=null?(lg.lostPer*100).toFixed(2):'–')+'</span><span></span></div>';
   keepOpen(el,h);
 }
@@ -3573,7 +3609,7 @@ function lgMatchGrid(a,b){
     return oddsSpark(a,b,RA,RB)+(a===my? gridHTML(v.rows, v.me, v.plan, v.oppRows, v.opp, v.oppPlan, "You", v.name, true) : gridHTML(v.oppRows, v.opp, v.oppPlan, v.rows, v.me, v.plan, v.name, "You", false)) }
   const side=rid=>{ const r=S.rosters[rid], m=W.matchups.find(x=>x.roster_id===rid)||{players_points:{}}, R=rowsFor(r,m,false), Q=planWeek(R,{light:true}); return {R, Q, D:teamDist(R,Q,1500)} };
   const A=side(a), B=side(b);
-  return oddsSpark(a,b,A.R,B.R)+gridHTML(A.R, A.D, A.Q, B.R, B.D, B.Q, a===my? "You" : rosterName(a), b===my? "You" : rosterName(b), false);
+  return oddsSpark(a,b,A.R,B.R)+gridHTML(A.R, A.D, A.Q, B.R, B.D, B.Q, a===my? "You" : rosterName(a), b===my? "You" : rosterName(b), false, teamLines(a)||{}, teamLines(b)||{});
 }
 // How lucky each record is: head-to-head wins against an all-play record (each week's score compared with every other team's),
 // and how strong the rest of the schedule is (average strength of the teams still to play, vs the league's average team; +
@@ -3615,7 +3651,9 @@ function renderLeague(){
   }).join("");
   // tap a matchup for both lineups (same rows as the Lock-in tab); it and its open rows stay open through refreshes
   LG.openM ||= new Set();
-  $("lgWeek").querySelectorAll("details.lgm").forEach(d=>{ const k=d.dataset.a+"-"+d.dataset.b, fill=()=>{ const g=d.querySelector(".lgg"); if(!g.innerHTML) try{ g.innerHTML=lgMatchGrid(+d.dataset.a,+d.dataset.b) }catch(e){ g.innerHTML='<div class="empty">Couldn\'t build this matchup.</div>' } };
+  $("lgWeek").querySelectorAll("details.lgm").forEach(d=>{ const k=d.dataset.a+"-"+d.dataset.b, fill=()=>{ const g=d.querySelector(".lgg"), A_=+d.dataset.a, B_=+d.dataset.b; if(!g.innerHTML) try{ g.innerHTML=lgMatchGrid(A_,B_) }catch(e){ g.innerHTML='<div class="empty">Couldn\'t build this matchup.</div>' }
+      // their lock lines: worked out now if not already known, then the grid is drawn again with them
+      if(teamLines(A_)==null || teamLines(B_)==null) ensureLines([A_,B_], ()=>{ if(d.open) try{ const keep=new Set([...g.querySelectorAll("details.mr[open]")].map(r=>r.dataset.k)); g.innerHTML=lgMatchGrid(A_,B_); g.querySelectorAll("details.mr").forEach(r=>{ if(keep.has(r.dataset.k)) r.open=true }) }catch(e){} }) };
     if(d.open){ fill(); d.querySelectorAll(".lgg details.mr").forEach(r=>{ if(openRows.has(k+"|"+r.dataset.k)) r.open=true }) }
     d.addEventListener("toggle",()=>{ if(d.open){ LG.openM.add(k); fill() } else LG.openM.delete(k) }) });
   if(Math.abs(window.scrollY-y0)>2) window.scrollTo(0,y0);
@@ -3633,6 +3671,7 @@ function showView(v,persist){
   $("weekView").hidden = v!=="week"; $("draftView").hidden = v!=="draft"; $("leagueView").hidden = v!=="league";
   if(v==="week"){ loadWeek(false) }
   if(v==="league"){ loadLeague(false) }
+  if(v==="draft" && !S.draft && S.league) loadDraft().catch(()=>{});
   setLive(S.err?"err":"on"); renderClock();
 }
 $("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b) showView(b.dataset.view,true)});
