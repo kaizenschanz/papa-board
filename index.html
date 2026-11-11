@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-33EzvrjjjpbvZ6WwOaGu9ckkyiAYK5sZNNiS/tVMw8c='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PG2+jhAmEPswPAly8uiVC+JvkeEte+sAmDw/roVcL2k='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1822,7 +1822,8 @@ function planWeek(A,opt={}){
     if(x.starter && a.live) hold=emax(waitValue(a.future)??-1e9, a.live.mu, a.live.sd);
     else if(a.future.length) hold=waitValue(a.future);
     if(hold!=null && hold>0) ch.push({k:"hold",v:hold});
-    if(x.starter && a.latest && !a.live && !a.latest.dnp && startedWholeGame(x.rid, x.pid, a.latest.date)) ch.push({k:"lock",v:a.latest.fp});
+    // asStarted: a what-if row for a game still to come (replanLine), where he'll be in the lineup by then
+    if(x.starter && a.latest && !a.live && !a.latest.dnp && (x.asStarted || startedWholeGame(x.rid, x.pid, a.latest.date))) ch.push({k:"lock",v:a.latest.fp});
     const f=opt.force&&opt.force[x.pid]; const ch2= f? ch.filter(h=>h.k===f) : ch;
     // opt.pinLock: what-if for where to lock him (that slot, locked, everyone else re-planned around it)
     const pl=opt.pinLock&&opt.pinLock.pid===x.pid? opt.pinLock : null, ch3= pl? ch2.filter(h=>h.k==="lock") : ch2;
@@ -2355,10 +2356,12 @@ function todoItems(A,P){
           rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
             .concat(keepAll || realAt.get(+slot)!==E.pid? [] : [{id:"back-"+E.then, t:E.thenTip, lead:10, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+(back? "" : " unless "+nm(E.pid)+" has "+bar+"+ so far")}])});
         continue }
-      const bar=fx(keepBar(A,P,E.then,null)??chainValue(A,P,E.then)??N.at[E.pid])||"big";
+      // his lock line, the same one his row shows once the game is in (a forward's look in UTIL gets locked at SF/PF/F, so the slot's
+      // chain alone read 22.3 for Walker against a 19.8 line, 11-11); the chain is the fallback
+      const bar=fx((X(E.pid)? lineFor(A,P,{...X(E.pid), idx:+slot},N.day) : null)??keepBar(A,P,E.then,null)??chainValue(A,P,E.then)??N.at[E.pid])||"big";
       out.push({t: started? E.thenTip : E.tip, pid:E.pid, kind:"look", title: started? nm(E.pid)+" is playing in "+P.SL[slot]+" (free look): keep him only at "+bar+"+" : already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
         note: started? "" : "Keep his score only if it's "+bar+"+; otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+".",
-        sub:"Keep his score only if it's "+bar+"+ (what "+nm(E.then)+"'s game plus your Sunday fallbacks are worth)"+(lastG?"; it's his last game, so it counts without a lock while he stays in":"; lock it if so")+". Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
+        sub:"Keep his score only if it's "+bar+"+ (where locking it beats playing the slot on)"+(lastG?"; it's his last game, so it counts without a lock while he stays in":"; lock it if so")+". Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
         rems:(already||started? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
           .concat(E.thenTip>now && realAt.get(+slot)===E.pid? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+bar+"+"}] : [])});
     }
@@ -2573,38 +2576,60 @@ function slotLinesFor(A,P,x,date){
   if(!out.size){ const c=ch.find(c=>c.slot===x.idx) || ch[0]; const b= c? titleBar(c.hp, [{...c.st[0], pm:0}].concat(c.st.slice(1))) : null; if(b!=null) out.set(c.slot,b) }
   return out }
 // The lock line: re-plan the whole week with his score locked, against re-planning it without (user, 11-11: "it's not like it's
-// guaranteed clingan gets locked"). Nothing about who holds which slot later is fixed: everyone left is re-planned either way, so
-// it doesn't matter which same-kind slot he'd take, and a twin whose own score already clears its line counts as locked (two
+// guaranteed clingan gets locked"). Nothing about who holds which slot later is fixed: everyone left is re-planned either way,
+// he's locked in whichever open slot costs least, and a twin whose own score already clears its line counts as locked (two
 // finished scores can't both have the last open UTIL). For a game not played yet, the line is for his score in it.
 function replanLine(A,P,x,date,claims){
   const v=W.vs; if(!v?.me?.tot || !v.opp?.tot) return null;
   const a=x.a, known= !a.live && a.latest && !a.latest.dnp && a.latest.date===date;
   const g= known? a.latest : (a.live && a.live.date===date? a.live : a.future.find(f=>f.date===date)); if(!g) return null;
   const rest= a.future.filter(f=>f.date>date), fp= known? a.latest.fp : 0;
-  const row=r=>({...r, starter:true, idx:x.idx});
+  let B=A, xi=x.idx; const SLn=P.SL;
+  // One claim per slot, best score first: any other finished score that's higher (pid breaks ties) and clears its own line
+  // counts as locked, in the slot its own line found cheapest. Any slot type: with every open slot priced below, a forward
+  // in UTIL and one in SF can both be after the same forward slot (11-11), not just two UTILs.
+  if(claims){ const open0=SLn.map((_,i)=>i).filter(i=>!A.some(y=>y.starter&&y.a.lockedOn&&y.idx===i));
+    const share=y=>open0.some(i=>elig(a.info.pos,SLn[i]) && elig(y.a.info.pos,SLn[i]));
+    const tw=A.filter(y=> y.pid!==x.pid && y.starter && y.idx!=null && !y.a.lockedOn && !y.a.live && y.a.latest && !y.a.latest.dnp && y.a.future.length && share(y)
+      && (!known || y.a.latest.fp>fp || (y.a.latest.fp===fp && String(y.pid)<String(x.pid)))).sort((p,q)=> q.a.latest.fp-p.a.latest.fp || (String(p.pid)<String(q.pid)? -1 : 1));
+    for(const y of tw){ const l=lineFor(A,P,y,y.a.latest.date); if(l==null || y.a.latest.fp<l) continue;
+      const cur=B.find(r=>r.pid===y.pid), from=cur.idx, taken=i=>B.some(r=>r.starter&&r.a.lockedOn&&r.idx===i);
+      let s=v._lfs?.get(y.pid+"|"+y.a.latest.date+"|"+y.idx+"|1"); if(s==null || taken(s)) s=from; if(taken(s)) continue;
+      const occ= s===from? null : B.find(r=>r.starter&&r.idx===s&&r.pid!==y.pid); if(occ && occ.a.live && !elig(occ.a.info.pos,SLn[from])) s=from;   // can't free that slot mid-game
+      B=B.map(r=> r.pid===y.pid? {...r, idx:s, a:{...r.a, lockedOn:{fp:r.a.latest.fp, date:r.a.latest.date}}} : (s!==from && r.starter && r.idx===s)? {...r, idx:from} : r);
+      if(s!==from && xi===s && x.starter) xi=from } }
+  // a game still to come counts as started (a bench player the plan starts had no lock option here, so his To do line fell
+  // back to the old chain line: Hartenstein 20.3 against 23.6 this way, 11-11)
+  const row=r=>({...r, starter:true, idx:xi, asStarted:!known});
   const xL={...row(x), a:{...a, live:null, latest:{...g, fp, dnp:false, done:true, live:false}, future:rest}};
   const xW={...row(x), a:{...a, live:null, latest:{...g, fp:0, dnp:true, done:true, live:false}, future:rest}};
-  let B=A;
-  if(claims){ const mine=P.SL?.[x.idx];
-    const tw=A.filter(y=> y.pid!==x.pid && y.starter && y.idx!=null && y.idx!==x.idx && P.SL[y.idx]===mine && !y.a.lockedOn && !y.a.live && y.a.latest && !y.a.latest.dnp && y.a.future.length
-      && (!known || y.a.latest.fp>fp || (y.a.latest.fp===fp && String(y.pid)<String(x.pid))));
-    const cl=new Set(tw.filter(y=>{ const l=lineFor(A,P,y,y.a.latest.date,true); return l!=null && y.a.latest.fp>=l }).map(y=>y.pid));
-    if(cl.size) B=A.map(y=> cl.has(y.pid)? {...y, a:{...y.a, lockedOn:{fp:y.a.latest.fp, date:y.a.latest.date}}} : y) }
+  // A game still to come: the call is made after it, so the board is taken as it'll stand at his tip. Everyone else's games
+  // that tip before his are over by then (and weren't locked: their scores are gone), so locking him can't cost those nights.
+  // Before 11-11 the lock was priced as if made today, charging it for looks the slot gets before he even plays (Embiid's
+  // Thursday line read 26.6 against 23.6 as of his tip). Scores the plan locks stay locked, and so does the week of anyone who's
+  // done playing by then (wiping it left his slot empty, and a Sunday look read "keep at 0.00+"). Days out it's a rough preview.
+  if(!known && !(a.live && a.live.date===date)){ const tp=(p,d)=>tipAt(p,d)||Date.parse(d+"T19:00:00"), t0=tp(x.pid,date), fl=(v.planBase||{force:v.force}).force||{};
+    B=B.map(r=>{ if(r.pid===x.pid || r.a.lockedOn || P.pick.get(r.pid)?.k==="lock" || fl[r.pid]==="lock") return r;
+      const keep=r.a.future.filter(f=>tp(r.pid,f.date)>=t0); if(!keep.length || keep.length===r.a.future.length) return r;   // done before his tip: his slot is spoken for, left as planned
+      return {...r, a:{...r.a, future:keep, latest: r.a.latest? {...r.a.latest, fp:0, dnp:true} : r.a.latest}} }) }
   const AL=B.map(r=> r.pid===x.pid? xL : r), AW=B.map(r=> r.pid===x.pid? xW : r);
   if(!AL.includes(xL)) AL.push(xL); if(!AW.includes(xW)) AW.push(xW);
   const b0=v.planBase||{force:v.force}, force={...(b0.force||{})}; delete force[x.pid];
   const ex= b0.exclude instanceof Set? new Set([...b0.exclude].filter(p=>p!==x.pid)) : b0.exclude, base={...b0, force, exclude:ex};
   const QW=planWeek(AW,{...base, light:true}), DW=withPickups(teamDist(AW,QW),v.pkMe);
-  // any open slot of his kind he fits (the planner can land on a slightly different week depending on which, so the best counts)
-  const SLn=P.SL, lk=new Set(B.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx)); let best=null;
-  for(let i=0;i<SLn.length;i++){ if(lk.has(i) || !(i===x.idx || (SLn[i]===SLn[x.idx] && elig(a.info.pos,SLn[i])))) continue;
-    const QL=planWeek(AL,{...base, light:true, pinLock:{pid:x.pid, slot:i, from:x.idx}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
-    const l=lockBarD(withPickups(teamDist(AL,QL),v.pkMe), fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best) best=l }
-  return best }
+  // every open slot he fits, the same ones the lock step picks from (lockSlotFor): a forward sitting in UTIL gets locked at
+  // SF/PF/F, which keeps the UTILs for the centers, so that's the lock his line has to price (Walker in UTIL was priced as a
+  // UTIL lock, 22.4, 11-11). The cheapest slot counts.
+  const lk=new Set(B.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx)), from= lk.has(xi)? null : xi; let best=null, at=null;
+  for(let i=0;i<SLn.length;i++){ if(lk.has(i) || !elig(a.info.pos,SLn[i])) continue;
+    const occ= i===xi? null : B.find(y=>y.starter&&y.idx===i&&y.pid!==x.pid); if(occ && occ.a.live && !(from!=null && elig(occ.a.info.pos,SLn[from]))) continue;   // can't free that slot mid-game
+    const QL=planWeek(AL,{...base, light:true, pinLock:{pid:x.pid, slot:i, from}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
+    const l=lockBarD(withPickups(teamDist(AL,QL),v.pkMe), fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i } }
+  return best==null? null : {l:best, slot:at} }
 function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
   const v=W.vs, key=x.pid+"|"+date+"|"+x.idx+"|"+(noClaims?0:1); if(v){ v._lf ||= new Map(); if(v._lf.has(key)) return v._lf.get(key) }
-  let b=null; try{ b=replanLine(A,P,x,date,!noClaims) }catch(e){ b=null }
+  let b=null; try{ const r=replanLine(A,P,x,date,!noClaims); if(r){ b=r.l; if(v) (v._lfs ||= new Map()).set(key,r.slot) } }catch(e){ b=null }
   if(b==null){ const own=slotLinesFor(A,P,x,date); b= own.size? (own.get(x.idx) ?? Math.min(...own.values())) : null }   // fallback: his slot's chain
   if(v) v._lf.set(key,b); return b }
 function slotLine(R,Q,x,date){ return lineFor(R,Q,x,date) }
