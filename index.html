@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lUwqxTI2UYlA/2bObjP7KqaFWVyjMAtpdlpaj7vti5g='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-W6UO3xXd1kXw7prcQ3F4ZVephQ9baoN8Ux6c/snTcks='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2572,28 +2572,41 @@ function slotLinesFor(A,P,x,date){
     if(b!=null && !(out.has(c.slot) && out.get(c.slot)<=b)) out.set(c.slot,b) }
   if(!out.size){ const c=ch.find(c=>c.slot===x.idx) || ch[0]; const b= c? titleBar(c.hp, [{...c.st[0], pm:0}].concat(c.st.slice(1))) : null; if(b!=null) out.set(c.slot,b) }
   return out }
-// Twin slots claimed by each other (user, 11-11: "fix the gap"): two finished scores can't both take the weaker UTIL. The
-// finished, lockable scores in slots of his kind are matched to those slots to lock as many as clear (then the most margin);
-// each locking score shows the line of the slot it takes, and everyone else faces the weakest slot left over.
-function lineFor(A,P,x,date){
+// The lock line: re-plan the whole week with his score locked, against re-planning it without (user, 11-11: "it's not like it's
+// guaranteed clingan gets locked"). Nothing about who holds which slot later is fixed: everyone left is re-planned either way, so
+// it doesn't matter which same-kind slot he'd take, and a twin whose own score already clears its line counts as locked (two
+// finished scores can't both have the last open UTIL). For a game not played yet, the line is for his score in it.
+function replanLine(A,P,x,date,claims){
+  const v=W.vs; if(!v?.me?.tot || !v.opp?.tot) return null;
+  const a=x.a, known= !a.live && a.latest && !a.latest.dnp && a.latest.date===date;
+  const g= known? a.latest : (a.live && a.live.date===date? a.live : a.future.find(f=>f.date===date)); if(!g) return null;
+  const rest= a.future.filter(f=>f.date>date), fp= known? a.latest.fp : 0;
+  const row=r=>({...r, starter:true, idx:x.idx});
+  const xL={...row(x), a:{...a, live:null, latest:{...g, fp, dnp:false, done:true, live:false}, future:rest}};
+  const xW={...row(x), a:{...a, live:null, latest:{...g, fp:0, dnp:true, done:true, live:false}, future:rest}};
+  let B=A;
+  if(claims){ const mine=P.SL?.[x.idx];
+    const tw=A.filter(y=> y.pid!==x.pid && y.starter && y.idx!=null && y.idx!==x.idx && P.SL[y.idx]===mine && !y.a.lockedOn && !y.a.live && y.a.latest && !y.a.latest.dnp && y.a.future.length
+      && (!known || y.a.latest.fp>fp || (y.a.latest.fp===fp && String(y.pid)<String(x.pid))));
+    const cl=new Set(tw.filter(y=>{ const l=lineFor(A,P,y,y.a.latest.date,true); return l!=null && y.a.latest.fp>=l }).map(y=>y.pid));
+    if(cl.size) B=A.map(y=> cl.has(y.pid)? {...y, a:{...y.a, lockedOn:{fp:y.a.latest.fp, date:y.a.latest.date}}} : y) }
+  const AL=B.map(r=> r.pid===x.pid? xL : r), AW=B.map(r=> r.pid===x.pid? xW : r);
+  if(!AL.includes(xL)) AL.push(xL); if(!AW.includes(xW)) AW.push(xW);
+  const b0=v.planBase||{force:v.force}, force={...(b0.force||{})}; delete force[x.pid];
+  const ex= b0.exclude instanceof Set? new Set([...b0.exclude].filter(p=>p!==x.pid)) : b0.exclude, base={...b0, force, exclude:ex};
+  const QW=planWeek(AW,{...base, light:true}), DW=withPickups(teamDist(AW,QW),v.pkMe);
+  // any open slot of his kind he fits (the planner can land on a slightly different week depending on which, so the best counts)
+  const SLn=P.SL, lk=new Set(B.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx)); let best=null;
+  for(let i=0;i<SLn.length;i++){ if(lk.has(i) || !(i===x.idx || (SLn[i]===SLn[x.idx] && elig(a.info.pos,SLn[i])))) continue;
+    const QL=planWeek(AL,{...base, light:true, pinLock:{pid:x.pid, slot:i, from:x.idx}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
+    const l=lockBarD(withPickups(teamDist(AL,QL),v.pkMe), fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best) best=l }
+  return best }
+function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
-  const mine=P.SL[x.idx], own=slotLinesFor(A,P,x,date); if(!own.size) return null;
-  const done=y=> y.starter && !y.a.lockedOn && !y.a.live && y.a.latest && !y.a.latest.dnp && y.a.future.length && y.idx!=null && P.SL[y.idx]===mine && P.pick.get(y.pid)?.k!=="lock";
-  const xKnown= done(x) && x.a.latest.date===date;
-  const K=A.filter(y=> y.pid!==x.pid && done(y)).map(y=>({pid:y.pid, s:y.a.latest.fp, L:slotLinesFor(A,P,y,y.a.latest.date)}));
-  if(xKnown) K.push({pid:x.pid, s:x.a.latest.fp, L:own});
-  if(!K.length) return Math.min(...own.values());
-  // the same order from every player's side, so they agree; on a tie the bigger score takes the stronger slot
-  K.sort((p,q)=> q.s-p.s || String(p.pid).localeCompare(String(q.pid))); for(const k of K) k.L=[...k.L].sort((p,q)=>q[1]-p[1]);
-  // best matching: most locks, then most total margin (groups are 1-3 slots, so try them all)
-  let best={n:0, m:0, at:new Map()};
-  const go=(i,used,at,n,m)=>{ if(i===K.length){ if(n>best.n || (n===best.n && m>best.m+1e-9)) best={n,m,at:new Map(at)}; return }
-    go(i+1,used,at,n,m);
-    for(const [sl,b] of K[i].L) if(!used.has(sl) && K[i].s>=b){ used.add(sl); at.set(K[i].pid,{sl,b}); go(i+1,used,at,n+1,m+K[i].s-b); used.delete(sl); at.delete(K[i].pid) } };
-  go(0,new Set(),new Map(),0,0);
-  if(best.at.has(x.pid)) return best.at.get(x.pid).b;
-  const taken=new Set([...best.at.values()].map(t=>t.sl)), left=[...own].filter(([sl])=>!taken.has(sl)).map(([,b])=>b);
-  return left.length? Math.min(...left) : Math.max(...own.values()) }
+  const v=W.vs, key=x.pid+"|"+date+"|"+x.idx+"|"+(noClaims?0:1); if(v){ v._lf ||= new Map(); if(v._lf.has(key)) return v._lf.get(key) }
+  let b=null; try{ b=replanLine(A,P,x,date,!noClaims) }catch(e){ b=null }
+  if(b==null){ const own=slotLinesFor(A,P,x,date); b= own.size? (own.get(x.idx) ?? Math.min(...own.values())) : null }   // fallback: his slot's chain
+  if(v) v._lf.set(key,b); return b }
 function slotLine(R,Q,x,date){ return lineFor(R,Q,x,date) }
 // Starters whose lockable score already clears their line: {pid: line}. Those are locks (one line per player).
 function lineLocks(A,P){ const out={};
@@ -3262,6 +3275,11 @@ async function loadLeague(force){
 // How each manager plays lock-in, from finished weeks: Sleeper's exact lock records with the login, else the public feed
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
+// Bump when the grading itself changes, so stored grades are redone once.
+const GRADE_V=1;
+function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
+    for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
+      else if(v && typeof v==="object"){ const o=(P[k] ||= {}); for(const [k2,v2] of Object.entries(v)) o[k2]=(o[k2]||0)+v2 } } } }
 async function managerTendencies(){
   if(LG.tend && LG.tendWeek===W.week) return LG.tend;
   if(LG.tendRun) return LG.tendRun;   // already running (League tab opened twice): share it
@@ -3283,11 +3301,20 @@ async function managerTendencies0(){
           if(lastP>=0){ if(r.sg && r.sg[pid]!=null) idx=g.findIndex(x=>x.id===String(r.sg[pid]));
             else { idx=lastP; (r.open ||= new Set()).add(pid) } }      // not locked yet: his latest score is still a live decision
           r.slots.push({pid,si,g,idx}) }) }
-      await gradeWeek(w, cur, logs, SL, per);
+      // Grades come from what was known at each call, so they don't change (user, 11-11: "you don't have to recompute the stuff
+      // that's already been computed"): this week's replay reruns only when a game finished, a call was made or a deadline passed.
+      const now=Date.now(), sig=JSON.stringify([GRADE_V, cur.map(r=>[r.rid, r.starters, r.sg, r.open? [...r.open] : 0]),
+        Object.entries(logs).map(([p,g])=>[p, g.map(x=>[x.fp, x.dnp, (x.t||0)<=now])])]);
+      const hit=LG.curTend && LG.curTend.sig===sig? LG.curTend : null;
+      const perW= hit? hit.per : {}, n0=LG.waitChk.length;
+      if(!hit){ await gradeWeek(w, cur, logs, SL, perW); LG.curTend={sig, per:perW, wc:LG.waitChk.slice(n0)} } else LG.waitChk.push(...hit.wc);
+      mergePer(per, perW);
       continue;
     }
     // Finished weeks: Sleeper's lock records (with your login) are right; the public feed reports each player's latest game,
     // not the locked one, so it can't show past locks. Without the login the grades are rough.
+    const ck="tend:"+lid+":"+w+":"+GRADE_V+":"+((tok || W.legsPastSnap?.[w])? "x" : "r"), kept=store.get(ck,null);
+    if(kept && kept.per){ mergePer(per, kept.per); LG.waitChk.push(...(kept.wc||[])); if(kept.dates) (LG.weekDates ||= {})[w]=kept.dates; if(!kept.exact) exact=false; continue }
     let legs=null;
     if(tok){ try{ const r=await fetch("https://sleeper.com/graphql",{method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
       body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+w+') { roster_id matchup_id starters starters_games players points } }'})});
@@ -3320,7 +3347,8 @@ async function managerTendencies0(){
           if(r.sg){ const gid=r.sg[pid]; idx= gid!=null? g.findIndex(x=>x.id===String(gid)) : g.map(x=>x.fp!=null).lastIndexOf(true) }   // not in Sleeper's lock list = rode it out (his last game played)
           else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) } }
         r.slots.push({pid,si,g,idx}) }) }
-    await gradeWeek(w, rows, logs, SL, per);
+    const perW={}, n0=LG.waitChk.length; await gradeWeek(w, rows, logs, SL, perW); mergePer(per, perW);
+    if(rows.length && Object.keys(perW).length) store.set(ck, {per:perW, wc:LG.waitChk.slice(n0), dates:LG.weekDates?.[w]||null, exact:!!legs});
   }
   LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
 }
@@ -3877,7 +3905,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
   WR.forEach(([n,g,set])=>{ const f=g(); set(function(...a){ if(depth[n]) return f.apply(this,a); depth[n]=1; const t=performance.now(); try{ return f.apply(this,a) } finally{ depth[n]=0; const o=(acc[n] ||= [0,0]); o[0]+=performance.now()-t; o[1]++ } }) }) }
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
-if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD} }
+if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD} }
 if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
