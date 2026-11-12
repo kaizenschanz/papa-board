@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-G22FSJ8gzhEk/nmkNAGTjJZ4is39o1K7cZxMq798HVk='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BtU/w4YaY0EdR+dG1YMz/ol3gDeUouvH1zQYDQt0POE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1412,6 +1412,9 @@ function analyse(pid, counted, isStarter, sg, mine=true, unanimous=false){
   else if(!games.length){ call={c:"idle",t:"No games"}; value=0 }
   else if(!latest){ call={c:"idle",t:"Waiting"}; why="first game "+dayLabel(future[0].date); value=wv }
   else if(!future.length){ call={c:"forced",t:"Counts "+latest.fp.toFixed(2)}; why="last game of the week"; value=latest.fp }
+  // he didn't play his last game: there's no score to lock, so no Lock/Wait call (user, 11-12: "why is it saying wait on Norman
+  // Powell when I couldn't lock even if I tried")
+  else if(latest.dnp){ call={c:"idle",t:"Play"}; why="no score to lock (didn't play "+dayLabel(latest.date)+")"; value=wv }
   else if(latest.fp>=wv){ call={c:"lock",t:"Lock "+latest.fp.toFixed(2)}; why="beats waiting ("+wv.toFixed(2)+")"; value=latest.fp }
   else { call={c:"wait",t:"Wait"}; why="lock at "+wv.toFixed(2)+"+ · got "+latest.fp.toFixed(2); value=wv }
   if(!isStarter){ value=wv ?? 0 }
