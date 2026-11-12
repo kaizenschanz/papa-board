@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-949kJor+4uzYhcV0ukpCnMt6ibc3CWcuXfWowtqM9Sc='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-XZb1FvE0vxPOsr2ADn/W8WwBWtzPMFD8AAhccRg3BH0='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3977,7 +3977,7 @@ function renderLeague(){
     const oa=own(a), ob=own(b), pA= oa? oa.win : p0, pB= ob? ob.win : 1-p0;
     const medOf=rid=>{ const o=rid===a? oa : ob; return o&&o.med!=null? o.med : mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null };
     const side=(X,r)=>{ const o=X.rid===a? oa : ob;
-      return '<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(o&&o.m!=null? o.m : mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+(o&&o.title!=null&&!weekOver()?' · title <b>'+(o.title*100).toFixed(2)+'%</b>':'')+'</span></div>' };
+      return '<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(o&&o.m!=null? o.m : mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+'</span></div>' };
     return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+(pA*100).toFixed(1)+'% – '+(pB*100).toFixed(1)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(100*pA/((pA+pB)||1)).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
   }).join(""));
   // tap a matchup for both lineups (same rows as the Lock-in tab); it and its open rows stay open through refreshes (keepOpen).
