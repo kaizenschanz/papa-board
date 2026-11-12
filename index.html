@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UXTlhI5Hhd350JHORUxe+mBTKtpDtlgUXBcEHvKeIl8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/79CEiumgYr54cKcYDdiFel0U2g0WoqpxPgWh9A0nrQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2672,7 +2672,7 @@ function projLine(pid,g){
     else for(const k of ["pts","reb","ast","tpm","stl","blk"]) if(g.line[k]!=null) base[k]=propLine(g.line,k) }   // the same stats the projection is built from
   const pf=scoreStats(base), m0= g.live? (g.mu0>0? g.mu0 : g.mu) : g.mu, k= pf>0 && m0>0? m0/pf : 1;
   const so= g.live? (W.stats[pid]?.[g.id]?.stats||{}) : {}, rem= g.live? Math.max(0,1-(g.lf||0)) : 1;
-  const out=STAT_SHOW.map(([key,lab])=>{ const v=(+so[key]||0)+rem*k*(+base[key]||0); return v>=0.05? (v>=10? v.toFixed(0) : v.toFixed(1))+" "+lab : null }).filter(Boolean);
+  const out=STAT_SHOW.map(([key,lab])=>{ const v=(+so[key]||0)+rem*k*(+base[key]||0); return v>=0.05? v.toFixed(1)+" "+lab : null }).filter(Boolean);   // one decimal on every stat (user, 11-12)
   return out.length? out.join(" · ") : null }
 function playerDetail(x,mine,L){
   const a=x.a, pid=x.pid;
