@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-V3mE896twkgIEbViSVL9M93ECajH1AX2w+wfDUniqr4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-G22FSJ8gzhEk/nmkNAGTjJZ4is39o1K7cZxMq798HVk='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2107,8 +2107,13 @@ function pTop(x,oth){ let dp=[1];
 function pMedian(m,v,oth){ const sd=Math.sqrt(Math.max(v,1)); let s=0,w=0; for(let i=-12;i<=12;i++){ const z=i*0.3, wt=phi(z); s+=wt*pTop(m+z*sd,oth); w+=wt } return s/w }
 // What a week total ~ N(m, v) is worth toward the title: (head-to-head win + median win) x title value of a win,
 // plus points x title value of a point (seeding tiebreaks). The values come from the League tab's season + playoff simulation.
+// Playoff weeks (user, 11-12: "when the playoffs start the lock decisions will be made solely based on matchups right"): Sleeper's
+// league-median game is regular season only, and a playoff week is win or go home, so every call is the head-to-head alone.
+const isPlayoffWeek=w=> +w >= (S.league?.settings?.playoff_week_start||22);
+const medianOn=w=> !!S.league?.settings?.league_average_match && !isPlayoffWeek(w);
+function wtNow(w0){ return isPlayoffWeek(W.week)? {perWin:1, perPt:0, base: w0?.base ?? null} : w0 }
 function titleObj(m,v,opp,oth,median,wt0){
-  const wt=wt0||(viewingMe()&&LG.wt)||{perWin:1,perPt:0};
+  const wt=wt0||wtNow(viewingMe()&&LG.wt)||{perWin:1,perPt:0};
   const h=Phi((m-opp.m)/Math.sqrt(Math.max(v+opp.v,1e-6))), md= median? pMedian(m,v,oth) : 0;
   return {h, md, wins:h+md, obj: wt.perWin*(h+md)+wt.perPt*m};
 }
@@ -2772,9 +2777,9 @@ function buildMatchup(me, isMe, main, pre, pins, holds){
   if(oppRoster){
     const B=rowsFor(oppRoster, opp, false), pkOpp=pickupFor(oppRoster.roster_id,{rows:B, focal:true});
     const P0=P;
-    const median=!!S.league.settings?.league_average_match, oth=othersDist(me.roster_id);
+    const median=medianOn(W.week), oth=othersDist(me.roster_id);
     // championship weights (what one more win, or one more point, adds to title odds) for both teams, from the League simulation
-    const wtMe= isMe? LG.wt : (LG.wtFor? LG.wtFor(me.roster_id) : null), wtOpp= LG.wtFor? LG.wtFor(oppRoster.roster_id) : null;
+    const wtMe=wtNow(isMe? LG.wt : (LG.wtFor? LG.wtFor(me.roster_id) : null)), wtOpp=wtNow(LG.wtFor? LG.wtFor(oppRoster.roster_id) : null);
     const othFor=D=>oth.filter(o=>o.rid!==oppRoster.roster_id).concat([{rid:me.roster_id, m:D.m, s:Math.sqrt(D.v+36)}]);
     const tabMe= median? pTopTable(oth) : null;
     // how the other team plays: smart (their own title odds, median included) unless you've said they're going all-in on you
@@ -3511,7 +3516,7 @@ function startedThatDay(rid, pid, date){
   return any || (prev? prev.includes(pid) : true);
 }
 async function gradeWeek(w, rows, logs, SL, per){
-  const N=400, median=!!S.league.settings?.league_average_match;
+  const N=400, median=medianOn(w);
   // waiting is played the way the board plays it: each call at the next tip, holding the slot's unlocked score (x0)
   const steps=(st,x0=0)=>{ const V=stepsValue(st); return q=>playSteps(st,V,q,0,x0) };
   // A game's projection as it stood at the deadline (user, 11-09: iminyourmind let LeBron ride because teammates were ruled out
@@ -3551,7 +3556,7 @@ async function gradeWeek(w, rows, logs, SL, per){
       const ids=[...new Set(r.starters.concat(r.players||[]))].filter(q=>q&&q!=="0"), A=ids.map(q=>rowAt(r,q,Dv)), T={r, A, tot:totOf(A,planWeek(A,{light:true}))};
       teamMemo.set(mk,T); return T });
     for(const T of teams){ const r=T.r, opp=teams.find(x=>x.r.mid===r.mid && x.r.rid!==r.rid); if(!opp) continue;
-      const others=teams.filter(x=>x!==T), wt=LG.wtFor? LG.wtFor(r.rid) : null;
+      const others=teams.filter(x=>x!==T), wt= isPlayoffWeek(w)? {perWin:1, perPt:0} : LG.wtFor? LG.wtFor(r.rid) : null;
       const P=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
       for(const sl of r.slots){ const g=sl.g; if(sl.idx<0 || g.length<2) continue;
         const i=g.findIndex((x,k)=>k<g.length-1 && tipOf(g[k+1])===D); if(i<0 || i>sl.idx) continue;
@@ -3962,7 +3967,7 @@ function renderLeague(){
   // playoff path: your most likely seed and first-round opponent (same season simulation)
   if(me && LG.path && me.po>=0.02){ const P=LG.path, k=P.seed.indexOf(Math.max(...P.seed)), o=P.opp[0], ord=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+(P.seed[k]/P.N*100).toFixed(1)+'%)'+'</span>') }
-  if(O.median){ const pm=pastMedians(), mp=(W.vs? weekMedian() : null) ?? expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
+  if(O.median && !isPlayoffWeek(W.week)){ const pm=pastMedians(), mp=(W.vs? weekMedian() : null) ?? expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(1):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(1)+'</b>').join(", "):'')+'</span>') }
   // this week's matchups
   LG.openM ||= new Set();
@@ -3977,7 +3982,7 @@ function renderLeague(){
     // league simulation stands in until a team's view is worked out (in the background, right after this draws)
     const own=rid=> W.vs && viewingMe() && rid===myRid && W.vs.win!=null? {win:W.vs.win, med:W.vs.med, title:W.vs.title, m:W.vs.me?.m} : W.vs && viewingMe() && rid===W.vs.oppRid && W.vs._oppOwn? {...W.vs._oppOwn.vs} : teamOdds(rid);
     const oa=own(a), ob=own(b), hA=h2h(a), pA= hA!=null? hA : oa? oa.win : p0, pB= hA!=null? 1-hA : ob? ob.win : 1-p0;
-    const medOf=rid=>{ const o=rid===a? oa : ob; return o&&o.med!=null? o.med : mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null };
+    const medOf=rid=>{ if(isPlayoffWeek(W.week)) return null; const o=rid===a? oa : ob; return o&&o.med!=null? o.med : mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null };
     const side=(X,r)=>{ const o=X.rid===a? oa : ob;
       return '<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(o&&o.m!=null? o.m : mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+'</span></div>' };
     return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+(pA*100).toFixed(1)+'% – '+(Math.abs(pA+pB-1)<1e-9? (100-+(pA*100).toFixed(1)).toFixed(1) : (pB*100).toFixed(1))+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(100*pA/((pA+pB)||1)).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
