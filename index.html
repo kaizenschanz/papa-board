@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-itZX1ixjHrWT7NoqpIdlMqelzLUlxnZZscOPEy1rDJA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Cd8v8i4AMOCK3keDYrH+r9xDqnWAt+Q//JKe4r2CUoQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3934,7 +3934,7 @@ function renderLeague(){
   $("lgSum").innerHTML= me? '<span>You: <b>'+me.w+'-'+me.l+'</b>, playoff odds <b>'+(me.po*100).toFixed(1)+'%</b>, title odds <b>'+(me.ch*100).toFixed(1)+'%</b>, projected finish <b>'+me.xw.toFixed(1)+'-'+me.xl.toFixed(1)+'</b></span>' : "";
   // playoff path: your most likely seed and first-round opponent (same season simulation)
   if(me && LG.path && me.po>=0.02){ const P=LG.path, k=P.seed.indexOf(Math.max(...P.seed)), o=P.opp[0], ord=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
-    $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+(P.seed[k]/P.N*100).toFixed(1)+'%)'+(o?' · first round vs <b>'+esc(rosterName(o[0]))+'</b> ('+(o[1]/P.N*100).toFixed(1)+'%)':'')+'</span>') }
+    $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+(P.seed[k]/P.N*100).toFixed(1)+'%)'+'</span>') }
   if(O.median){ const pm=pastMedians(), mp=(W.vs? weekMedian() : null) ?? expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(1):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(1)+'</b>').join(", "):'')+'</span>') }
   // this week's matchups
