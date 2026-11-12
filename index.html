@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BtU/w4YaY0EdR+dG1YMz/ol3gDeUouvH1zQYDQt0POE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-GvLiTcZ0wp2KhEDkTl6Oz9KsSiki+GmsIDrlgkD0GLM='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2591,6 +2591,8 @@ function playerDetail(x,mine,L){
   if(a.avg!=null) st.push('Season <b>'+a.avg.toFixed(2)+'</b>');
   if(r4) st.push('Last '+r4.list.length+' <b>'+r4.avg.toFixed(2)+'</b>');
   { const wk=weekValue(x); if(wk!=null) st.push('Week <b>'+(a.lockedOn? '' : '~')+wk.toFixed(2)+'</b>') }   // user, 11-08: his weekly value next to season and last 4
+  // chance he sits each game left (user, 11-12: "sit out odds could be cool to see"): the same numbers the simulation uses
+  let sitL=""; if(!a.lockedOn){ const fu=a.future.map((g,j)=>[g,j]).filter(([g])=>g.mu>0); if(fu.length) sitL='Sit chance '+fu.map(([g,j])=>dayLabel(g.date)+' <b>'+(dnpP(g,j,pid)*100).toFixed(0)+'%</b>'+(b2bOf(pid,g.date)?' (2nd night)':'')).join(' · ') }
   const nx=a.future[0], sp=nx&&srcParts(nx), gp=a.live||nx, pl= gp && !a.lockedOn? projLine(pid,gp) : null;
   let why="";
   if(mine && a.why && (x.starter&&!a.lockedOn || a.call?.t?.startsWith("Start"))) why=a.why;
@@ -2598,7 +2600,7 @@ function playerDetail(x,mine,L){
     why= (W.vs.oppLines?.[pid]!=null? a.latest.fp>=W.vs.oppLines[pid] : W.vs.oppPlan.pick.get(pid)?.k==="lock")? "Their best play: lock it." : "Their best play: play on.";
   if(!why && L?.why?.[pid] && x.starter && !a.lockedOn && !a.live) why=L.why[pid];   // League tab: that team's own lock odds
   return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div>'+
-    (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+esc(why)+'</div>':'')+'</div>';
+    (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(sitL?'<div class="ln">'+sitL+'</div>':'')+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+esc(why)+'</div>':'')+'</div>';
 }
 // One matchup as rows: each slot's player, his lock or live score, his next game, and the slot's projected value (from that
 // team's own plan; a slot the plan gives to someone else shows "-> him"). Used by the Lock-in tab (your matchup, with your calls)
