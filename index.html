@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Cd8v8i4AMOCK3keDYrH+r9xDqnWAt+Q//JKe4r2CUoQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-akNBhuF9ovLITDkp8hmdMrGBkz8Fugiji+rMTp6TMrw='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2713,7 +2713,14 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     if(other){ const o=R.find(y=>y.pid===other), q=D.parts.get(other);
       // his own game first (Hyland Thu before Mitchell Fri): the score worth keeping instead of handing the slot over
       const g0= side==="me"? (a.live || a.future.find(f=>f.mu>0)) : null, og=o?.a?.future?.[0], ln0= g0?.date && !(og && og.date<g0.date)? lnOf(g0.date) : null;
-      return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">'+(ln0>0&&isFinite(ln0)? (a.live? 'lock at ' : dayLabel(g0.date)+': lock at ')+ln0.toFixed(1)+'+ · else ' : '')+'→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
+      // a score he can lock now, headed to another slot (user, 11-12: saucydalton's Porter showed only "→ Zion Williamson" while
+      // the To do said "Lock Michael Porter's 23.52 at SF"): his own call first, then who takes this slot
+      const pk=Q?.pick?.get(x.pid), tgt= pk && pk.slot!=null && pk.slot!==x.idx? pk.slot : null;
+      let own='';
+      if(side==="me" && x.starter && !a.live && a.latest && !a.latest.dnp && a.future.length){ let l=null; try{ l=lineFor(R,Q,{...x, idx: tgt??x.idx},a.latest.date) }catch(e){}
+        const lk= a.call?.c==="lock" || (l!=null && a.latest.fp>=l);
+        own=(lk? '<span class="badge lock">Lock</span> ' : '')+'Can lock '+a.latest.fp.toFixed(2)+(tgt!=null&&SL[tgt]? ' at '+SL[tgt] : '')+(l!=null&&isFinite(l)? ' · lock at '+l.toFixed(1)+'+' : '')+' · '+(SL[x.idx]? SL[x.idx]+' ' : '') }
+      return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">'+(own? own : ln0>0&&isFinite(ln0)? (a.live? 'lock at ' : dayLabel(g0.date)+': lock at ')+ln0.toFixed(1)+'+ · else ' : '')+'→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
     // the opponent's plan locks it (Flagg's 49.20): say so plainly instead of "Can lock · next game" (user, 11-10)
     const lnO= !mine && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? lnOf(a.latest.date) : null;   // mid-game: nothing to lock (user, 11-11: Eason)   // his line, when it's worked out: the badge follows it
     const oppLock= !mine && x.starter && !a.lockedOn && !a.live && a.latest && (lnO!=null? a.latest.fp>=lnO : (L? (L.locks||[]).includes(x.pid) : W.vs && R===W.vs.oppRows && Q?.pick?.get(x.pid)?.k==="lock"));   // any team's plan (League tab: from its own view)
