@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-XZZ9aQOyWlb06GhSjuZHc23VYtAlFAIP+5OLTZo05M4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-949kJor+4uzYhcV0ukpCnMt6ibc3CWcuXfWowtqM9Sc='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2568,7 +2568,7 @@ function projLine(pid,g){
   const so= g.live? (W.stats[pid]?.[g.id]?.stats||{}) : {}, rem= g.live? Math.max(0,1-(g.lf||0)) : 1;
   const out=STAT_SHOW.map(([key,lab])=>{ const v=(+so[key]||0)+rem*k*(+base[key]||0); return v>=0.05? (v>=10? v.toFixed(0) : v.toFixed(1))+" "+lab : null }).filter(Boolean);
   return out.length? out.join(" · ") : null }
-function playerDetail(x,mine){
+function playerDetail(x,mine,L){
   const a=x.a, pid=x.pid;
   // who he plays (user, 11-10: "put who they're facing for each game"): vs at home, @ away
   const tm=a.info.team, vs=g=>{ const G=W.games.find(y=>y.game_id===g.id) || W.games.find(y=>y.date===g.date && (y.home?.team===tm || y.away?.team===tm)); if(!G) return "";
@@ -2588,6 +2588,7 @@ function playerDetail(x,mine){
   if(mine && a.why && (x.starter&&!a.lockedOn || a.call?.t?.startsWith("Start"))) why=a.why;
   if(mine===false && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length && W.vs?.oppPlan)
     why= (W.vs.oppLines?.[pid]!=null? a.latest.fp>=W.vs.oppLines[pid] : W.vs.oppPlan.pick.get(pid)?.k==="lock")? "Their best play: lock it." : "Their best play: play on.";
+  if(!why && L?.why?.[pid] && x.starter && !a.lockedOn && !a.live) why=L.why[pid];   // League tab: that team's own lock odds
   return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div>'+
     (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+esc(why)+'</div>':'')+'</div>';
 }
@@ -2743,7 +2744,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       s=bits.join(' · '); if(p && !val) val='~'+slotShown(p).toFixed(2) }
     const back= W.injESPN?.[x.pid]?.ret && a.future[0] && W.injESPN[x.pid].ret<=a.future[0].date;   // ESPN has him back for his next game: the old tag is stale
     return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn&&!back? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
-  const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA,LA)+cell(b,DB,QB,B,false,LB)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null):'<div></div>')+(b?playerDetail(b,mineA? false : null):'<div></div>')+'</div></details>';
+  const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA,LA)+cell(b,DB,QB,B,false,LB)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null,LA):'<div></div>')+(b?playerDetail(b,mineA? false : null,LB):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
   let h='<div class="mhd"><span></span><span>'+esc(nameA)+'</span><span>'+esc(nameB)+'</span></div>';
   SL.forEach((s,i)=>{ h+=row(s,at(A,i),at(B,i)) });
@@ -2870,7 +2871,14 @@ function teamLines(rid, fresh){ const v=W.vs, my=myRoster()?.roster_id, lk=Q=>[.
 function teamLinesRun(rid){ const R=S.rosters[rid]; if(!R) return null; const sig=teamSig(rid);
   const save=W.vs; let H, lines, vs=null;
   try{ H=fullMatchup(R, R.roster_id===myRoster()?.roster_id, false); if(!H||!H.vs) return null; W.vs=H.vs; lines=linesOfView(H.A,H.P);
-    vs={win:H.vs.win, med:H.vs.med, title:H.vs.title, mx:weekMedian(), m:H.vs.me?.m} }
+    vs={win:H.vs.win, med:H.vs.med, title:H.vs.title, mx:weekMedian(), m:H.vs.me?.m};
+    // each open lock decision as that team's own Matchup tab explains it: best play, line, and the odds each way (user, 11-12:
+    // "I wanted to view the percentages on the Jarrett Allen lock decisions but I couldn't unless I switched to Dalton")
+    const why={}; for(const x of H.A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||!a.future.length) continue;
+      let l=null, o=null; try{ l=slotLine(H.A,H.P,x,a.latest.date) }catch(e){} try{ o=lockOdds(H.A,H.P,x) }catch(e){}
+      const lk= l!=null? a.latest.fp>=l : H.P.pick.get(x.pid)?.k==="lock";
+      why[x.pid]=(lk? "Best play: lock it" : "Best play: play on")+(l!=null? " (line "+l.toFixed(2)+")" : "")+". "+oddsWhy(o) }
+    lines.why=why }
   catch(e){ return null } finally{ W.vs=save }
   lines.locks=[...H.P.pick].filter(([,q])=>q.k==="lock").map(([p])=>p);   // his plan locks these: no line to show, the call is Lock
   TL[rid]={at:W.updated, sig, lines, vs}; return lines }
