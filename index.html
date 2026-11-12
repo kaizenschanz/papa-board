@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-GePetEAd1Uvk/pRqQ01bg5Ywfs7Un/d2eDMPSYHdDH4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9+ftMRxBULmXiMdEos9Un1vkwQxrtHNPwhvq+BfJX2s='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -199,6 +199,7 @@ button.g:hover{border-color:var(--ink)}
 .lg-table tr.me td{background:var(--accent-soft)}
 .lg-table tr.cut td{border-bottom:2px solid var(--ink)}
 .lg-table .odds{font-weight:700}
+.lg-table.lg-tight{width:auto;min-width:0}.lg-table.lg-tight td,.lg-table.lg-tight th{padding:6px 10px}   /* waivers: three short columns, no stretch */
 .mu{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:4px 10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .mu:first-child{border-top:0}
 .mu .side{display:grid;gap:2px;min-width:0}
@@ -405,10 +406,6 @@ details.fold #poolSeg{margin-bottom:6px}
     <div class="card">
       <h2>Manager tendencies</h2>
       <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
-    </div>
-    <div class="card">
-      <h2>Luck &amp; schedule</h2>
-      <div class="lg-scroll"><table class="lg-table num" id="lgLuck"></table></div>
     </div>
     <div class="card">
       <h2>Waivers</h2>
@@ -1108,6 +1105,9 @@ async function loadLegs(lid,week){
       const me=myRoster(); W.legs=d.data.matchup_legs||[]; W.legLive=true; W.legSnap=null; W.legAt=Date.now(); W.leg=W.legs.find(x=>x.roster_id===me?.roster_id)||null;
       $("tokState").textContent = W.leg? "· on, reading locks" : "· on, roster not found";
       $("tokRaw").textContent=JSON.stringify(W.leg? {starters:W.leg.starters, starters_games:W.leg.starters_games, subs:W.leg.subs, player_map:W.leg.player_map} : d.data, null, 1);
+      // the recorded lines live in the Mac's legs.json: read them with a login too (user, 11-12: on a device with the login, grades
+      // never saw them, so Robinson showed the replay's 19.9 instead of the 18.69 he was shown)
+      try{ const r2=await fetch("legs.json?t="+Date.now(),{cache:"no-store"}); if(r2.ok){ const d2=await r2.json(); if(d2.dec && typeof d2.dec==="object") W.decSnap=d2.dec; W.legsPastSnap={...(d2.past||{})} } }catch(e){}
       return;
     }catch(e){ W.legErr=e.message+" · "+tokenCheck(tok); $("tokState").textContent="· token didn't work ("+W.legErr+")"; $("tokRaw").textContent=String(W.legErr) }
   } else $("tokRaw").textContent="No token saved.";
@@ -4079,10 +4079,10 @@ function renderLuck(){ renderAcc();
     for(const m of Object.values(LG.sched||{})){ const me=(m||[]).find(x=>x.roster_id===t.rid); if(!me) continue; const opp=m.find(x=>x.matchup_id===me.matchup_id&&x.roster_id!==t.rid), ot=opp&&T.find(x=>x.rid===opp.roster_id); if(ot){ so+=ot.mu-avg; k++ } }
     return {t, hw, g, ap, luck:hw-ap, sos: k? so/k : null} }).sort((a,b)=>b.luck-a.luck);
   const sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1);
-  $("lgLuck").innerHTML='<thead><tr><th>Team</th><th>H2H</th><th>All-play</th><th>Luck</th><th>Schedule left</th></tr></thead><tbody>'+
+  if($("lgLuck")) $("lgLuck").innerHTML='<thead><tr><th>Team</th><th>H2H</th><th>All-play</th><th>Luck</th><th>Schedule left</th></tr></thead><tbody>'+
     rows.map(r=>'<tr class="'+(r.t.me?'me':'')+'"><td>'+esc(r.t.name)+'</td><td>'+r.hw+'-'+(r.g-r.hw)+'</td><td>'+r.ap.toFixed(1)+'-'+(r.g-r.ap).toFixed(1)+'</td><td class="'+(r.luck>0.3?'good':r.luck<-0.3?'bad':'')+'">'+sg(r.luck)+'</td><td>'+(r.sos==null?'–':sg(r.sos))+'</td></tr>').join("")+'</tbody>';
   const qr=claimRates(), my=myRoster()?.roster_id, R=Object.values(S.rosters).sort((a,b)=>(a.settings?.waiver_position??99)-(b.settings?.waiver_position??99));
-  $("lgWaiv").innerHTML='<table class="lg-table num"><thead><tr><th>#</th><th>Team</th><th>Claims</th></tr></thead><tbody>'+
+  $("lgWaiv").innerHTML='<table class="lg-table num lg-tight"><thead><tr><th>#</th><th>Team</th><th>Claims</th></tr></thead><tbody>'+
     R.map(r=>'<tr class="'+(r.roster_id===my?'me':'')+'"><td>'+(r.settings?.waiver_position??'–')+'</td><td>'+esc(rosterName(r.roster_id))+'</td><td>'+Math.round((qr.q[r.roster_id]??qr.qbar)*100)+'% of nights</td></tr>').join("")+'</tbody></table>';
 }
 function renderLeague(){
