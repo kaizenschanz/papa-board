@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-XZb1FvE0vxPOsr2ADn/W8WwBWtzPMFD8AAhccRg3BH0='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OhnR3a9G7pqpyxTelnrzKJY6izBolHTZRSz4UlhLb58='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2871,7 +2871,7 @@ function teamLines(rid, fresh){ const v=W.vs, my=myRoster()?.roster_id, lk=Q=>[.
 function teamLinesRun(rid){ const R=S.rosters[rid]; if(!R) return null; const sig=teamSig(rid);
   const save=W.vs; let H, lines, vs=null;
   try{ H=fullMatchup(R, R.roster_id===myRoster()?.roster_id, false); if(!H||!H.vs) return null; W.vs=H.vs; lines=linesOfView(H.A,H.P);
-    vs={win:H.vs.win, med:H.vs.med, title:H.vs.title, mx:weekMedian(), m:H.vs.me?.m};
+    vs={win:H.vs.win, med:H.vs.med, title:H.vs.title, mx:weekMedian(), m:H.vs.me?.m, D:H.vs.me, A:H.A, P:H.P};
     // each open lock decision as that team's own Matchup tab explains it: best play, line, and the odds each way (user, 11-12:
     // "I wanted to view the percentages on the Jarrett Allen lock decisions but I couldn't unless I switched to Dalton")
     const why={}; for(const x of H.A){ const a=x.a; if(!x.starter||a.lockedOn||a.live||!a.latest||a.latest.dnp||!a.future.length) continue;
@@ -2884,24 +2884,25 @@ function teamLinesRun(rid){ const R=S.rosters[rid]; if(!R) return null; const si
   TL[rid]={at:W.updated, sig, lines, vs}; return lines }
 // that team's own odds (win, median, title), when its view is worked out for the current data
 function teamOdds(rid){ teamLines(rid,true); const c=TL[rid]; return c&&c.at===W.updated&&c.vs? c.vs : null }
+// Head-to-head with both teams playing their own best plan (user, 11-12: "use both teams full plans, always wanna assume they play
+// optimally"): every page and the League tab compare the same two distributions, so a matchup adds to 100 and reads the same
+// everywhere. Each team's distribution is its own full view's (yours: this page's).
+function ownD(rid){ const v=W.vs; if(v && v.rid!=null && viewRoster()?.roster_id===rid && v.me?.tot) return v.me;
+  const c=TL[rid]; return c && c.vs?.D?.tot && c.sig===teamSig(rid)? c.vs.D : null }
+function h2h(rid){ const m=W.matchups.find(x=>x.roster_id===rid), o=m&&W.matchups.find(x=>x.matchup_id===m.matchup_id&&x.roster_id!==rid); if(!o) return null;
+  const a=ownD(rid), b=ownD(o.roster_id); return a&&b? titleObjD(a,b,null,false).h : null }
+// your page: the opponent as his own full plan has him (his rows, plan and distribution), once it's worked out
+function applyOppOwn(v){ const c=TL[v.oppRid]; if(!c||!c.vs?.D?.tot||c.sig!==teamSig(v.oppRid)) return false;
+  if(v._oppOwn===c) return true; v._oppOwn=c; v.oppRows=c.vs.A; v.oppPlan=c.vs.P; v.opp=c.vs.D; v.oppLines=c.lines;
+  v.win=titleObjD(v.me,c.vs.D,null,false).h; return true }
 // work out the given teams' lines (wheel on), then redraw: done() runs after
 function ensureLines(rids, done){ const need=rids.filter(r=>teamLines(r,true)==null); if(!need.length){ done(); return }
   busyOn(); paintNow().then(()=>{ try{ for(const r of need) teamLinesRun(r) } finally{ busyOff() } done() }) }
 function oppLinesLater(){
-  const v=W.vs; if(!v||!v.oppRows||v.oppLines) return;
-  const sig=oppSig(v), c=W._oppL||store.get("oppLines",null);
-  if(c && c.sig===sig){ W._oppL=c; v.oppLines=c.lines; renderMatchup(v.rows); return }
+  const v=W.vs; if(!v||!v.oppRows||v._oppOwn) return;
+  if(applyOppOwn(v)){ renderMatchup(v.rows); return }
   busyOn();
-  setTimeout(()=>{ try{ oppLinesRun(v,sig) } finally{ busyOff() } }, 30) }
-function oppLinesRun(v,sig){ if(W.vs!==v) return; const R=S.rosters[v.oppRid]; if(!R) return;
-    let H; try{ H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false) }catch(e){ return }
-    if(W.vs!==v || !H.vs) return;
-    const lines={}; W.vs=H.vs;
-    try{ for(const x of H.A){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue;
-        const date= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!date) continue;
-        const ln=slotLine(H.A,H.P,x,date); if(ln!=null) lines[x.pid]=ln } }
-    finally{ W.vs=v }
-    v.oppLines=lines; W._oppL={sig, lines}; if(!(LOGX||NOASSUME)) store.set("oppLines",W._oppL); renderMatchup(v.rows) }
+  setTimeout(()=>{ try{ if(W.vs===v){ teamLinesRun(v.oppRid); if(applyOppOwn(v)){ try{ renderBoard(v.rows, v.plan) }catch(e){} renderMatchup(v.rows) } } } finally{ busyOff() } }, 30) }
 function renderMatchup(A){
   // lock grades (✓/✗) come from the managers' replay: run it here too, not only on the League tab (user, 11-11: Hartenstein's and
   // Robinson's locks had no mark); it's cached, so this only costs a rerun when a lock or score changed
@@ -2987,6 +2988,7 @@ function renderWeek(){
   if(isMe && W.vs){ W.myScore={me:lockedSum(A), opp:lockedSum(W.vs.oppRows), name:W.vs.name}; renderClock() }
   // On the League tab only the matchup numbers are needed: the To do, claims and pickups (~1.5 s) wait until Lock-in is shown
   W.weekDirty=false; if(W.view!=="week" && !(LOGX||NOASSUME)){ W.weekDirty=true; bootDone(); return }
+  if(W.vs) applyOppOwn(W.vs);   // the opponent's own full plan, when it's already worked out for this data
   renderBoard(A,P);
   const items=todoItems(A,P);
   renderTodo(items);
@@ -3973,12 +3975,12 @@ function renderLeague(){
     const p0= mine? (a===myRid? W.vs.win : 1-W.vs.win) : m? m.pa : A.ww;
     // each team's own numbers, as its own Matchup tab has them (user, 11-12: "so I don't have to switch to daltons"); the quick
     // league simulation stands in until a team's view is worked out (in the background, right after this draws)
-    const own=rid=> W.vs && viewingMe() && rid===myRid && W.vs.win!=null? {win:W.vs.win, med:W.vs.med, title:W.vs.title, m:W.vs.me?.m} : teamOdds(rid);
-    const oa=own(a), ob=own(b), pA= oa? oa.win : p0, pB= ob? ob.win : 1-p0;
+    const own=rid=> W.vs && viewingMe() && rid===myRid && W.vs.win!=null? {win:W.vs.win, med:W.vs.med, title:W.vs.title, m:W.vs.me?.m} : W.vs && viewingMe() && rid===W.vs.oppRid && W.vs._oppOwn? {...W.vs._oppOwn.vs} : teamOdds(rid);
+    const oa=own(a), ob=own(b), hA=h2h(a), pA= hA!=null? hA : oa? oa.win : p0, pB= hA!=null? 1-hA : ob? ob.win : 1-p0;
     const medOf=rid=>{ const o=rid===a? oa : ob; return o&&o.med!=null? o.med : mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null };
     const side=(X,r)=>{ const o=X.rid===a? oa : ob;
       return '<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(o&&o.m!=null? o.m : mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+'</span></div>' };
-    return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+(pA*100).toFixed(1)+'% – '+(pB*100).toFixed(1)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(100*pA/((pA+pB)||1)).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
+    return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+(pA*100).toFixed(1)+'% – '+(Math.abs(pA+pB-1)<1e-9? (100-+(pA*100).toFixed(1)).toFixed(1) : (pB*100).toFixed(1))+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(100*pA/((pA+pB)||1)).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
   }).join(""));
   // tap a matchup for both lineups (same rows as the Lock-in tab); it and its open rows stay open through refreshes (keepOpen).
   // One listener for all of them; a matchup's grid is drawn when it opens, and again once its teams' lock lines are worked out.
