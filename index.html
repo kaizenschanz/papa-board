@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AAAyak/Dp+uphMMUFS2wh2Rbq6d4gEVMQYc3kWRjgEg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UXTlhI5Hhd350JHORUxe+mBTKtpDtlgUXBcEHvKeIl8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1279,13 +1279,7 @@ function blendMu(pid, info, g, pr, slp){
   if(L && L.pts!=null){
     const st={...((pr&&pr.stats)||{})};
     if(!st.pts){ const t=W.tot[pid]; if(t&&t.gp) for(const k in t) if(typeof t[k]==="number") st[k]=t[k]/t.gp }
-    const Lp=propLine(L,"pts"), La= L.ast!=null? propLine(L,"ast") : null;
-    const r=st.pts? Lp/st.pts : 1, rTo=(st.pts||0)+(st.ast||0)>0? (Lp+(La??st.ast??0))/((st.pts||0)+(st.ast||0)) : 1;
-    const adj={...st};
-    for(const k of ["fgm","fga","ftm","fta","fgmi","ftmi","tpa","tpmi"]) if(adj[k]!=null) adj[k]*=r;
-    if(adj.to!=null) adj.to*=rTo;
-    for(const k of ["pts","reb","ast","tpm","stl","blk"]) if(L[k]!=null) adj[k]=propLine(L,k);
-    dkv=scoreStats(adj);
+    dkv=scoreStats(propStats(L,st));
   }
   const t=W.tot[pid], avg= t&&t.gp>=3? scoreStats(t)/t.gp : null;
   // no DK line yet (a later game): the Sleeper fallback, scaled by how DK has priced him against it (model_fit dkr; on only while it
@@ -1541,6 +1535,14 @@ const FALLBACK = {"pick":"current","w":null,"test":{"current":[5.3676,6.7769],"s
 // A prop's line moved by its prices (user, 11-12: an over at -140 isn't a coin flip): the over's no-vig chance p moves the line by
 // c x (p - 0.5) x sqrt(line), c per stat from prop_fit.py, used only while that beats the plain line on later games.
 const PROPADJ = {"use":true,"c":{"pts":4.542,"ast":2.7169,"reb":3.4107,"tpm":2.1838,"stl":3.2284,"blk":4.115},"test":{"plain":[5.5837,0.271,1123],"price":[5.5665,0.096,1123]},"test_from":"2026-11-02"};
+// His stat line from the props: each prop's line (moved by its prices), shooting volume scaled to the points line, turnovers to
+// points + assists, the rest Sleeper's. One function for both the projection and the stat line shown (user, 11-12).
+function propStats(L,st){ const Lp=propLine(L,"pts"), La= L.ast!=null? propLine(L,"ast") : null;
+  const r=st.pts? Lp/st.pts : 1, rTo=(st.pts||0)+(st.ast||0)>0? (Lp+(La??st.ast??0))/((st.pts||0)+(st.ast||0)) : 1, adj={...st};
+  for(const k of ["fgm","fga","ftm","fta","fgmi","ftmi","tpa","tpmi"]) if(adj[k]!=null) adj[k]*=r;
+  if(adj.to!=null) adj.to*=rTo;
+  for(const k of ["pts","reb","ast","tpm","stl","blk"]) if(L[k]!=null) adj[k]=propLine(L,k);
+  return adj }
 function propLine(L,k){ const v=L[k]; const P=PROPADJ, q=L._p?.[k]; if(!P||!P.use||!P.c?.[k]||!q||q.length<2||q[0][0]!==q[1][0]||!(v>0)) return v;
   const po=q[0][1]/(q[0][1]+q[1][1]); return Math.max(0, v + P.c[k]*(po-0.5)*Math.sqrt(v)) }
 function last5Avg(pid){ const r=recent(pid,5); return r? r.avg : null }
@@ -2665,7 +2667,9 @@ function weekValue(x){ const a=x.a, pid=x.pid; if(a.lockedOn) return a.lockedOn.
 const STAT_SHOW=[["pts","pts"],["reb","reb"],["ast","ast"],["stl","stl"],["blk","blk"],["tpm","3pm"],["to","to"]];
 function projLine(pid,g){
   const pr=W.proj[pid]?.[g.id]?.stats; if(!pr && !g.line) return null;
-  const base={...(pr||{})}; if(g.line) for(const k of ["pts","reb","ast","tpm","stl","blk"]) if(g.line[k]!=null) base[k]=g.line[k];
+  let base={...(pr||{})};
+  if(g.line){ if(g.line.pts!=null){ const st={...base}; if(!st.pts){ const t=W.tot[pid]; if(t&&t.gp) for(const k in t) if(typeof t[k]==="number") st[k]=t[k]/t.gp } base=propStats(g.line,st) }
+    else for(const k of ["pts","reb","ast","tpm","stl","blk"]) if(g.line[k]!=null) base[k]=propLine(g.line,k) }   // the same stats the projection is built from
   const pf=scoreStats(base), m0= g.live? (g.mu0>0? g.mu0 : g.mu) : g.mu, k= pf>0 && m0>0? m0/pf : 1;
   const so= g.live? (W.stats[pid]?.[g.id]?.stats||{}) : {}, rem= g.live? Math.max(0,1-(g.lf||0)) : 1;
   const out=STAT_SHOW.map(([key,lab])=>{ const v=(+so[key]||0)+rem*k*(+base[key]||0); return v>=0.05? (v>=10? v.toFixed(0) : v.toFixed(1))+" "+lab : null }).filter(Boolean);
