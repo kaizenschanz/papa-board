@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CXAyLOnnT5IOQAxNTd8lpa0idt2FxNjTXHXdm3OujNM='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7X0vg5bhur/WYXGqjgjgoPxKF8lWQxhZ0OSHm3cd9nI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2632,14 +2632,16 @@ function replanLine(A,P,x,date,claims){
   if(!AL.includes(xL)) AL.push(xL); if(!AW.includes(xW)) AW.push(xW);
   const b0=v.planBase||{force:v.force}, force={...(b0.force||{})}; delete force[x.pid];
   const ex= b0.exclude instanceof Set? new Set([...b0.exclude].filter(p=>p!==x.pid)) : b0.exclude, base={...b0, force, exclude:ex, pins:undefined};   // the line is priced without pins, as before
-  const QW=planWeek(AW,{...base, light:true}), DW=withPickups(teamDist(AW,QW),v.pkMe);
+  // the full planner, the one behind the header's odds (user, 11-11: Robinson's "play on" odds read 6% win / 28% median under a
+  // header of 10% / 37%: with games live the quick planner ran 5.5 points under the full plan, which has the mid-game switches)
+  const QW=planWeek(AW,base), DW=withPickups(teamDist(AW,QW),v.pkMe);
   // every open slot he fits, the same ones the lock step picks from (lockSlotFor): a forward sitting in UTIL gets locked at
   // SF/PF/F, which keeps the UTILs for the centers, so that's the lock his line has to price (Walker in UTIL was priced as a
   // UTIL lock, 22.4, 11-11). The cheapest slot counts.
   const lk=new Set(B.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx)), from= lk.has(xi)? null : xi; let best=null, at=null, DLb=null;
   for(let i=0;i<SLn.length;i++){ if(lk.has(i) || !elig(a.info.pos,SLn[i])) continue;
     const occ= i===xi? null : B.find(y=>y.starter&&y.idx===i&&y.pid!==x.pid); if(occ && occ.a.live && !(from!=null && elig(occ.a.info.pos,SLn[from]))) continue;   // can't free that slot mid-game
-    const QL=planWeek(AL,{...base, light:true, pinLock:{pid:x.pid, slot:i, from}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
+    const QL=planWeek(AL,{...base, pinLock:{pid:x.pid, slot:i, from}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
     const DLi=withPickups(teamDist(AL,QL),v.pkMe), l=lockBarD(DLi, fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi } }
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   return best==null? null : {l:best, slot:at, odds: known? {L:titleObjD(DLb,v.opp,v.tab,v.median,v.wt), W:titleObjD(DW,v.opp,v.tab,v.median,v.wt)} : null} }
