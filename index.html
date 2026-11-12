@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-E56FG+DWWCd+EmclSjcfY8P9NZRPKrZXUq2tLhiLwbo='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OSonX/rq8p+D57QhiB5+gjXZGVpoX4GP0VPlnIAyNUw='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3048,6 +3048,10 @@ function renderWeek(){
   if(isMe && (LOGX||NOASSUME)) W.tlJson=JSON.stringify({week:W.week, at:Date.now(), exact:!!(W.legLive && legFor(myRoster()?.roster_id)),
     legs: W.legLive? (W.legs||[]).map(pickLeg) : null, legsAt: W.legLive? W.legAt : null, past: W.legLive? (W.legsPast||null) : null,
     league: (()=>{ try{ return leagueOdds() }catch(e){ return null } })(),
+    // tonight's best free looks on waivers vs what the pickup model assumes for the week (user, 11-12: "most nights you can get a
+    // free look at a guy or two ... just track it and see if it adds anything"): kept once a night by the Mac's sync
+    pick: (()=>{ try{ const L=(W._claims?.list)||[]; return {date:todayStr(), assumed: W.vs? +(W.vs.me.pk||0).toFixed(2) : null,
+      top:L.slice(0,3).map(c=>({pid:c.pid, name:c.name, pts:+(c.dmu||0).toFixed(2), title:+(c.d||0).toFixed(5), get:c.pGet!=null? +c.pGet.toFixed(2) : null}))} }catch(e){ return null } })(),
     calls: W.vs? Object.entries(W.vs.calls).map(([pid,c])=>{ const x=A.find(y=>y.pid===pid); return {pid, name:x?.a.info.name, fp:x?.a.latest?+x.a.latest.fp.toFixed(2):null, wait:c.wpts!=null?+c.wpts.toFixed(2):null, bar:c.at!=null?+c.at.toFixed(2):null, call:(x?.a.call?.c)||null} }) : null,
     odds: W.vs? {win:+W.vs.win.toFixed(4), worst:+(W.vs.winWorst??0).toFixed(4), med:W.vs.med!=null?+W.vs.med.toFixed(4):null, me:+W.vs.me.m.toFixed(2), opp:+W.vs.opp.m.toFixed(2), oppName:W.vs.name, allIn:!!W.oppAllIn, pkMe:+(W.vs.me.pk||0).toFixed(2), pkOpp:+(W.vs.opp.pk||0).toFixed(2)} : null,
     cal: W._cal? {M:+W._cal.M.toFixed(2), sim:W._cal.sim!=null?+W._cal.sim.toFixed(2):null, prior:W._cal.prior!=null?+W._cal.prior.toFixed(2):null, phi:+W._cal.phi.toFixed(3), k:+W._cal.k.toFixed(3), sd0:(CALIB?.med?.sd0)||MED_SD0, t:Object.fromEntries(W._cal.raw.map(t=>[t.rid,[+t.m.toFixed(2),+(t.own||0).toFixed(2),+t.base.toFixed(2)]]))} : null,
