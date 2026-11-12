@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-P+53rpRw+9VRCq+LHPZppjBoL8ifTnt0V6hyGBGAdZ4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-p6IVP3VgEL7wFqUYo+HNFf+GeCFsl+dur7IJNsVDixs='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1539,7 +1539,7 @@ function b2bOf(pid,date){ const tm=playerInfo(pid)?.team, S_=W.sched; if(!tm||!d
 // out, available), else Sleeper's GTD as Questionable, else "none" if nobody lists him. Only within ~30 hours of tip, when the
 // official report covers the game (that's what "none" meant in training); null when it can't be told (a vague or stale note).
 const WDAY=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-function liveTag(pid,g){ const tip=tipAt(pid,g.date)||Date.parse(g.date+"T19:00:00"), now=W.updated||Date.now(); if(!(tip-now<30*3600e3)) return null;
+function liveTag(pid,g){ const tip=tipAt(pid,g.date)||Date.parse(g.date+"T19:00:00"), now=W.updated||Date.now(); if(!(tip>now && tip-now<30*3600e3)) return null;   // games still ahead only (past weeks' replays never read today's tags)
   const e=W.injESPN?.[pid];
   if(e){ const n=(e.note||"").toLowerCase(), day=WDAY[new Date(g.date+"T12:00:00").getDay()], named=WDAY.filter(d=>n.includes(d));
     if(named.length? !named.includes(day) : !(e.at && now-e.at<24*3600e3)) return null;   // about another game, or too old to tell
@@ -1559,6 +1559,8 @@ const DNPM=new Map();
 function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
   if(SIT && SIT.c1>0){ const e=pid!=null && SIT.p?.[pid], bb= pid!=null && g.date && b2bOf(pid,g.date);
     if(!e) return j===0? SIT.c1 : SIT.cL;
+    // a game from an earlier week (the managers' replay): his usual rate after a game he played, not today's state
+    if(W.games?.length && g.date && g.date<W.games[0].date) return e[bb? 5 : 4];
     const mk=pid+"|"+g.date+"|"+(W.updated||0); if(DNPM.has(mk)) return DNPM.get(mk); if(DNPM.size>4000) DNPM.clear();
     // where this game falls among the ones he has left (a live one counts as played): his next one, or one after another
     const F=playerWeek(pid).games.filter(x=>!x.done && x.mu>0), k=F.findIndex(x=>x.date===g.date), prev= k>0? F[k-1] : null;
@@ -3454,7 +3456,7 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=3;
+const GRADE_V=4;   // 4: per-player sit chances (11-12)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
       else if(v && typeof v==="object"){ const o=(P[k] ||= {}); for(const [k2,v2] of Object.entries(v)) o[k2]=(o[k2]||0)+v2 } } } }
@@ -3569,7 +3571,10 @@ async function gradeWeek(w, rows, logs, SL, per){
   // dk line but the best projection"). Later games: the scaled Sleeper fallback, with projection moves and sit chances ahead.
   const dkrOf=pid=>{ const D=MODEL?.dkr; return D&&D.use? (D.r?.[pid] ?? D.g ?? 1) : 1 }, dnpLater=((SHAPE&&SHAPE.dnp)||[0.05,0.08])[1];
   const gstep=(pid,x,next)=>{ const bp= next && x.best>0? x.best : null, mu= bp ?? (x.mu>0 && !x.fin? x.mu*dkrOf(pid) : x.mu);
-    return {mu, r:volOf(pid), cur:null, key:hashKey(pid+":"+x.id), pm: next? 0 : dnpLater, ps: bp!=null||!(mu>0)? 0 : projSd(mu)} };
+    // later games: his own sit chance from the current model (back-to-backs included, as if he played the game before), not one
+    // flat rate (user, 11-12: "did you ever rerun the replay grades on the current model")
+    const e=SIT?.p?.[pid], bb= x.date && b2bOf(pid,x.date), pmL= e? e[bb? 5 : 4] : dnpLater;
+    return {mu, r:volOf(pid), cur:null, key:hashKey(pid+":"+x.id), sk:hashKey(pid+":sit"), pm: next? 0 : pmL, ps: bp!=null||!(mu>0)? 0 : projSd(mu)} };
   // A lock call about game i can be made until his team's next game tips, so that's when it's judged (user, 11-08: "use the
   // info they had at the time... the best info is right before tip of the next game"). Everything finished by then counts as
   // known, games earlier that day included; nothing after does. Games he went on to miss still count as expected games
