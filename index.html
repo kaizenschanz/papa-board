@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Xro2mJyrkVWc6ls85fEfSnEDk73+TBeLR9XcsDuEK4w='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-itZX1ixjHrWT7NoqpIdlMqelzLUlxnZZscOPEy1rDJA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1833,6 +1833,8 @@ function medianOf(xs){ const s=xs.filter(x=>x>0).sort((a,b)=>a-b), n=s.length; i
 // Where this week's league median should land: the midpoint of 6th and 7th in each simulated week, averaged (user, 11-11: the
 // middle projection read ~229 while the median the odds use sat near 237; with teams bunched, the ones that run hot take 6th
 // and 7th). T: each team's simulated totals {tot} or a mean and spread {m,s}.
+// this week's expected league median, the one number every view shows (user: numbers never disagree across views)
+function weekMedian(){ const v=W.vs; return v?.me?.tot? expMedian([{tot:v.me.tot}].concat((v.oth||[]).map(o=>({m:o.m, s:o.s})))) : null }
 function expMedian(T){ if(!T||!T.length) return null; const L=T.filter(t=>t.tot&&t.tot.length).map(t=>t.tot.length), N=Math.min(4000, ...(L.length? L : [4000])), n=T.length, k=T.map((_,i)=>hashKey("med:"+i));
   let sum=0; const v=new Float64Array(n);
   for(let s=0;s<N;s++){ for(let i=0;i<n;i++){ const t=T[i]; v[i]= t.tot&&t.tot.length? t.tot[s%t.tot.length] : t.m+(t.s||0)*qnorm(uAt(k[i],s)) } v.sort(); sum+= n%2? v[(n-1)/2] : (v[n/2-1]+v[n/2])/2 }
@@ -2139,7 +2141,7 @@ function knownBy(deadline){
   return out;
 }
 function lockDeadline(a){ const g=a.future[0]; return g? tipAt(a.info.pid,g.date) : null }
-const pct=p=>p>0.995?">99%":p<0.005?"<1%":Math.round(p*100)+"%";
+const pct=p=>p>0.9995?">99.9%":p<0.0005?"<0.1%":(p*100).toFixed(1)+"%";   // one decimal (user, 11-12)
 // a change in championship probability, in percentage points ("+0.35%"), never "pts" (reads like fantasy points)
 const tChance=d=>{ const v=Math.abs(d)*100; return "+"+(v<0.01? v.toFixed(3) : v.toFixed(2))+"%" };
 const fx=v=>v!=null&&isFinite(v)? v.toFixed(2) : null;
@@ -2528,7 +2530,7 @@ function renderBoard(A,P){
     (v? side(v.name, v.opp.m, lockedSum(v.oppRows), open(v.oppRows), true) : '')+'</div><div class="sb-cap">projected final</div>';
   const pills=[];
   if(v){ pills.push('<span class="pill '+(v.win>=.5?'good':'bad')+'">Win <b>'+pct(v.win)+'</b></span>');
-    if(v.med!=null){ const mx= v.me?.tot? expMedian([{tot:v.me.tot}].concat((v.oth||[]).map(o=>({m:o.m, s:o.s})))) : null; pills.push('<span class="pill">Median <b>'+pct(v.med)+'</b>'+(mx!=null? ' · ~'+mx.toFixed(0) : '')+'</span>') }
+    if(v.med!=null){ const mx=weekMedian(); pills.push('<span class="pill">Median <b>'+pct(v.med)+'</b>'+(mx!=null? ' · ~'+mx.toFixed(1) : '')+'</span>') }
     // title odds on one page at a time: this week while it's on, next week once this one is final (they can't disagree)
     if(v.title!=null && !weekOver() && !(W.week>W.baseWeek && !W.baseDone)) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b></span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
@@ -2894,8 +2896,8 @@ function renderInfo(){
   if(LI) bits.push('Every team\'s projection also counts its likely waiver pickups for the days left: how often that team adds someone (its own history this season), times what its best free agents would add after dropping its least-needed bench player. Claims clear overnight, so nothing can be added for today.');
   if(MODEL&&MODEL.test){ const r=MODEL.test.recent||{}, m=r.model, b=r.board;
     bits.push('Learning model, refit '+dayLabel(MODEL.asof)+' on '+(MODEL.test.n||0).toLocaleString()+' games: <b>'+(MODEL.use?'in use':'on standby')+'</b>.'+(m&&b?' On the last 7 days (never used to tune it) it missed by '+m.mae.toFixed(2)+' a game vs '+b.mae.toFixed(2)+' for the blend.':'')) }
-  const v=W.vs, me_=v?.me?.tot? expMedian([{tot:v.me.tot}].concat((v.oth||[]).map(o=>({m:o.m, s:o.s})))) : null, mv= me_ ?? v?.medProj;
-  if(v&&mv!=null){ const pm=pastMedians(); bits.push('League median: about <b>'+mv.toFixed(0)+'</b> expected this week'+(pm.length?' (past weeks '+pm.map(x=>x.med.toFixed(0)).join(', ')+')':'')+'.') }
+  const v=W.vs, me_=weekMedian(), mv= me_ ?? v?.medProj;
+  if(v&&mv!=null){ const pm=pastMedians(); bits.push('League median: about <b>'+mv.toFixed(1)+'</b> expected this week'+(pm.length?' (past weeks '+pm.map(x=>x.med.toFixed(1)).join(', ')+')':'')+'.') }
   $("wkInfo").innerHTML=bits.map(b=>'<p>'+b+'</p>').join("");
 }
 
@@ -3689,12 +3691,12 @@ function logDec(){ const out=[], mine=myRoster()?.roster_id, v=W.vs;
 function logSeason(){ const O=LG.out; if(!O||!O.teams) return null;
   return {scale:+(O.scale||1).toFixed(4), teams:O.teams.map(t=>Object.fromEntries(Object.entries(t).filter(([k,x])=>typeof x==="number" && isFinite(x)).map(([k,x])=>[k, +x.toFixed(4)])))} }
 // How the board's predictions have done (score_board.py, refreshed each morning): one short line per level, once there's enough.
-function renderAcc(){ const el=$("lgAcc"); if(!el) return; const C=(typeof SCORE!=="undefined"&&SCORE)||{}, L=[], pc=x=>Math.round(x*100)+'%';
-  const p=C.proj; if(p&&p.n>=20&&p.mae!=null) L.push(['Projections','miss <b>'+(p.mae_same??p.mae).toFixed(1)+'</b>'+(p.slp_mae!=null? ' · Sleeper '+p.slp_mae.toFixed(1) : '')+' · '+p.n]);
+function renderAcc(){ const el=$("lgAcc"); if(!el) return; const C=(typeof SCORE!=="undefined"&&SCORE)||{}, L=[], pc=x=>(x*100).toFixed(1)+'%';
+  const p=C.proj; if(p&&p.n>=20&&p.mae!=null) L.push(['Projections','miss <b>'+(p.mae_same??p.mae).toFixed(2)+'</b>'+(p.slp_mae!=null? ' · Sleeper '+p.slp_mae.toFixed(2) : '')+' · '+p.n]);
   const k=C.lock; if(k&&k.n>=10) L.push(['Lock calls','<b>'+(k.gain>=0?'+':'−')+Math.abs(k.gain).toFixed(1)+'</b> a call · '+k.n]);
   const o=C.odds; if(o&&o.n>=6) L.push(['Match odds','said <b>'+pc(o.said)+'</b> · won <b>'+pc(o.won)+'</b> · '+o.n]);
   const m=C.median; if(m&&m.n>=12) L.push(['Median odds','said <b>'+pc(m.said)+'</b> · won <b>'+pc(m.won)+'</b> · '+m.n]);
-  const s=C.season; if(s&&s.n>=12) L.push(['Week totals','miss <b>'+s.mae.toFixed(1)+'</b> · naive '+s.naive.toFixed(1)+' · '+s.n]);
+  const s=C.season; if(s&&s.n>=12) L.push(['Week totals','miss <b>'+s.mae.toFixed(2)+'</b> · naive '+s.naive.toFixed(2)+' · '+s.n]);
   el.hidden=!L.length; el.innerHTML= L.length? '<div class="acc-h">Accuracy</div>'+L.map(([a,b])=>'<span>'+a+'</span><span>'+b+'</span>').join("") : "" }
 // Every matchup this week with the same simulation (both teams playing their best plan), for checking calibration over time.
 function leagueOdds(){
@@ -3929,12 +3931,12 @@ function renderLeague(){
   const O=LG.out; if(!O) return; const T=O.teams;
   $("lgTitle").textContent=(S.league.name||"League")+" · Week "+W.week;
   const me=T.find(t=>t.me);
-  $("lgSum").innerHTML= me? '<span>You: <b>'+me.w+'-'+me.l+'</b>, playoff odds <b>'+Math.round(me.po*100)+'%</b>, title odds <b>'+Math.round(me.ch*100)+'%</b>, projected finish <b>'+me.xw.toFixed(1)+'-'+me.xl.toFixed(1)+'</b></span>' : "";
+  $("lgSum").innerHTML= me? '<span>You: <b>'+me.w+'-'+me.l+'</b>, playoff odds <b>'+(me.po*100).toFixed(1)+'%</b>, title odds <b>'+(me.ch*100).toFixed(1)+'%</b>, projected finish <b>'+me.xw.toFixed(1)+'-'+me.xl.toFixed(1)+'</b></span>' : "";
   // playoff path: your most likely seed and first-round opponent (same season simulation)
   if(me && LG.path && me.po>=0.02){ const P=LG.path, k=P.seed.indexOf(Math.max(...P.seed)), o=P.opp[0], ord=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
-    $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+Math.round(P.seed[k]/P.N*100)+'%)'+(o?' · first round vs <b>'+esc(rosterName(o[0]))+'</b> ('+Math.round(o[1]/P.N*100)+'%)':'')+'</span>') }
-  if(O.median){ const pm=pastMedians(), mp=expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
-    $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(0):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(0)+'</b>').join(", "):'')+'</span>') }
+    $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+(P.seed[k]/P.N*100).toFixed(1)+'%)'+(o?' · first round vs <b>'+esc(rosterName(o[0]))+'</b> ('+(o[1]/P.N*100).toFixed(1)+'%)':'')+'</span>') }
+  if(O.median){ const pm=pastMedians(), mp=(W.vs? weekMedian() : null) ?? expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
+    $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(1):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(1)+'</b>').join(", "):'')+'</span>') }
   // this week's matchups
   LG.openM ||= new Set();
   const pairs=pairsOf(W.matchups), lo=(()=>{ try{ return leagueOdds() }catch(e){ return [] } })(), myRid=myRoster()?.roster_id;
@@ -3944,8 +3946,8 @@ function renderLeague(){
     // same simulation as the Lock-in tab; your own matchup uses the Lock-in number exactly (with how your opponent plays)
     const mine= W.vs && viewingMe() && (a===myRid||b===myRid) && W.vs.rid===(a===myRid?b:a), m=lo.find(x=>x.a===a&&x.b===b);
     const pA= mine? (a===myRid? W.vs.win : 1-W.vs.win) : m? m.pa : A.ww;
-    const medOf=rid=> mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+Math.round(medOf(X.rid)*100)+'%</b>':'')+'</span></div>';
-    return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+Math.round(pA*100)+'% – '+Math.round((1-pA)*100)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(pA*100).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
+    const medOf=rid=> mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null; const side=(X,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+'</span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+'</span></div>';
+    return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+(pA*100).toFixed(1)+'% – '+((1-pA)*100).toFixed(1)+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(pA*100).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
   }).join(""));
   // tap a matchup for both lineups (same rows as the Lock-in tab); it and its open rows stay open through refreshes (keepOpen).
   // One listener for all of them; a matchup's grid is drawn when it opens, and again once its teams' lock lines are worked out.
@@ -3958,7 +3960,7 @@ function renderLeague(){
   const order=[...T].sort((x,y)=>y.xw-x.xw||y.xpf-x.xpf);
   const cut=S.league.settings?.playoff_teams||8;
   $("lgTable").innerHTML='<thead><tr><th>Proj #</th><th>Team</th><th>W-L</th><th class="c-x">PF</th><th class="c-x">PA</th><th class="c-x">Proj W-L</th><th>Playoffs</th><th>#1 seed</th><th>Title</th></tr></thead><tbody>'+
-    order.map((t,k)=>'<tr class="'+(t.me?'me ':'')+(k===cut-1?'cut':'')+'"><td>'+(k+1)+'</td><td>'+esc(t.name)+'</td><td>'+t.w+'-'+t.l+(t.t?'-'+t.t:'')+'</td><td class="c-x">'+t.pf.toFixed(0)+'</td><td class="c-x">'+t.pa.toFixed(0)+'</td><td class="c-x">'+t.xw.toFixed(1)+'-'+t.xl.toFixed(1)+'</td><td class="odds">'+(t.po>0.995?'>99':t.po<0.005?'<1':Math.round(t.po*100))+'%</td><td>'+(t.top<0.005?'<1':Math.round(t.top*100))+'%</td><td class="odds">'+(t.ch<0.005?'<1':Math.round(t.ch*100))+'%</td></tr>').join("")+'</tbody>';
+    order.map((t,k)=>'<tr class="'+(t.me?'me ':'')+(k===cut-1?'cut':'')+'"><td>'+(k+1)+'</td><td>'+esc(t.name)+'</td><td>'+t.w+'-'+t.l+(t.t?'-'+t.t:'')+'</td><td class="c-x">'+t.pf.toFixed(0)+'</td><td class="c-x">'+t.pa.toFixed(0)+'</td><td class="c-x">'+t.xw.toFixed(1)+'-'+t.xl.toFixed(1)+'</td><td class="odds">'+(t.po>0.995?'>99':t.po<0.005?'<1':(t.po*100).toFixed(1))+'%</td><td>'+(t.top<0.005?'<1':(t.top*100).toFixed(1))+'%</td><td class="odds">'+(t.ch<0.005?'<1':(t.ch*100).toFixed(1))+'%</td></tr>').join("")+'</tbody>';
   try{ renderLuck() }catch(e){}
   setLive("on");
 }
