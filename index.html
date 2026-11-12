@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7X0vg5bhur/WYXGqjgjgoPxKF8lWQxhZ0OSHm3cd9nI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tGKkmivn88BcR1V7Dgw8rrwfiGyY9O2rNufdwQqfVMM='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3180,15 +3180,18 @@ function claimOptions0(A,P){
     const best=[...fixes].sort((a,b)=>b.alone-a.alone)[0];
     if(best.alone>bar){ fix={steps:best.steps, d:best.alone, title:!!v.wt}; base=best.r; baseOut=best.out; f0=futD(best.out); states=[{R:best.R, out:[], on:[], steps:[], short:[], alone:0, now:true}] }
     else states=fixes }
-  const benchOrder=R=>R.filter(y=>y.slot==="BN").sort((a,b)=>(need.has(a.pid)-need.has(b.pid))||(benchDropScore(a)-benchDropScore(b)));
+  // who can go: bench players and unlocked starters (user, 11-11: Walker, 0 points in UTIL, was never tested as the drop because
+  // only the bench was); a starter's game tonight still counts before the claim clears
+  const benchOrder=R=>R.filter(y=>y.slot==="BN" || (y.starter && !y.a.lockedOn)).sort((a,b)=>(need.has(a.pid)-need.has(b.pid))||(benchDropScore(a)-benchDropScore(b)));
   // One claim on one roster state. His drop: the least-needed bench player (spare ones first; early in the week everyone has a
   // role, so then the least valuable), never one the fix just activated (cutting him is its own fix). This week is always
   // priced: the drop leaves when the claim clears, even if the new player can't play yet (user, 11-09: Missi, out all week, came
   // up free because dropping Poeltl's free looks at C wasn't counted). A fix made on claim night keeps whoever it drops until
   // then and plays whoever it activates only after.
-  const evalC=(c,st)=>{
-    const cd=benchOrder(st.R).find(y=>!st.on.includes(y.pid)); if(!cd) return null;
-    const keep=y=>{ const f=y.a.future.filter(g=>g.date<c.from); return f.length? [{...y, a:{...y.a, future:f}}] : [] };
+  // each claim tries the four least-needed players as its drop and keeps the best (before 11-11 only the first was tried)
+  const evalC=(c,st)=>{ let best=null; for(const cd of benchOrder(st.R).filter(y=>!st.on.includes(y.pid)).slice(0,4)){ const e=evalC1(c,st,cd); if(e && (!best || e.t>best.t)) best=e } return best };
+  const evalC1=(c,st,cd)=>{
+    const keep=y=>{ const f=y.a.future.filter(g=>g.date<c.from); return f.length || y.a.live? [{...y, a:{...y.a, future:f}}] : [] };
     let R=st.R.filter(y=>y.pid!==cd.pid).concat(keep(cd));
     if(!st.now) R=R.map(y=> st.on.includes(y.pid)? {...y, a:{...y.a, future:y.a.future.filter(g=>g.date>=c.from), live:null, latest:null}} : y)
       .concat(st.out.map(pid=>A.find(y=>y.pid===pid && y.slot!=="IR")).filter(Boolean).flatMap(keep));
