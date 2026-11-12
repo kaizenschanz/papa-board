@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-p6IVP3VgEL7wFqUYo+HNFf+GeCFsl+dur7IJNsVDixs='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-E56FG+DWWCd+EmclSjcfY8P9NZRPKrZXUq2tLhiLwbo='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1408,7 +1408,7 @@ function analyse(pid, counted, isStarter, sg, mine=true, unanimous=false){
   if(lockedOn){ call={c:"locked",t:"Locked "+lockedOn.fp.toFixed(2)};
     why= lockSrc==="exact"? "locked "+dayLabel(lockedOn.date)+" (from Sleeper)" : lockSrc==="you"? "you marked "+dayLabel(lockedOn.date) : lockSrc==="sleeper"? "Sleeper shows "+dayLabel(lockedOn.date)+" locked" : "assumed: the call was Lock · Sleeper confirms at his next tip";
     value=lockedOn.fp }
-  else if(live){ call={c:"idle",t:"Live "+(live.cur||0).toFixed(2)}; why=(live.clock||"live")+" · on pace for ~"+live.mu.toFixed(0)+(future.length? " · then "+future.length+" more" : " · last game this week, it counts"); value=emax(waitValue(future)??-1e9, live.mu, live.sd) }
+  else if(live){ call={c:"idle",t:"Live "+(live.cur||0).toFixed(2)}; why=(live.clock||"live")+" · on pace for ~"+live.mu.toFixed(1)+(future.length? " · then "+future.length+" more" : " · last game this week, it counts"); value=emax(waitValue(future)??-1e9, live.mu, live.sd) }
   else if(!games.length){ call={c:"idle",t:"No games"}; value=0 }
   else if(!latest){ call={c:"idle",t:"Waiting"}; why="first game "+dayLabel(future[0].date); value=wv }
   else if(!future.length){ call={c:"forced",t:"Counts "+latest.fp.toFixed(2)}; why="last game of the week"; value=latest.fp }
@@ -2625,8 +2625,8 @@ function playerDetail(x,mine,L){
   const chips=a.games.map(g=>{
     const counted = a.lockedOn ? g.id===a.lockedOn.id : (x.starter && g===a.latest && !a.future.length);
     if(g.done) return '<span class="g'+(counted?' counted':'')+'"><span>'+dayLabel(g.date)+'</span><b>'+(g.dnp?'DNP':g.fp.toFixed(2))+'</b>'+vs(g)+'</span>';
-    if(g.live) return '<span class="g live"><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(0)+'</b>'+vs(g)+'</span>';
-    return '<span class="g future'+(g.src==="dk"?' dk':'')+'"><span>'+dayLabel(g.date)+tipLabel(pid,g.date)+'</span><b>'+(g.mu>0?'~'+g.mu.toFixed(0):'out')+'</b>'+vs(g)+'</span>';
+    if(g.live) return '<span class="g live"><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(1)+'</b>'+vs(g)+'</span>';
+    return '<span class="g future'+(g.src==="dk"?' dk':'')+'"><span>'+dayLabel(g.date)+tipLabel(pid,g.date)+'</span><b>'+(g.mu>0?'~'+g.mu.toFixed(1):'out')+'</b>'+vs(g)+'</span>';
   }).join("") || '<span class="muted">No games this week</span>';
   const r4=recent(pid,4), st=[];
   if(a.avg!=null) st.push('Season <b>'+a.avg.toFixed(2)+'</b>');
@@ -2788,9 +2788,9 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
       else if(now){ const ln= g? lnOf(a.latest.date) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(ln!=null? ' · lock at '+ln.toFixed(1)+'+' : '')) }
       else if(x.starter && a.latest && a.latest.gone!=null) bits.push(a.latest.gone.toFixed(2)+' gone (was benched)');
-      if(a.live){ bits.push('~'+a.live.mu.toFixed(0));   // his game now, not the next one (user, 11-09: "why display their next game projection when they're mid game?")
+      if(a.live){ bits.push('~'+a.live.mu.toFixed(1));   // his game now, not the next one (user, 11-09: "why display their next game projection when they're mid game?")
         if(x.starter && a.future.length){ const ln=lnOf(a.live.date); if(ln!=null) bits.push('lock '+ln.toFixed(1)+'+') } }
-      else if(g && !(now&&!g) && !(mine && now && a.call?.c==="lock") && !oppLock) bits.push(tipS(x.pid,g)+(g.mu>0?' ~'+g.mu.toFixed(0):' out'));   // a lock call: his next game is beside the point
+      else if(g && !(now&&!g) && !(mine && now && a.call?.c==="lock") && !oppLock) bits.push(tipS(x.pid,g)+(g.mu>0?' ~'+g.mu.toFixed(1):' out'));   // a lock call: his next game is beside the point
       else if(!g && !a.live && !now) bits.push('done');
       s=bits.join(' · '); if(p && !val) val='~'+slotShown(p).toFixed(2) }
     const back= W.injESPN?.[x.pid]?.ret && a.future[0] && W.injESPN[x.pid].ret<=a.future[0].date;   // ESPN has him back for his next game: the old tag is stale
@@ -3376,7 +3376,7 @@ function renderPool(me, A, P){
     const beat= used.has(pid)? null : open.filter(o=>o.pid!==pid && SLOT_OK[o.slot] && pw.info.pos.some(p=>SLOT_OK[o.slot].includes(p)) && v>o.value+0.05).sort((a,b)=>a.value-b.value)[0];
     const live=fut.filter(g=>g.mu>0), r4=recent(pid,4);
     const sched=fut.map(g=>{ const G=W.games.find(x=>x.game_id===g.id); const home=G&&G.home?.team===pw.info.team; const o=G? (home? G.away?.team : G.home?.team) : "";
-      return dayLabel(g.date)+tipLabel(pid,g.date)+(o?(home?" vs ":" @ ")+o:"")+(g.mu>0?" ~"+g.mu.toFixed(0):" out")+(g.src==="dk"?" (DK)":"") });
+      return dayLabel(g.date)+tipLabel(pid,g.date)+(o?(home?" vs ":" @ ")+o:"")+(g.mu>0?" ~"+g.mu.toFixed(1):" out")+(g.src==="dk"?" (DK)":"") });
     const skipped=fa? pw.games.filter(g=>!g.done && !g.live && g.date<=today).length : 0;
     const srcs=new Set(live.map(g=>g.model?"learning model":g.src==="dk"?"DraftKings props":"Sleeper + season blend"));
     cand.push({pid,info:pw.info,v,n:fut.length,mine:benchIds.has(pid),beat,from:fut[0].date,sched,skipped, proj: live.length? live.reduce((s,g)=>s+g.mu,0)/live.length : 0, r4, src:[...srcs].join(" / ")});
@@ -3386,7 +3386,7 @@ function renderPool(me, A, P){
   // same look as the matchup rows: name + status line + value on the right, tap for the details
   keepOpen($("wkPool"), moves.join("") + (cand.length ? cand.slice(0,W.poolLimit).map((c,i)=>{
     const badge= c.beat? '<span class="badge start">Add</span>' : '';
-    const sub=badge+esc((c.info.team||"FA")+" "+c.info.pos.join("/"))+' · '+c.n+' game'+(c.n===1?'':'s')+(c.mine?(viewingMe()?' · your bench':' · bench'):' · from '+dayLabel(c.from))+' · ~'+c.proj.toFixed(0)+'/g';
+    const sub=badge+esc((c.info.team||"FA")+" "+c.info.pos.join("/"))+' · '+c.n+' game'+(c.n===1?'':'s')+(c.mine?(viewingMe()?' · your bench':' · bench'):' · from '+dayLabel(c.from))+' · ~'+c.proj.toFixed(1)+'/g';
     return '<details class="mr pk" data-k="pk'+c.pid+'"><summary><span class="sl">'+(i+1)+'</span><div class="pc"><span class="n">'+esc(c.info.name)+(c.info.inj?' <span class="chip inj">'+esc(c.info.inj)+'</span>':'')+'</span><span class="s">'+sub+'</span><span class="v">'+c.v.toFixed(2)+'</span></div></summary>'+
       '<div class="det"><div class="pd">'+
         (c.beat?'<div class="ln why">Beats <b>'+esc(c.beat.name)+'</b> in '+c.beat.slot+' ('+c.beat.value.toFixed(2)+' for the rest of the week vs his '+c.v.toFixed(2)+').</div>':'')+
