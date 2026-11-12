@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-w4ZIxNMM3dOk0Ndj5f8XZto3ggIrIo8jBvtmP8eFOW0='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-GePetEAd1Uvk/pRqQ01bg5Ywfs7Un/d2eDMPSYHdDH4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -292,7 +292,7 @@ body:not([data-view="draft"]) #setup.compact{display:none}
 .seg button,.btn.icon,.oppmode select{min-height:40px}
 details.fold>summary{padding:10px 0}
 #wkSum .linkbtn{padding:8px 0}
-@media (max-width:640px){.bar .live{display:none}.pc .s{white-space:normal}.lg-table{min-width:0}.lg-table .c-x{display:none}}
+@media (max-width:640px){.bar .live{display:none}.pc .s{white-space:normal}.lg-table{font-size:12px}.lg-table td,.lg-table th{padding:5px 4px}}
 .status{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:12.5px;color:var(--muted);margin-top:10px}
 .status .ok{color:var(--good)}.status .warn{color:var(--warn)}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-size:inherit}
@@ -403,16 +403,16 @@ details.fold #poolSeg{margin-bottom:6px}
       <div class="lg-scroll"><table class="lg-table num" id="lgTable"></table></div>
     </div>
     <div class="card">
+      <h2>Manager tendencies</h2>
+      <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="card">
       <h2>Luck &amp; schedule</h2>
       <div class="lg-scroll"><table class="lg-table num" id="lgLuck"></table></div>
     </div>
     <div class="card">
       <h2>Waivers</h2>
       <div class="lg-scroll" id="lgWaiv"></div>
-    </div>
-    <div class="card">
-      <h2>Manager tendencies</h2>
-      <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
     </div>
   </section>
 
@@ -3553,7 +3553,10 @@ async function managerTendencies0(){
           r.slots.push({pid,si,g,idx}) }) }
       // Grades come from what was known at each call, so they don't change (user, 11-11: "you don't have to recompute the stuff
       // that's already been computed"): this week's replay reruns only when a game finished, a call was made or a deadline passed.
-      const now=Date.now(), sig=JSON.stringify([GRADE_V, cur.map(r=>[r.rid, r.starters, r.sg, r.open? [...r.open] : 0]),
+      // the recorded lines (W.decSnap, from the Mac's sync) are part of the grade: when they arrive or change, regrade (user, 11-12:
+      // Robinson showed his replay line 19.8 on the phone, not the 18.69 he was shown, because the grade was worked out first)
+      const decW=Object.entries(W.decSnap||{}).filter(([k])=>k.startsWith(w+"|")).map(([k,v])=>k+":"+v[1]).sort().join(","),
+        now=Date.now(), sig=JSON.stringify([GRADE_V, decW, cur.map(r=>[r.rid, r.starters, r.sg, r.open? [...r.open] : 0]),
         Object.entries(logs).map(([p,g])=>[p, g.map(x=>[x.fp, x.dnp, (x.t||0)<=now])])]);
       const hit=LG.curTend && LG.curTend.sig===sig? LG.curTend : null;
       const perW= hit? hit.per : {}, n0=LG.waitChk.length;
@@ -3563,7 +3566,8 @@ async function managerTendencies0(){
     }
     // Finished weeks: Sleeper's lock records (with your login) are right; the public feed reports each player's latest game,
     // not the locked one, so it can't show past locks. Without the login the grades are rough.
-    const ck="tend:"+lid+":"+w+":"+GRADE_V+":"+((tok || W.legsPastSnap?.[w])? "x" : "r"), kept=store.get(ck,null);
+    const dk=hashKey(Object.entries(W.decSnap||{}).filter(([k])=>k.startsWith(w+"|")).map(([k,v])=>k+":"+v[1]).sort().join(",")),
+      ck="tend:"+lid+":"+w+":"+GRADE_V+":"+((tok || W.legsPastSnap?.[w])? "x" : "r")+":"+dk, kept=store.get(ck,null);   // recorded lines in the key too
     if(kept && kept.per){ mergePer(per, kept.per); LG.waitChk.push(...(kept.wc||[])); if(kept.dates) (LG.weekDates ||= {})[w]=kept.dates; if(!kept.exact) exact=false; continue }
     let legs=null;
     if(tok){ try{ const r=await fetch("https://sleeper.com/graphql",{method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
@@ -3598,7 +3602,7 @@ async function managerTendencies0(){
           else { const c=r.pp[pid]; if(c!=null) idx=g.findIndex(x=>Math.abs(x.fp-c)<0.02) } }
         r.slots.push({pid,si,g,idx}) }) }
     const perW={}, n0=LG.waitChk.length; await gradeWeek(w, rows, logs, SL, perW); mergePer(per, perW);
-    if(rows.length && Object.keys(perW).length){ for(let v0=1; v0<GRADE_V; v0++) for(const m of ["x","r"]) store.del("tend:"+lid+":"+w+":"+v0+":"+m);
+    if(rows.length && Object.keys(perW).length){ for(let v0=1; v0<=GRADE_V; v0++) for(const m of ["x","r"]) store.del("tend:"+lid+":"+w+":"+v0+":"+m);
       store.set(ck, {per:perW, wc:LG.waitChk.slice(n0), dates:LG.weekDates?.[w]||null, exact:!!legs}) }
   }
   LG.tend=per; LG.tendWeek=W.week; LG.tendExact=exact; return per;
