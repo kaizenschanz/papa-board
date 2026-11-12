@@ -256,6 +256,10 @@ details.lgm .lgg{padding:4px 0 12px}
 .sb .sm{font-size:12px;color:var(--muted);margin-top:2px}
 .sb-cap{text-align:center;font:600 10.5px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:-30px;pointer-events:none}
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:22px}
+details.guide{margin:6px 0 10px;font-size:13.5px;color:var(--muted)}
+details.guide>summary{cursor:pointer;font-weight:600;color:var(--text,inherit)}
+details.guide ul{margin:6px 0 0;padding-left:18px;line-height:1.45}
+details.guide li{margin:3px 0}
 .pill{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .pill b{color:var(--ink)}
 .pill.good{background:var(--good-soft);border-color:transparent;color:var(--good)}.pill.good b{color:var(--good)}
@@ -387,6 +391,17 @@ details.fold #poolSeg{margin-bottom:6px}
     <button type="button" role="tab" data-view="league" aria-pressed="false">League</button>
     <button type="button" role="tab" data-view="draft" aria-pressed="true">Draft board</button>
   </div>
+  <!-- a short how-to for anyone in the league (user, 11-12: "make sure people know how to use it") -->
+  <details class="guide"><summary>How to use this board</summary><ul>
+    <li><b>Pick your team</b> in the team menu at the top of the Matchup tab. The board remembers it.</li>
+    <li><b>Top of the Matchup tab:</b> both teams' projected totals, your chance to win the matchup, to beat the league median (and the score that should take), and to win the title.</li>
+    <li><b>To do</b> lists every move in order with times: who to start or bench, and "after X's game: lock it if he scores Y+".</li>
+    <li><b>Each row is a lineup slot.</b> <b>Lock</b>: lock that score (by the time in To do). <b>Wait</b>: keep playing him. "lock at Y+": the score worth locking. "→ Name": the plan gives the slot to that player.</li>
+    <li><b>Tap a player</b> for his games, projection, and the odds of locking vs playing on.</li>
+    <li><b>League tab:</b> every matchup (tap one for both lineups and each team's lock odds), standings with playoff and title odds, and how each manager's past lock calls went.</li>
+    <li>A player shows Locked only once Sleeper confirms it, which can take about 10 minutes.</li>
+    <li>It's a guide, not a rule: when the two options are close, either is fine.</li>
+  </ul></details>
 
   <section class="wk" id="leagueView" hidden>
     <div class="card">
