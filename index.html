@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qIVpJCkfQ8Ogq90QRz0PZ8zmhiIor4XySy1YsfSb73E='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-G9gbceXDkqNDYmrePIjr1jHMEj/AD53Lgjv83N/SRVo='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3373,9 +3373,10 @@ function claimOptions0(A,P){
     else states=fixes }
   // who can go: bench players and unlocked starters (user, 11-11: Walker, 0 points in UTIL, was never tested as the drop because
   // only the bench was); a starter's game tonight still counts before the claim clears
-  // never a player who's playing right now or whose score the plan locks this week (user, 11-12: "drop Bones Hyland" while he was
-  // live and past his lock line)
-  const benchOrder=R=>R.filter(y=>y.slot==="BN" || (y.starter && !y.a.lockedOn && !y.a.live && v.plan?.pick?.get(y.pid)?.k!=="lock")).sort((a,b)=>(need.has(a.pid)-need.has(b.pid))||(benchDropScore(a)-benchDropScore(b)));
+  // never a player whose score is past his lock line (live or finished) or one the plan locks this week; a live player under his
+  // line is fine, the claim clears after his game (user, 11-12: "drop Bones Hyland" while he was live and past his line)
+  const pastLine=y=>{ if(!y.starter || !y.a.live) return false; let l=null; try{ l=lineFor(A, v.plan, y, y.a.live.date) }catch(e){} return l!=null && (y.a.live.cur||0)>=l };
+  const benchOrder=R=>R.filter(y=>y.slot==="BN" || (y.starter && !y.a.lockedOn && !pastLine(y) && v.plan?.pick?.get(y.pid)?.k!=="lock")).sort((a,b)=>(need.has(a.pid)-need.has(b.pid))||(benchDropScore(a)-benchDropScore(b)));
   // One claim on one roster state. His drop: the least-needed bench player (spare ones first; early in the week everyone has a
   // role, so then the least valuable), never one the fix just activated (cutting him is its own fix). This week is always
   // priced: the drop leaves when the claim clears, even if the new player can't play yet (user, 11-09: Missi, out all week, came
