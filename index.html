@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6PZONNQiMciqui9TPLq1sUDTrQ2af/m7/AWY7dUmaMg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Su/xDN9iN+RLLiokNmlO8A9Xn47z3+Ii/WWSEBaRz3k='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2457,6 +2457,18 @@ function switchBar(slotPid, st, i, j){
   for(let it=0;it<16;it++){ const mid=(lo+hi)/2; if(keepAt(mid)>=oSw) hi=mid; else lo=mid }
   return v._bars[key]=hi;
 }
+// Keep him or switch, by title odds right now (user, 11-13: "what time is it in their game and which player gives better
+// championship odds", not a points line): keep = his game from his live score and clock on; switch = the later player's game
+// (he's playing by then), with the rest of the slot's chain after either. Same simulated week as every other number.
+function switchOdds(slotPid, st, i, j){
+  const v=W.vs; if(!v||!v.me?.tot||!st[i]||!st[j]) return null;
+  const part=v.me.parts.get(slotPid); if(!part||!part.s) return null;
+  const N=v.me.tot.length, f=calF(), wb=waitBias(st.length), R=new Float64Array(N); let Rm=0;
+  for(let s=0;s<N;s++){ R[s]=v.me.tot[s]-part.s[s]; Rm+=R[s] } Rm/=N;
+  const obj=S=>{ const V=stepsValue(S), C=new Float64Array(N); let m=0; for(let s=0;s<N;s++){ C[s]=playSteps(S,V,s); m+=C[s] } m/=N;
+    const tot=new Float64Array(N); for(let s=0;s<N;s++) tot[s]=R[s]+m+f*(C[s]-m)+wb; return titleObjD({tot,m:Rm+m+wb},v.opp,v.tab,v.median,v.wt).obj };
+  const rest=st.slice(j+1);
+  return {keep:obj([{...st[i], pm:0}].concat(rest)), sw:obj([{...st[j], pm:0}].concat(rest))} }
 // The same line in expected points (no simulated week to judge by): where the keep value meets the switch value.
 function switchBarPts(st,i,j){ st=st.map((t,k)=>k===j? {...t, pm:0} : t); const V=stepsValue(st), o=V.ov&&V.ov[i]; if(!o||!o.kv) return null; const m=o.J.indexOf(j); if(m<0) return null;
   const T=o.kv[m], want=V.e[j], n=T.v.length; if(T.v[0]>=want) return T.lo;
@@ -2565,14 +2577,13 @@ function todoItems(A,P){
     for(const [slot,E] of Object.entries(N.early||{}).concat(Object.entries(N.early2||{}))){ if(!(E.thenTip>now)) continue;
       const already=prev.get(+slot)===E.pid, started=!(E.tip>now), lastG=!X(E.pid)?.a.future.some(g=>g.date>N.day);
       // his game is still on at the regular's tip: keep him or put the regular back then, on his score so far
-      if(E.ov && !started){ const sl=swapLine(A,P,E.then,E.pid,N.day,E.then,N.day); if(!sl) continue;
-        const keepAll=!(sl.bar>sl.lo+0.01), back=sl.bar===Infinity, bar=fx(sl.bar);
-        const sw_= E.bridge? "start "+nm(E.then) : "put "+nm(E.then)+" back", Sw_= E.bridge? "Start "+nm(E.then) : "Put "+nm(E.then)+" back";
-        const so= (keepAll? "Keep him in whatever he has at "+clock(E.thenTip)+"; "+nm(E.then)+" sits." : back? Sw_+" before "+clock(E.thenTip)+" whatever he has." : "At "+clock(E.thenTip)+", keep him only if he has "+bar+"+ so far; otherwise "+sw_+"."); if(E.bridge && ruledOut(E.then,N.day)) so=nm(E.then)+" is out: keep him in.";
-        out.push({t:E.tip, pid:E.pid, kind:"look", title: already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
+      if(E.ov){ const sw_= E.bridge? "start "+nm(E.then) : "put "+nm(E.then)+" back", out_=ruledOut(E.then,N.day), xs=X(E.pid)?.a, live=xs?.live && xs.live.date===N.day;
+        if(started && !live) continue;   // his game's over or he never went in: the regular's own items take it from here
+        const so= out_? nm(E.then)+" is out: keep him in." : swCall(E.then,E.pid,N.day,E.then,N.day,sw_).txt;
+        out.push({t: started? E.thenTip : E.tip, pid:E.pid, kind:"look", title: started? nm(E.pid)+" or "+nm(E.then)+" in "+P.SL[slot]+"?" : already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
           note:so, sub:so+(lastG? " If he stays in, it's his last game, so it counts without a lock." : " If he stays in, lock it if it ends big.")+later,
-          rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
-            .concat(keepAll || realAt.get(+slot)!==E.pid? [] : [{id:"back-"+E.then, t:E.thenTip, lead:10, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+(back? "" : " unless "+nm(E.pid)+" has "+bar+"+ so far")}])});
+          rems:(already||started? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
+            .concat(out_? [] : [{id:"sw-"+E.then+"-"+N.day, t:E.thenTip, lead:10, title:last(E.pid)+" or "+last(E.then)+"? Check the board"}])});
         continue }
       // his lock line, the same one his row shows once the game is in (a forward's look in UTIL gets locked at SF/PF/F, so the slot's
       // chain alone read 22.3 for Walker against a 19.8 line, 11-11); the chain is the fallback
@@ -2595,6 +2606,15 @@ function todoItems(A,P){
       if(dup){ dup.sub=(a.info.name+" finished with "+k.fp.toFixed(2)+", under the "+fx(k.at)+" he needed. Swapping adds "+eTxt+". "+dup.sub).trim() }
       else out.push({t:bt, pid, kind:"move", title:"Start "+nm(by)+" for "+a.info.name+" (his "+k.fp.toFixed(2)+" is under the "+fx(k.at)+" he needed)",
       sub:"Swapping adds "+eTxt+" · "+odds+".", rems:[{id:"swap-"+pid, t:bt, lead:15, title:"Start "+last(by)+" for "+last(pid)+" ("+(P.SL[x.idx]||"")+")"}]}) } }
+  // keep-or-switch at a later player's tip, said in title odds (user, 11-13: "idk if setting a points line makes sense, moreso what
+  // time is it in their game and which player gives better championship odds"): live, the comparison from his score and clock now
+  const swCall=(slotPid,pid,date,pid2,date2,swTo)=>{ const xa=X(pid)?.a, live=!!(xa?.live && xa.live.date===date), t2=tipAt(pid2,date2);
+    if(!live) return {live:false, keep:null, txt:"At "+clock(t2)+", keep him or "+swTo+", whichever gives better title odds from his score and the game clock then (the board shows which once he's on)."};
+    const st=slotSteps(A,P,slotPid), i=st.findIndex(t=>t.pid===pid && t.date===date), j=st.findIndex(t=>t.pid===pid2 && t.date===date2), o= i>=0 && j>=0? switchOdds(slotPid,st,i,j) : null;
+    const clk=W.clock?.[xa.info.team]?.[date]?.label, cur=(xa.live.cur||0).toFixed(2), head=nm(pid)+" has "+cur+(clk? " ("+clk+")" : "")+".";
+    if(!o) return {live:true, keep:null, txt:head+" Keep him or "+swTo+" at "+clock(t2)+", whichever gives better title odds."};
+    const d=(o.keep-o.sw)*100, keep=d>=0, ing=swTo.replace(/^start/,"starting").replace(/^put/,"putting");
+    return {live:true, keep, d, txt:head+" Right now "+(keep? "keeping him" : ing)+" is better by "+Math.abs(d).toFixed(2)+"% title odds"+(t2>now? "; decide at "+clock(t2)+"." : ".")} };
   // a free look already under way or just finished: keep him only if he beats the regular's chain, else the regular goes back in
   for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||out.some(o=>o.kind==="look"&&o.pid===x.pid)||v?.keepCalls?.[x.pid]) continue;
     const g0=a.future[0], tipped= g0 && g0.date===todayStr() && tipAt(x.pid,g0.date) && tipAt(x.pid,g0.date)<=now && a.future.length===1;
@@ -2604,13 +2624,12 @@ function todoItems(A,P){
     // his game is still on when the fallback tips: keep him or bench him then, on his score so far (not his final)
     if(a.live && !other && ht<(gameEnd(x.pid,a.live)||0)){ const b=P.backup?.[x.pid], sl= b? swapLine(A,P,x.pid,x.pid,a.live.date,b.pid,b.date) : null;
       if(!sl || !(sl.bar>sl.lo+0.01) || !sl.real) continue;     // no real score so far would make the switch worth it: his game just counts
-      const cur=a.live.cur||0, sw=sl.bar===Infinity, bar=fx(sl.bar), ok=!sw && cur>=sl.bar;
+      const sw=sl.bar===Infinity, c=sw? null : swCall(x.pid,x.pid,a.live.date,b.pid,b.date,"start "+nm(hp));
       out.push({t:ht, pid:x.pid, kind: sw? "move" : "look",
-        title: sw? "Bench "+a.info.name+" and start "+nm(hp)+" before "+clock(ht) : ok? "Leave "+a.info.name+" in: "+cur.toFixed(2)+" so far clears the "+bar+" he needs" : a.info.name+" has "+cur.toFixed(2)+" so far: keep him only at "+bar+"+",
-        note: sw||ok? "" : "Otherwise bench him and start "+nm(hp)+" before "+clock(ht)+".",
-        sub: sw? nm(hp)+"'s game plus your later fallbacks beat anything he's likely to finish with." : ok? "It's his last game, so it counts while he stays in; "+nm(hp)+" sits."
-          : "Check his score at "+clock(ht)+" ("+nm(hp)+"'s tip). Under "+bar+", bench him mid-game and start "+nm(hp)+"; at "+bar+"+ leave him in (his last game, so it counts without a lock).",
-        rems: ok? [] : [{id:"switch-"+x.pid, t:ht, lead:10, title: sw? "Start "+last(hp)+" for "+last(x.pid) : last(x.pid)+" under "+bar+" so far? Start "+last(hp)+" for him"}]});
+        title: sw? "Bench "+a.info.name+" and start "+nm(hp)+" before "+clock(ht) : a.info.name+" or "+nm(hp)+"?",
+        note: sw? "" : c.txt,
+        sub: sw? nm(hp)+"'s game plus your later fallbacks beat anything he's likely to finish with." : c.txt+" If he stays in, it's his last game, so it counts without a lock.",
+        rems:[{id:"switch-"+x.pid, t:ht, lead:10, title: sw? "Start "+last(hp)+" for "+last(x.pid) : last(x.pid)+" or "+last(hp)+"? Check the board"}]});
       continue }
     // a free look is measured against the regular's whole chain; the regular himself against his fallbacks (Powell, then Pritchard)
     const bar= lineIn(A,P,x.pid,x.idx, a.live? a.live.date : tipped? g0.date : a.latest.date) ?? (other? (keepBar(A,P,hp,null)??chainValue(A,P,hp)) : (keepBar(A,P,x.pid,todayStr())??chainValue(A,P,x.pid,true))), inPlay= a.live || tipped, cur= a.live? (a.live.cur||0) : tipped? 0 : a.latest.fp, keep= !inPlay && bar!=null && cur>=bar;
@@ -2665,11 +2684,11 @@ function todoItems(A,P){
     else if(b){ const bt=tipAt(b.pid,b.date);
       // the fallback tips while he's still playing: the call is made at that tip, on his score so far
       if(bt && bt<end){ if(!(bt>now)) continue; const sl=swapLine(A,P,pid,pid,g.date,b.pid,b.date); if(!sl || !(sl.bar>sl.lo+0.01) || !sl.real) continue;
-        const sw=sl.bar===Infinity, bar=fx(sl.bar);
-        out.push({t:bt, kind:"check", title: sw? "Bench "+a.info.name+" for "+nm(b.pid)+" at "+clock(bt)+", whatever he has" : "Keep "+a.info.name+" in only if he has "+bar+"+ so far",
-          note: sw? "" : "Otherwise bench him mid-game and "+bring(b.pid,X(pid)?.idx)+".",
-          sub:(sw? "" : "Check at "+clock(bt)+", "+nm(b.pid)+"'s tip. Under "+bar+", bench him and "+bring(b.pid,X(pid)?.idx)+"; at "+bar+"+ leave him in (his last game, so it counts without a lock).")+edgeNote(b.pid,nm),
-          rems:[{id:"swap-"+pid, t:bt, lead:10, title: sw? "Start "+last(b.pid)+" for "+last(pid) : last(pid)+" under "+bar+" so far? Start "+last(b.pid)+" for him"}]});
+        const sw=sl.bar===Infinity, c=sw? null : swCall(pid,pid,g.date,b.pid,b.date,bring(b.pid,X(pid)?.idx));
+        out.push({t:bt, kind:"check", title: sw? "Bench "+a.info.name+" for "+nm(b.pid)+" at "+clock(bt)+", whatever he has" : a.info.name+" or "+nm(b.pid)+" at "+clock(bt)+"?",
+          note: sw? "" : c.txt,
+          sub:(sw? "" : c.txt+" If he stays in, it's his last game, so it counts without a lock. ")+edgeNote(b.pid,nm),
+          rems:[{id:"swap-"+pid, t:bt, lead:10, title: sw? "Start "+last(b.pid)+" for "+last(pid) : last(pid)+" or "+last(b.pid)+"? Check the board"}]});
         continue }
       out.push({t:end, approx:true, kind:"check", title:"After "+a.info.name+"'s game: keep it if he scores "+(thr||"?")+"+",
         note:"Otherwise "+bring(b.pid,X(pid)?.idx)+" before "+(bt? whenLabel(bt) : dayLabel(b.date))+".",
@@ -2684,12 +2703,12 @@ function todoItems(A,P){
       const x= m.on? (X(m.on)||{a:analyse(m.on,null,false,null,false), idx:x0.idx}) : x0, a=x.a, sIdx= P.pick.get(pid)?.slot ?? x0.idx, who=m.on||pid;
       const sl=swapLine(A,P,pid,m.on||pid,m.after,m.pid,m.date); if(!sl || !(sl.bar>sl.lo+0.01) || !sl.real) continue;
       const nx=a.future.find(g=>g.date>m.after), back= nx? " He's back in for "+dayLabel(nx.date)+"." : "";
-      const live= !!(a.live && a.live.date===m.after), cur= live? (a.live.cur||0) : 0, sw=sl.bar===Infinity, bar=fx(sl.bar), ok= live && !sw && cur>=sl.bar;
+      const sw=sl.bar===Infinity, c=sw? null : swCall(pid,who,m.after,m.pid,m.date,bring(m.pid,sIdx));
       out.push({t:bt, pid, kind: sw? "move" : "check",
-        title: sw? "Bench "+a.info.name+" for "+nm(m.pid)+" at "+clock(bt)+", whatever he has" : ok? "Leave "+a.info.name+" in: "+cur.toFixed(2)+" so far clears the "+bar+" he needs" : live? a.info.name+" has "+cur.toFixed(2)+" so far: keep him only at "+bar+"+" : "Keep "+a.info.name+" in only if he has "+bar+"+ so far",
-        note: ok||sw? "" : "Otherwise bench him mid-game and "+bring(m.pid,sIdx)+".",
-        sub:(sw||ok? "" : "Check at "+clock(bt)+", "+nm(m.pid)+"'s tip. Under "+bar+", bench him and "+bring(m.pid,sIdx)+" (lock "+nm(m.pid)+"'s game only if it ends big).")+back,
-        rems: ok? [] : [{id:"mid-"+pid+"-"+m.date, t:bt, lead:10, title: sw? Bring(m.pid,sIdx,last)+" for "+last(who) : last(who)+" under "+bar+" so far? "+Bring(m.pid,sIdx,last)+" for him"}]}) } }
+        title: sw? "Bench "+a.info.name+" for "+nm(m.pid)+" at "+clock(bt)+", whatever he has" : a.info.name+" or "+nm(m.pid)+" at "+clock(bt)+"?",
+        note: sw? "" : c.txt,
+        sub:(sw? "" : c.txt+" If you switch, lock "+nm(m.pid)+"'s game only if it ends big.")+back,
+        rems:[{id:"mid-"+pid+"-"+m.date, t:bt, lead:10, title: sw? Bring(m.pid,sIdx,last)+" for "+last(who) : last(who)+" or "+last(m.pid)+"? Check the board"}]}) } }
   // same-time backups: shown only once the holder is actually ruled out (user, 11-13: "you don't have to put the if so and so is
   // ruled out stuff in the to do, just update the to do if someone is ruled out"); the plan still counts on them either way
   for(const [hp,b] of Object.entries(P.backupS||{})){ const x=X(hp), q=P.pick.get(hp); if(!x||!q) continue; const tb=tipAt(b.pid,b.date); if(!tb || tb<=now || !ruledOut(hp,b.date)) continue;
@@ -3925,7 +3944,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13c", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13d", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
