@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B0gcX6PGhopVB6DYQ1AtOJBk49966xRDK4XN8tHJ/9Q='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6lCw8V2FpXnvIEQamPsDPO1psnVNk2GL3F2Nq3CkRUA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -366,6 +366,8 @@ details.fold #poolSeg{margin-bottom:6px}
 #weekView.stale #wkScore,#weekView.stale #wkTodo,#weekView.stale #wkMatch,#weekView.stale #wkSum{opacity:.55;transition:opacity .3s}
 #weekView #wkScore,#weekView #wkTodo,#weekView #wkMatch,#weekView #wkSum{transition:opacity .3s}
 .stg{font-weight:400;opacity:.65;font-size:.78em;white-space:nowrap}.tm .tn .stg{display:block;margin-top:1px}
+.ovl{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}.ovg{display:inline-flex;gap:4px;align-items:center}.ovg>span{font-size:.85em;opacity:.7;min-width:26px}
+.ovb{font:600 11px var(--body);padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}.ovb.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1614,18 +1616,25 @@ function injKind(pid){ const e=W.injESPN?.[pid]; if(!e) return null; const t=((e
 function lastWhy(pid){ const e=W.injESPN?.[pid]; if(!e) return String(playerInfo(pid).inj||"")? "injury:other" : "notlisted";
   const n=(e.note||"").toLowerCase(); if(/\brest\b|injury management|load management/.test(n)) return "rest"; if(/personal|family|bereavement|birth of/.test(n)) return "personal"; return "injury:"+injKind(pid) }
 // a later game of his this week: the chance he sits it if he sat the one before, and if he played it (sitAt uses them)
-function sitCond(pid,g){ const e=SIT?.p?.[pid]; if(!e || g.live || g.cur!=null || g.sure || !g.date) return null;
+// Your own call on whether a player plays a game (user, 11-13: "assume a player is playing or isn't playing a particular game ...
+// basically just changing their odds to 0 or 100%"; Dejounte Murray requested a trade and is out indefinitely). Kept on this device
+// per league and week: {"pid|date": 1 sits, 0 plays}. Every number on the page uses it (the sit chance in the simulation).
+function sitOvKey(){ return "sitOv:"+(S.league?.league_id||"")+":"+(W.week||"") }
+function sitOvAll(){ if(W._sitOvK!==sitOvKey()){ W._sitOvK=sitOvKey(); W.sitOv=store.get(W._sitOvK,{})||{}; W.sitOvSig=JSON.stringify(W.sitOv) } return W.sitOv }
+function sitOvOf(pid,date){ const o=sitOvAll()[pid+"|"+date]; return o===0||o===1? o : null }
+function sitCond(pid,g){ const e=SIT?.p?.[pid]; if(!e || g.live || g.cur!=null || g.sure || !g.date || sitOvOf(pid,g.date)!=null) return null;
   if(W.games?.length && g.date<W.games[0].date) return null;
   const F=playerWeek(pid).games.filter(x=>!x.done && x.mu>0), k=F.findIndex(x=>x.date===g.date); if(k<=0) return null;
   const bb=b2bOf(pid,g.date), gapD=Math.round((Date.parse(g.date+"T12:00:00")-Date.parse(F[k-1].date+"T12:00:00"))/864e5), G3= !bb && gapD>=3 && SIT.g3?.[pid];
   return G3? {pS:G3[1], pP:G3[2]} : {pS:e[bb? 3 : 2], pP:e[bb? 5 : 4]} }
 const DNPM=new Map();
 function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
+  if(pid!=null && g.date){ const ov=sitOvOf(pid,g.date); if(ov!=null) return ov }   // your call: sits (1) or plays (0)
   if(SIT && SIT.c1>0){ const e=pid!=null && SIT.p?.[pid], bb= pid!=null && g.date && b2bOf(pid,g.date);
     if(!e) return j===0? SIT.c1 : SIT.cL;
     // a game from an earlier week (the managers' replay): his usual rate after a game he played, not today's state
     if(W.games?.length && g.date && g.date<W.games[0].date) return e[bb? 5 : 4];
-    const mk=pid+"|"+g.date+"|"+(W.updated||0)+"|"+(W.injAt||0)+(W._noEspnRet?"|n":""); if(DNPM.has(mk)) return DNPM.get(mk); if(DNPM.size>4000) DNPM.clear();
+    const mk=pid+"|"+g.date+"|"+(W.updated||0)+"|"+(W.injAt||0)+(W._noEspnRet?"|n":"")+"|"+(W.sitOvSig||""); if(DNPM.has(mk)) return DNPM.get(mk); if(DNPM.size>4000) DNPM.clear();
     // where this game falls among the ones he has left (a live one counts as played): his next one, or one after another
     const F=playerWeek(pid).games.filter(x=>!x.done && x.mu>0), k=F.findIndex(x=>x.date===g.date), prev= k>0? F[k-1] : null;
     let p;
@@ -2343,7 +2352,7 @@ function othersDist(rid=viewRoster()?.roster_id){
 // MED_SD0 and the simulation's bias from finished weeks (the board logs every look: cal in the league log).
 const MED_SD0=14, MED_PRIOR_SD=5;
 let CAL_OFF=false;
-const calKey=()=>W.updated+"|"+((LG.past||[]).length);   // past medians arrive with the League data: recompute then
+const calKey=()=>W.updated+"|"+((LG.past||[]).length)+"|"+(sitOvAll(), W.sitOvSig||"");   // past medians arrive with the League data: recompute then
 function calShift(rid){ const F=W._cal; return (!CAL_OFF && rid!=null && F && F.at===calKey() && F.d[rid]) || 0 }
 function calibrateField(){
   if(W._cal && W._cal.at===calKey()) return W._cal;
@@ -2938,6 +2947,10 @@ function playerDetail(x,mine,L){
   { const wk=weekValue(x); if(wk!=null) st.push('Week <b>'+(a.lockedOn? '' : '~')+wk.toFixed(2)+'</b>') }   // user, 11-08: his weekly value next to season and last 4
   // chance he plays each game left (user, 11-12: "sit out odds could be cool to see"; shown as the chance he plays): the same numbers the simulation uses
   let sitL=""; if(!a.lockedOn){ const fu=a.future.map((g,j)=>[g,j]).filter(([g])=>g.mu>0); if(fu.length) sitL='Chance he plays '+fu.map(([g,j])=>dayLabel(g.date)+' <b>'+((1-dnpP(g,j,pid))*100).toFixed(0)+'%</b>'+(b2bOf(pid,g.date)?' (back-to-back)':'')+(()=>{ const t= j===0? liveTag(pid,g) : null; return t&&t!=="none"? ' ('+t.toLowerCase()+')' : '' })()).join(' · ') }
+  // your call per game: plays / sits / back to the model, and out for the rest of the week
+  let ovL=""; if(!a.lockedOn){ const fu=a.future.filter(g=>!g.live && !g.done); if(fu.length){ const btn=(d,v,lab,on)=>'<button class="ovb'+(on?' on':'')+'" data-sitov="'+pid+'|'+d+'|'+v+'">'+lab+'</button>';
+    ovL='<div class="ln ovl">'+fu.map(g=>{ const o=sitOvOf(pid,g.date); return '<span class="ovg"><span>'+dayLabel(g.date).slice(0,3)+'</span>'+btn(g.date,0,"Plays",o===0)+btn(g.date,1,"Sits",o===1)+(o!=null? btn(g.date,"x","Auto",false) : '')+'</span>' }).join("")+
+      (fu.length>1? btn("*",1,"Out rest of week",fu.every(g=>sitOvOf(pid,g.date)===1)) : '')+(fu.some(g=>sitOvOf(pid,g.date)!=null)? btn("*","x","Reset",false) : '')+'</div>' } }
   const nx=a.future[0], sp=nx&&srcParts(nx), gp=a.live||nx, pl= gp && !a.lockedOn? projLine(pid,gp) : null;
   let why="";
   if(mine && a.why && (x.starter&&!a.lockedOn || a.call?.t?.startsWith("Start"))) why=a.why;
@@ -2945,7 +2958,7 @@ function playerDetail(x,mine,L){
     why= (W.vs.oppLines?.[pid]!=null? a.latest.fp>=W.vs.oppLines[pid] : W.vs.oppPlan.pick.get(pid)?.k==="lock")? "Their best play: lock it." : "Their best play: play on.";
   if(!why && L?.why?.[pid] && x.starter && !a.lockedOn && !a.live) why=L.why[pid];   // League tab: that team's own lock odds
   return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div>'+
-    (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(sitL?'<div class="ln">'+sitL+'</div>':'')+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+esc(why)+'</div>':'')+'</div>';
+    (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(sitL?'<div class="ln">'+sitL+'</div>':'')+ovL+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+esc(why)+'</div>':'')+'</div>';
 }
 // One matchup as rows: each slot's player, his lock or live score, his next game, and the slot's projected value (from that
 // team's own plan; a slot the plan gives to someone else shows "-> him"). Used by the Lock-in tab (your matchup, with your calls)
@@ -3230,7 +3243,7 @@ function oppSig(v){ const w=LG.wtFor? LG.wtFor(v.oppRid) : null;
 // depend on changes (the same signature as your opponent's lines).
 const TL={};
 function teamSig(rid){ const r=S.rosters[rid], m=W.matchups.find(x=>x.roster_id===rid); if(!r||!m) return null; const o=W.matchups.find(x=>x.matchup_id===m.matchup_id && x.roster_id!==rid);
-  const rows=x=>rowsFor(S.rosters[x.roster_id], x, false).map(rowSig).join("|"); return [S.league?.league_id, W.week, rid, (W._cal?.k||1).toFixed(3), rows(m), o? rows(o) : ""].join("#") }
+  const rows=x=>rowsFor(S.rosters[x.roster_id], x, false).map(rowSig).join("|"); return [S.league?.league_id, W.week, rid, (W._cal?.k||1).toFixed(3), rows(m), o? rows(o) : "", (sitOvAll(), W.sitOvSig||"")].join("#") }
 function linesOfView(A,P){ const out={}; for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||!a.future.length) continue;
     const date= a.live? a.live.date : (a.latest&&!a.latest.dnp? a.latest.date : null); if(!date) continue; const ln=slotLine(A,P,x,date); if(ln!=null) out[x.pid]=ln } return out }
 function teamLines(rid, fresh){ const v=W.vs, my=myRoster()?.roster_id, lk=Q=>[...(Q?.pick||[])].filter(([,q])=>q.k==="lock").map(([p])=>p);
@@ -4176,7 +4189,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13z", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-14a", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
@@ -4503,6 +4516,13 @@ $("teamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) retu
 $("wkSel").addEventListener("change",e=>{ const w=+e.target.value; if(!w||!W.baseWeek) return; store.set("wk:"+S.league.league_id,{base:W.baseWeek, off: w>W.baseWeek? 1 : 0});
   $("wkMsg").textContent="Updating…"; if(W.loading) W.reloadWk=true; else loadWeek(true) });
 document.addEventListener("change",e=>{ if(e.target.id==="oppMode" && W.oppKey){ store.set(W.oppKey,e.target.value); renderWeekBusy() } });
+// your plays/sits calls (sitOv): save, drop what was worked out with the old odds, recompute everything
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-sitov]"); if(!b) return; e.preventDefault&&e.preventDefault();
+  const [pid,d,v]=String(b.dataset.sitov).split("|"), o={...sitOvAll()};
+  const dates= d==="*"? (playerWeek(pid).games.filter(g=>!g.done && !g.live).map(g=>g.date)) : [d];
+  for(const dd of dates){ if(v==="x") delete o[pid+"|"+dd]; else o[pid+"|"+dd]=+v }
+  store.set(sitOvKey(),o); W._sitOvK=null; sitOvAll(); DNPM.clear(); W._swOdds=null; W._pk=null; if(typeof TL!=="undefined") for(const k of Object.keys(TL)) delete TL[k];
+  renderWeekBusy(); if(W.view==="league") try{ renderLeague() }catch(_){} });
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-open]"); if(!b) return; const d=$(b.dataset.open); if(d){ d.open=true; d.scrollIntoView({behavior:"smooth",block:"start"}) } });
 $("setupEdit").addEventListener("click",()=>$("setup").classList.remove("compact"));
 const cleanTok=v=>fixTok(v);
