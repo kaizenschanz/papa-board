@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6lCw8V2FpXnvIEQamPsDPO1psnVNk2GL3F2Nq3CkRUA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-b2cPy194T1hU6K3v6zcrujB7MUKyzAFPR4Yps76yNvA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1348,6 +1348,7 @@ function playerWeek(pid){
     const done = g.status==="complete";
     let mu = pr ? (pr.stats && Object.keys(pr.stats).length ? scoreStats(pr.stats) : 0) : baseMean(pid);
     if(!pr && /^(Out|IR|Suspension)$/i.test(info.inj)) mu=0;
+    if(!done && sitOvOf(pid,g.date)===1) mu=0;   // your call that he sits: out for that game everywhere (planner, slot owners, lines)
     const bl = done? null : blendMu(pid, info, g, pr, mu);
     if(bl) mu=bl.mu;
     // live game: points so far + the rest of his projection for the share of the game left (in-game pace counts 25%)
@@ -4189,7 +4190,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-14a", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-14b", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
