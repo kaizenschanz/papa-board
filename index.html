@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-riW1aO8CMOyudLJ7kZWKJHeDycy803C2HPr7+OseLmg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-yWjFEJbouWzODsMjOsjW39RKkjJaoLKvNDuJbdtdWUo='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1646,6 +1646,8 @@ function slotSteps(A,P,pid){
   for(const b of [P.backup?.[pid], P.backup2?.[pid]]) if(b) (b.games||[]).forEach((g,j)=>st.push(mkStep(b.pid,g,j)));
   for(const m of (P.mid?.[pid]||[])) st.push(mkStep(m.pid,m.g,0));        // mid-week switch looks (the holder comes back after)
   for(const m of (P.idle?.[pid]||[])) st.push(mkStep(m.pid,m.g,0));       // idle-day free looks
+  { const b=P.backupS?.[pid], hs= b && st.find(t=>t.pid===pid && t.date===b.date);   // covers him only if he's ruled out (sitAt)
+    if(b && hs){ const t=mkStep(b.pid,b.g,0); t.sitOnly=true; t.cover=pid; t.pm0=t.pm||0; t.pm=1-(hs.pm||0)*(1-t.pm0); t.ord=hs.ord+1; delete t.pS; delete t.pP; st.push(t) } }
   return st.filter(t=>t.mu>0 || t.cur!=null).sort((a,b)=>a.ord-b.ord);
 }
 // ---- Mid-game switches. League rule: a starter can be benched during his game (that game then can't count for him) and the
@@ -1722,6 +1724,7 @@ function endVal(p,rm,r,T){ if(!T) return p+rm; if(!(rm>0)) return gAt(T,p); cons
 // (review, 11-12: one shared draw per player made a second sit near-certain after a first: Powell 96% where the model says ~74%).
 // A step someone set to "he plays" (pm 0) counts as played for the games after it.
 function sitAt(st,i,s){ const t=st[i];
+  if(t.sitOnly){ let j=i-1; while(j>=0 && !(st[j].pid===t.cover && st[j].date===t.date)) j--; if(j<0 || !sitAt(st,j,s)) return true; return uAt(t.key^0x68E31DA4,s) < (t.pm0||0) }
   if(t.pS!=null && t.pid!=null){ let j=i-1; while(j>=0 && st[j].pid!==t.pid) j--;
     if(j>=0) return uAt(t.key^0x68E31DA4,s) < (sitAt(st,j,s)? t.pS : t.pP) }
   return !!t.pm && uAt(t.key^0x68E31DA4,s)<t.pm }
@@ -1996,6 +1999,15 @@ function planWeek(A,opt={}){
       const later=c.x.a.future.filter(g=>g.mu>0 && tipOrDay(c.pid,g.date)>bt+LOOK_GAP); if(!later.length) continue;
       const v=waitValue(later); if(!bb||v>bb.v) bb={pid:c.pid,v,date:later[0].date,games:later} }
     if(bb){ backup2[h.c.pid]=bb; usedB.add(bb.pid) } }
+  // ...and a backup whose game tips at the same time as the holder's next one (Stewart 5:00 with Powell 5:00): he can't cover a
+  // bad game, but he covers the holder being ruled out before tip, which is when a sit is known (user, 11-12: "if Powell sits I
+  // can slide Stewart to F"). The simulation plays him only in draws where the holder sits.
+  const backupS={};
+  for(const h of holders){ const g0=h.c.x.a.future.find(g=>g.mu>0); if(!g0 || h.c.x.a.live) continue; const th=tipAt(h.c.pid,g0.date); if(!th) continue; let bs=null;
+    for(const c of C){ if(best.pick.has(c.pid)||!fitsVia(c.pos,h.slot,h.c.pid,g0.date)) continue;
+      const cg=c.x.a.future.find(g=>g.date===g0.date && g.mu>0); if(!cg) continue; const tc=tipAt(c.pid,cg.date); if(!tc || Math.abs(tc-th)>LOOK_GAP) continue;
+      if(!bs || cg.mu>bs.g.mu) bs={pid:c.pid, g:cg, date:cg.date, cover:h.c.pid} }
+    if(bs) backupS[h.c.pid]=bs }
   if(Object.keys(term).length){
     for(const c of C){ if(term[c.pid]==null) continue; const hv=waitValueT(holdGames(c),term[c.pid],rhoT[c.pid]); c.ch=c.ch.map(h=>h.k==="hold"?{k:"hold",v:hv}:h) }
     best=bestAssign(C,slots,SL);
@@ -2118,7 +2130,8 @@ function planWeek(A,opt={}){
       pairs.sort((a,b)=>b.gain-a.gain); const usedS=new Set();
       for(const z of pairs){ if(usedS.has(z.hp)||took.has(z.o.pid)) continue; usedS.add(z.hp); took.add(z.o.pid); (idle[z.hp] ||= []).push({pid:z.o.pid, g:z.og, date:d, post:z.tp, after:z.after}) } } }
   const total=[...best.pick.values()].reduce((t,p)=>t+p.v,0);
-  const P={SL,slots,C,pick:best.pick,total,thr:{},night:null,term,backup,backup2,pre,seq,mid,idle};
+  for(const h of Object.keys(backupS)){ const q=best.pick.get(h), bc=C.find(c=>c.pid===backupS[h].pid); if(!q || q.k!=="hold" || !bc || best.pick.has(backupS[h].pid) || !fitsVia(bc.pos,q.slot,h,backupS[h].date)) delete backupS[h] }
+  const P={SL,slots,C,pick:best.pick,total,thr:{},night:null,term,backup,backup2,backupS,pre,seq,mid,idle};
   if(opt.light) return P;
   // breakeven for players whose last result is still lockable but the plan says wait (or lock)
   for(const c of C){ const p=best.pick.get(c.pid); const a=c.x.a;
@@ -2656,6 +2669,11 @@ function todoItems(A,P){
         note: ok||sw? "" : "Otherwise bench him mid-game and "+bring(m.pid,sIdx)+".",
         sub:(sw||ok? "" : "Check at "+clock(bt)+", "+nm(m.pid)+"'s tip. Under "+bar+", bench him and "+bring(m.pid,sIdx)+" (lock "+nm(m.pid)+"'s game only if it ends big).")+back,
         rems: ok? [] : [{id:"mid-"+pid+"-"+m.date, t:bt, lead:10, title: sw? Bring(m.pid,sIdx,last)+" for "+last(who) : last(who)+" under "+bar+" so far? "+Bring(m.pid,sIdx,last)+" for him"}]}) } }
+  // same-time backups: only if the holder is ruled out before tip (user, 11-12: "if Powell sits I can slide Stewart to F")
+  for(const [hp,b] of Object.entries(P.backupS||{})){ const x=X(hp), q=P.pick.get(hp); if(!x||!q) continue; const tb=tipAt(b.pid,b.date); if(!tb || tb<=now) continue;
+    out.push({t:tb-30*60e3, approx:true, kind:"check", title:"If "+x.a.info.name+" is ruled out: "+bring(b.pid,q.slot)+" for "+dayLabel(b.date)+" "+clock(tb),
+      sub:nm(b.pid)+" tips with him, so he only covers "+last(hp)+" sitting. "+last(hp)+" is "+Math.round((1-dnpP(x.a.future.find(g=>g.date===b.date)||{date:b.date},0,hp))*100)+"% to play.",
+      rems:[{id:"cover-"+hp+"-"+b.date, t:tb-45*60e3, lead:0, title:last(hp)+" out? "+Bring(b.pid,q.slot,last)}]}) }
   return out.sort((a,b)=>(a.t??0)-(b.t??0));
 }
 // One column per day in a sideways strip (swipe for later days; the next one peeks in), "Now" items above it. The strip keeps
@@ -3458,6 +3476,7 @@ function claimOptions0(A,P){
       const pl=Object.entries(r.Q.pre||{}).find(([,b])=>b.pid===c.pid);
       if(h) role="backs up "+(A.find(x=>x.pid===h[0])?.a.info.name||"a starter")+" ("+dayLabel(c.fut[0].date)+")";
       else if(pl) role="early free look before "+(A.find(x=>x.pid===pl[0])?.a.info.name||"a starter");
+      else if(Object.values(r.Q.backupS||{}).some(b=>b.pid===c.pid)){ const bs=Object.entries(r.Q.backupS).find(([,b])=>b.pid===c.pid); role="covers "+(A.find(x=>x.pid===bs[0])?.a.info.name||"a starter")+" if he's out ("+dayLabel(bs[1].date)+")" }
       else { const lk=Object.entries(r.Q.idle||{}).find(([,L])=>L.some(m=>m.pid===c.pid)); if(lk){ const q2=r.Q.pick.get(lk[0]); role="free look"+(q2? " at "+SL[q2.slot] : "")+" ("+dayLabel(lk[1].find(m=>m.pid===c.pid).date)+")" } } }
     const G=getP(c.pid);   // a claim that doesn't go through gains nothing, but a fix made for it still counts
     out.push({pid:c.pid, name:c.info.name, team:c.info.team, pos:c.info.pos, inj:c.info.inj, from:c.from, dWeek:G.p*e.d, dFut:G.p*e.pLose*e.dF, dmu:e.dmu, d:G.p*e.t+(1-G.p)*e.st.alone, dm:e.dm, role, games:c.fut, drop, ros:c.ros, dropRos:rosMean(drop.pid), title:!!v.wt,
@@ -3879,7 +3898,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-12r", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-12s", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
