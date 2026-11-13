@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JFP3gdDV7WNMx78pjVA08o38Kglf5MAJAA3b8x07qlE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6fzZhjAejDVUgeptBoPkJd4KforOjlqHQj6J+kTknNk='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2502,6 +2502,15 @@ function lookBar(A,P,slot,pid,date){ const hp=[...P.pick].find(([,q])=>q.slot===
 function todoItems(A,P){
   const now=Date.now(), out=[], v=W.vs, isMe=viewingMe();
   const X=pid=>A.find(x=>x.pid===pid), nm=pid=>X(pid)?.a.info.name||pid, last=pid=>String(nm(pid)).split(" ").slice(-1)[0];
+  // keep-or-switch at a later player's tip, said in title odds (user, 11-13: "idk if setting a points line makes sense, moreso what
+  // time is it in their game and which player gives better championship odds"): live, the comparison from his score and clock now
+  const swCall=(slotPid,pid,date,pid2,date2,swTo)=>{ const xa=X(pid)?.a, live=!!(xa?.live && xa.live.date===date), t2=tipAt(pid2,date2);
+    if(!live) return {live:false, keep:null, txt:"At "+clock(t2)+", keep him or "+swTo+", whichever gives better title odds from his score and the game clock then (the board shows which once he's on)."};
+    const st=slotSteps(A,P,slotPid), i=st.findIndex(t=>t.pid===pid && t.date===date), j=st.findIndex(t=>t.pid===pid2 && t.date===date2), o= i>=0 && j>=0? switchOdds(slotPid,st,i,j) : null;
+    const clk=W.clock?.[xa.info.team]?.[date]?.label, cur=(xa.live.cur||0).toFixed(2), head=nm(pid)+" has "+cur+(clk? " ("+clk+")" : "")+".";
+    if(!o) return {live:true, keep:null, txt:head+" Keep him or "+swTo+" at "+clock(t2)+", whichever gives better title odds."};
+    const d=(o.keep-o.sw)*100, keep=d>=0, ing=swTo.replace(/^start/,"starting").replace(/^put/,"putting");
+    return {live:true, keep, d, txt:head+" Right now "+(keep? "keeping him" : ing)+" is better by "+Math.abs(d).toFixed(2)+"% title odds"+(t2>now? "; decide at "+clock(t2)+"." : ".")} };
   // bringing a player into a slot: "start" from the bench, "move ... to G" when he's already in the lineup (user, 11-11: "bench Trae
   // and start Rollins" with both already in)
   // bringing a player into a slot: straight in, or (when he can't play it) through another unlocked holder who slides over
@@ -2606,15 +2615,6 @@ function todoItems(A,P){
       if(dup){ dup.sub=(a.info.name+" finished with "+k.fp.toFixed(2)+", under the "+fx(k.at)+" he needed. Swapping adds "+eTxt+". "+dup.sub).trim() }
       else out.push({t:bt, pid, kind:"move", title:"Start "+nm(by)+" for "+a.info.name+" (his "+k.fp.toFixed(2)+" is under the "+fx(k.at)+" he needed)",
       sub:"Swapping adds "+eTxt+" · "+odds+".", rems:[{id:"swap-"+pid, t:bt, lead:15, title:"Start "+last(by)+" for "+last(pid)+" ("+(P.SL[x.idx]||"")+")"}]}) } }
-  // keep-or-switch at a later player's tip, said in title odds (user, 11-13: "idk if setting a points line makes sense, moreso what
-  // time is it in their game and which player gives better championship odds"): live, the comparison from his score and clock now
-  const swCall=(slotPid,pid,date,pid2,date2,swTo)=>{ const xa=X(pid)?.a, live=!!(xa?.live && xa.live.date===date), t2=tipAt(pid2,date2);
-    if(!live) return {live:false, keep:null, txt:"At "+clock(t2)+", keep him or "+swTo+", whichever gives better title odds from his score and the game clock then (the board shows which once he's on)."};
-    const st=slotSteps(A,P,slotPid), i=st.findIndex(t=>t.pid===pid && t.date===date), j=st.findIndex(t=>t.pid===pid2 && t.date===date2), o= i>=0 && j>=0? switchOdds(slotPid,st,i,j) : null;
-    const clk=W.clock?.[xa.info.team]?.[date]?.label, cur=(xa.live.cur||0).toFixed(2), head=nm(pid)+" has "+cur+(clk? " ("+clk+")" : "")+".";
-    if(!o) return {live:true, keep:null, txt:head+" Keep him or "+swTo+" at "+clock(t2)+", whichever gives better title odds."};
-    const d=(o.keep-o.sw)*100, keep=d>=0, ing=swTo.replace(/^start/,"starting").replace(/^put/,"putting");
-    return {live:true, keep, d, txt:head+" Right now "+(keep? "keeping him" : ing)+" is better by "+Math.abs(d).toFixed(2)+"% title odds"+(t2>now? "; decide at "+clock(t2)+"." : ".")} };
   // a free look already under way or just finished: keep him only if he beats the regular's chain, else the regular goes back in
   for(const x of A){ const a=x.a; if(!x.starter||a.lockedOn||out.some(o=>o.kind==="look"&&o.pid===x.pid)||v?.keepCalls?.[x.pid]) continue;
     const g0=a.future[0], tipped= g0 && g0.date===todayStr() && tipAt(x.pid,g0.date) && tipAt(x.pid,g0.date)<=now && a.future.length===1;
@@ -3944,7 +3944,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13e", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13f", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
