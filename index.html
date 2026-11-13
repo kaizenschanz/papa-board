@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TzLmj4orgF/OsxxB2m70N0LaTLW4BT5HkOyQ6Ynirz8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JwPEcyW+Yn0Tp8Zp2j2b8DQs+y1XTqvThnUCou0P2sE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -406,10 +406,6 @@ details.fold #poolSeg{margin-bottom:6px}
     <div class="card">
       <h2>Manager tendencies</h2>
       <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
-    </div>
-    <div class="card">
-      <h2>Waivers</h2>
-      <div class="lg-scroll" id="lgWaiv"></div>
     </div>
   </section>
 
@@ -4159,7 +4155,7 @@ function renderLuck(){ renderAcc();
   if($("lgLuck")) $("lgLuck").innerHTML='<thead><tr><th>Team</th><th>H2H</th><th>All-play</th><th>Luck</th><th>Schedule left</th></tr></thead><tbody>'+
     rows.map(r=>'<tr class="'+(r.t.me?'me':'')+'"><td>'+esc(r.t.name)+'</td><td>'+r.hw+'-'+(r.g-r.hw)+'</td><td>'+r.ap.toFixed(1)+'-'+(r.g-r.ap).toFixed(1)+'</td><td class="'+(r.luck>0.3?'good':r.luck<-0.3?'bad':'')+'">'+sg(r.luck)+'</td><td>'+(r.sos==null?'–':sg(r.sos))+'</td></tr>').join("")+'</tbody>';
   const qr=claimRates(), my=myRoster()?.roster_id, R=Object.values(S.rosters).sort((a,b)=>(a.settings?.waiver_position??99)-(b.settings?.waiver_position??99));
-  $("lgWaiv").innerHTML='<table class="lg-table num lg-tight"><thead><tr><th>#</th><th>Team</th><th>Claims</th></tr></thead><tbody>'+
+  if($("lgWaiv")) $("lgWaiv").innerHTML='<table class="lg-table num lg-tight"><thead><tr><th>#</th><th>Team</th><th>Claims</th></tr></thead><tbody>'+
     R.map(r=>'<tr class="'+(r.roster_id===my?'me':'')+'"><td>'+(r.settings?.waiver_position??'–')+'</td><td>'+esc(rosterName(r.roster_id))+'</td><td>'+Math.round((qr.q[r.roster_id]??qr.qbar)*100)+'% of nights</td></tr>').join("")+'</tbody></table>';
 }
 function renderLeague(){
