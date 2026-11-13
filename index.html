@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-j6VZ+Nvegul8sHnqIa+VadnFxOQvI0f+XXOWjdUdMnI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uCMjnfg7Y9eA/nURFtDBmFnv1/Wq1uDBIBPptzMB7hE='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2188,11 +2188,11 @@ function calibrateField(){
   finally{ CAL_OFF=false }
   const C=(typeof CALIB!=="undefined"&&CALIB&&CALIB.med)||{}, sd0=C.sd0||MED_SD0, bias=C.bias||0;
   const sim=medianOf(raw.map(t=>t.m)), tot=raw.reduce((a,t)=>a+t.m,0), open=raw.reduce((a,t)=>a+Math.max(0,t.m-t.base),0), phi= tot>0? open/tot : 1;
-  const pm=(typeof pastMedians==="function"&&LG.past)? pastMedians().map(x=>x.med) : [];
+  // Only the learned correction (calibrate_odds.py: the board's own simulated median against each week's real one, per unit of open
+  // week), once it has at least 3 readings from finished weeks; until then the simulation stands (k=1). The old pull toward past
+  // weeks' medians was a hand-set rule nobody tested (user, 11-12: "just calibrate it ... it sounds made up"), so it's gone.
   let prior=null, sp=null, M=sim, k=1, ss=null;
-  if(sim!=null && pm.length){ const n=pm.length, mu=pm.reduce((a,b)=>a+b,0)/n, sd= n>1? Math.sqrt(pm.reduce((a,b)=>a+(b-mu)**2,0)/(n-1)) : MED_PRIOR_SD;
-    prior=mu; sp=Math.max(MED_PRIOR_SD, sd*Math.sqrt(1+1/n)); ss=Math.max(0.5, sd0*phi);
-    const sa=sim-bias*phi, wS=1/(ss*ss), wP=1/(sp*sp); M=(sa*wS+prior*wP)/(wS+wP);
+  if(sim!=null && (C.n||0)>=3 && bias){ M=sim-bias*phi;
     const at=k=>medianOf(raw.map(t=>t.base+k*(t.m-t.base)));
     if(at(0.5)>=M) k=0.5; else if(at(1.5)<=M) k=1.5; else { let lo=0.5, hi=1.5; for(let i=0;i<30;i++){ const mid=(lo+hi)/2; if(at(mid)<M) lo=mid; else hi=mid } k=(lo+hi)/2 }
     M=at(k) }
@@ -3829,7 +3829,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-12o", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-12p", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
