@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wFzALO8Me+MS88riqo5KYqX6Va46qdnTRWlAO51U3VY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HXOwUBzPOZDchd+ZExZNJlQcN0cN6PzrM+mTi/UwZpQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3377,7 +3377,10 @@ function claimOptions0(A,P){
   const v=W.vs; if(!v||!v.me?.tot||!A.length) return [];
   // nothing until the league simulation's title weights are in: judged first on expected wins, a move could show for a few
   // seconds on load and then vanish (user, 11-09: "Drop McCain, take Powell off IR" flashed on refresh)
-  if(!v.wt && !LG.out){ const w=[]; w.pending=true; return w }
+  // ...and until this session's league simulation is in: it prices later weeks (strFor). Saved title weights alone let a claim
+  // count later weeks as nothing (user, 11-12: "drop Joel Embiid" on the Matchup tab before the League sim ran)
+  if(!LG.out || !LG.strFor){ W._claimsPending=true; const w=[]; w.pending=true; return w }
+  W._claimsPending=false;
   const key=(viewRoster()?.roster_id)+"|"+W.updated+"|"+(v.rid||"")+"|"+(v.wt? v.wt.perWin : "nw")+"|"+(LG.out?.N||0)+"|"+(v.opp?.pk||0).toFixed(3)+"|"+(W.txAt||0); if(W._claims&&W._claims.k===key) return W._claims.list;
   const done=list=>{ W._claims={k:key,list}; return list };
   const today=todayStr(), owned=new Set(Object.values(S.rosters).flatMap(r=>r.players||[]));
@@ -3977,7 +3980,7 @@ async function refreshTitleWeights(){
     LG.tl=await fetch("timeline.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok? r.json() : null).catch(()=>null);
     await computeLeague(); saveWts(); await paintNow();
     // redraw only if the title weights moved enough to change something shown (the first draw used the saved ones)
-    if(wtsMoved()) renderWeek();
+    if(wtsMoved() || W._claimsPending) renderWeek();   // claims wait for this run (later weeks), so draw them now
     // the managers' replay (~9 s) is for the League tab only: it runs when that tab is opened
     if(W.view==="league") managerTendencies().then(()=>renderTend()).catch(e=>{ LG.tendErr=String(e&&e.stack||e) });
   }catch(e){} finally{ LG.busy=false; busyOff() }
