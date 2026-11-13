@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-I882cedBv4/7k6KyEiKsfqxf+vJWcV0q1yCUAtlIALQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uixlmu/5R7CzCPr9yW/CeHBRx5GRdxhUF0gbC6tLTvc='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2899,7 +2899,10 @@ function replanLine(A,P,x,date,claims){
   // done playing by then (wiping it left his slot empty, and a Sunday look read "keep at 0.00+"). Days out it's a rough preview.
   if(!known && !(a.live && a.live.date===date)){ const tp=(p,d)=>tipAt(p,d)||Date.parse(d+"T19:00:00"), t0=tp(x.pid,date), fl=(v.planBase||{force:v.force}).force||{};
     B=B.map(r=>{ if(r.pid===x.pid || r.a.lockedOn || P.pick.get(r.pid)?.k==="lock" || fl[r.pid]==="lock") return r;
-      const keep=r.a.future.filter(f=>tp(r.pid,f.date)>=t0); if(!keep.length || keep.length===r.a.future.length) return r;   // done before his tip: his slot is spoken for, left as planned
+      const keep=r.a.future.filter(f=>tp(r.pid,f.date)>=t0); if(keep.length===r.a.future.length) return r;
+      // done before his tip: a starter's slot is spoken for, left as planned; a bench player's games are gone (review, 11-13: Clingan's
+      // Friday 7:00 game still counted on the wait side of Mitchell's 7:30 line, which read 27.4 against a slot worth ~22)
+      if(!keep.length && r.starter) return r;
       return {...r, a:{...r.a, future:keep, latest: r.a.latest? {...r.a.latest, fp:0, dnp:true} : r.a.latest}} }) }
   const AL=B.map(r=> r.pid===x.pid? xL : r), AW=B.map(r=> r.pid===x.pid? xW : r);
   if(!AL.includes(xL)) AL.push(xL); if(!AW.includes(xW)) AW.push(xW);
@@ -3976,7 +3979,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13j", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13k", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
