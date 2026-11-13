@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lNKxElE4cZri2p9CBqcJhISRnQ+hzgqz8PPQuNyh0Uk='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-I882cedBv4/7k6KyEiKsfqxf+vJWcV0q1yCUAtlIALQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2907,7 +2907,10 @@ function replanLine(A,P,x,date,claims){
   const ex= b0.exclude instanceof Set? new Set([...b0.exclude].filter(p=>p!==x.pid)) : b0.exclude, base={...b0, force, exclude:ex, pins:undefined};   // the line is priced without pins, as before
   // the full planner, the one behind the header's odds (user, 11-11: Robinson's "play on" odds read 6% win / 28% median under a
   // header of 10% / 37%: with games live the quick planner ran 5.5 points under the full plan, which has the mid-game switches)
-  const QW=planWeek(AW,base), DW=withPickups(teamDist(AW,QW),v.pkMe);
+  // pickups need an open slot: each side gets its own (user, 11-13: "I also have the ability to add someone off waivers Saturday
+  // and or Sunday"; the shared pickup line let a lock take a slot a Saturday add would have used, for free). Every waiver run left.
+  const rid= x.rid ?? viewRoster()?.roster_id, pkOf=R=>{ try{ return pickupFor(rid,{rows:R, from:0}) }catch(e){ return v.pkMe } };
+  const QW=planWeek(AW,base), DW=withPickups(teamDist(AW,QW),pkOf(AW));
   // every open slot he fits, the same ones the lock step picks from (lockSlotFor): a forward sitting in UTIL gets locked at
   // SF/PF/F, which keeps the UTILs for the centers, so that's the lock his line has to price (Walker in UTIL was priced as a
   // UTIL lock, 22.4, 11-11). The cheapest slot counts.
@@ -2915,7 +2918,8 @@ function replanLine(A,P,x,date,claims){
   for(let i=0;i<SLn.length;i++){ if(lk.has(i) || !elig(a.info.pos,SLn[i])) continue;
     const occ= i===xi? null : B.find(y=>y.starter&&y.idx===i&&y.pid!==x.pid); if(occ && occ.a.live && !(from!=null && elig(occ.a.info.pos,SLn[from]))) continue;   // can't free that slot mid-game
     const QL=planWeek(AL,{...base, pinLock:{pid:x.pid, slot:i, from}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
-    const DLi=withPickups(teamDist(AL,QL),v.pkMe), l=lockBarD(DLi, fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi } }
+    const ALk=AL.map(r=> r.pid===x.pid? {...r, starter:true, idx:i, a:{...r.a, lockedOn:{fp, date}}} : (r.starter && r.idx===i && from!=null)? {...r, idx:from} : r);
+    const DLi=withPickups(teamDist(AL,QL),pkOf(ALk)), l=lockBarD(DLi, fp, DW, v.opp, v.opp, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi } }
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   return best==null? null : {l:best, slot:at, odds: known? {L:titleObjD(DLb,v.opp,v.tab,v.median,v.wt), W:titleObjD(DW,v.opp,v.tab,v.median,v.wt)} : null} }
 function lineFor(A,P,x,date,noClaims){
@@ -3348,7 +3352,9 @@ const PK_N=1000;
 // the claim decision shown under Pickups), exclude (free agents taken off the table, e.g. by your claim), focal (look harder)
 function pickupFor(rid, opt={}){
   const r=S.rosters[rid]; if(!r||!W.games||!S.league) return null;
-  const today=todayStr(), from=opt.from||0, ex=opt.exclude||null, qr=claimRates(), q=qr.q[rid]??qr.qbar;
+  // your own team adds whenever it helps (user, 11-13: "I also have the ability to add someone off waivers Saturday and or Sunday");
+  // everyone else at the rate they actually add
+  const today=todayStr(), from=opt.from||0, ex=opt.exclude||null, qr=claimRates(), q= rid===myRoster()?.roster_id? 1 : (qr.q[rid]??qr.qbar);
   const gd=[...new Set(W.games.filter(g=>g.date>today).map(g=>g.date))].sort();
   const zero={rid, q, m:0, v:0, inc:null, top:[], nights:0, drop:null};
   if(!gd.length) return zero;
@@ -3970,7 +3976,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13i", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13j", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
