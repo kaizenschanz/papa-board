@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-EHxJIU91Gxzq08o9Smt1/1RB9CEAMcM6IrfEwZNkyLo='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-kysrUyipLm7FRsjf3VcwfNpEw/u/MrQLH1kPjHfTCVI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3969,7 +3969,14 @@ async function backtestDays(w){
         const known=g.filter(x=>end(x)<=D && x.fp!=null), lk=known.length? known[known.length-1] : null, held= lk && !closed(g.indexOf(lk))? lk : null;
         return {pid, rid:T.rid, starter:true, idx:si, slot:SL[si], asStarted:true, a:{info, live:null, lockedOn: lockedNow? {fp:g[li].fp, date:g[li].date} : null,
           latest: held && !lockedNow? {id:held.id, date:held.date, fp:held.fp, dnp:false, done:true, live:false} : null, future: lockedNow? [] : fut}} });
-      const Q=planWeek(A,{}), Dd=teamDist(A,Q,SIM_N); res.push({tot:Dd.tot, m:Dd.m, rid:T.rid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
+      const Q=planWeek(A,{}), Dd=teamDist(A,Q,SIM_N);
+      // per slot (user, 11-13: "test it"): the plan's value for the slot against the score the slot really ended the week with
+      if(/bt=2s/.test(location.search)){ const fin=si=>{ const pid=T.starters[si]; if(!pid||pid==="0") return 0; const g=gamesOf(pid), gid=T.sg[pid], li= gid!=null? g.findIndex(x=>x.id===String(gid)) : g.map(x=>x.fp!=null).lastIndexOf(true); return li>=0? (g[li].fp||0) : 0 };
+        const SR=(window.__btS ||= []), dIdx=days.indexOf(day);
+        for(const [pid,q] of Q.pick){ const pt=Dd.parts.get(pid); if(!pt) continue; const st= q.k==="lock"? [] : slotSteps(A,Q,pid), nOwn=st.filter(x=>x.pid===pid).length, held= heldScore(A.find(y=>y.pid===pid))>0;
+          SR.push({w, d:dIdx, k:q.k, n:st.length, own:nOwn, held, proj:+pt.m.toFixed(2), act:+fin(q.slot).toFixed(2), slot:SL[q.slot]}) }
+        for(const x of A) if(x.starter && x.a.lockedOn) SR.push({w, d:dIdx, k:"locked", n:0, own:0, held:false, proj:x.a.lockedOn.fp, act:+fin(x.idx).toFixed(2), slot:SL[x.idx]}) }
+      res.push({tot:Dd.tot, m:Dd.m, rid:T.rid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
     const realT=Object.fromEntries((LG.past?.[w-1]||[]).map(x=>[x.roster_id, x.points]));
     out.push({w, day, proj:+expMedian(res).toFixed(1), act, teams: /bt=2d/.test(location.search)? res.map(t=>[t.rid, +t.m.toFixed(1), +(realT[t.rid]||0).toFixed(1), +t.locked.toFixed(1)]) : undefined}) }
   return out }
