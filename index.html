@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-XPgS3o+mLFD/fydbm/YWuzGTiyB7LC7bdqIxNK3mO98='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6IzPplMdwVEdm2KumcRBNJVfwUKLONUgwiN3cwJK/YI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2149,6 +2149,13 @@ function planWeek(A,opt={}){
       if(!q || lg.date!==day || early[q.slot]) continue; const tc=tipOf(pr.pid), th=tipOf(hp); if(tc==null || th==null) continue;
       early[q.slot]={pid:pr.pid, tip:tc, then:hp, thenTip:th, ov: tc+GAME_MS>th};
       const rest=C.find(c=>c.pid===pr.pid).x.a.future.filter(h=>h.date>day); at[pr.pid]=lockAt(C,slots,SL,pr.pid, rest.length? waitValue(rest) : null) }
+    // ...and a free look on a day the holder doesn't play (Clingan Fri in UTIL, Embiid back Sun): the plan counts on it, so the To
+    // do says it (user, 11-12: the slot was worth 24.9 with Clingan's look, but nothing told you to start him)
+    for(const [hp,pr] of Object.entries(pre)){ if(pr.same || night.pick.has(pr.pid)) continue; const q=best.pick.get(hp); if(!q || early[q.slot]) continue;
+      const g=pr.games.find(h=>h.date===day); if(!g) continue; const hc=C.find(c=>c.pid===hp); if(!hc || hc.x.a.future.some(h=>h.date===day)) continue;
+      const nx=hc.x.a.future.find(h=>h.date>day); const tc=tipOf(pr.pid), th= nx? tipAt(hp,nx.date) : null; if(tc==null || th==null) continue;
+      early[q.slot]={pid:pr.pid, tip:tc, then:hp, thenTip:th, ov:false, xday:true};
+      const rest=C.find(c=>c.pid===pr.pid).x.a.future.filter(h=>h.date>day); at[pr.pid]=lockAt(C,slots,SL,pr.pid, rest.length? waitValue(rest) : null) }
     const lookers=C.filter(c=>role[c.pid]==="look" && !night.pick.has(c.pid) && !Object.values(early).some(E=>E.pid===c.pid) && !Object.values(mid).some(L=>L.some(m=>m.pid===c.pid&&m.date===day))).sort((a,b)=>b.x.a.future.find(g=>g.date===day).mu-a.x.a.future.find(g=>g.date===day).mu);
     for(const c of lookers){ const tc=tipOf(c.pid); if(tc==null) continue;
       for(const [pid,q] of night.pick){ if(early[q.slot] || !elig(c.pos,SL[q.slot])) continue;
@@ -2517,8 +2524,8 @@ function todoItems(A,P){
       // chain alone read 22.3 for Walker against a 19.8 line, 11-11); the chain is the fallback
       const bar=fx(lineIn(A,P,E.pid,slot,N.day)??keepBar(A,P,E.then,null)??chainValue(A,P,E.then)??N.at[E.pid])||"big";
       out.push({t: started? E.thenTip : E.tip, pid:E.pid, kind:"look", title: started? nm(E.pid)+" is playing in "+P.SL[slot]+" (free look): keep him only at "+bar+"+" : already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
-        note: started? "" : "Keep his score only if it's "+bar+"+; otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+".",
-        sub:"Keep his score only if it's "+bar+"+ (where locking it beats playing the slot on)"+(lastG?"; it's his last game, so it counts without a lock while he stays in":"; lock it if so")+". Otherwise put "+nm(E.then)+" back before "+clock(E.thenTip)+"."+later,
+        note: started? "" : "Keep his score only if it's "+bar+"+; otherwise put "+nm(E.then)+" back before "+(E.xday? whenLabel(E.thenTip) : clock(E.thenTip))+".",
+        sub:"Keep his score only if it's "+bar+"+ (where locking it beats playing the slot on)"+(lastG?"; it's his last game, so it counts without a lock while he stays in":"; lock it if so")+". Otherwise put "+nm(E.then)+" back before "+(E.xday? whenLabel(E.thenTip) : clock(E.thenTip))+"."+(E.xday? " Benching "+nm(E.then)+" gives up the score he has now; the plan counts that cost." : "")+later,
         rems:(already||started? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
           .concat(E.thenTip>now && realAt.get(+slot)===E.pid? [{id:"back-"+E.then, t:E.thenTip, lead:20, title:"Put "+nm(E.then)+" back in "+P.SL[slot]+" unless "+nm(E.pid)+" scored "+bar+"+"}] : [])});
     }
