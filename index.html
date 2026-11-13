@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-NyHokrj1k8fyQRNALck+GPSg/GaiLZPyhA581i6Ov2U='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-weqIokDNzHXsP8NVrwJImednVg1/0xs3BympCEjDvVg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1638,6 +1638,7 @@ function slotSteps(A,P,pid){
   const x=A.find(x=>x.pid===pid), a=x.a, st=[];
   const pre=P.pre?.[pid];
   if(pre) pre.games.forEach((g,j)=>st.push(mkStep(pre.pid,g,j)));
+  if(pre?.br) st.push(mkStep(pre.br.pid,pre.br.g,0));      // the bridge look after it (Clingan 7:00 before Mitchell 7:30)
   if(a.live&&x.starter) st.push(mkStep(pid,a.live,0));
   a.future.forEach((g,j)=>st.push(mkStep(pid,g,j+(a.live&&x.starter?1:0))));
   for(const b of [P.backup?.[pid], P.backup2?.[pid]]) if(b) (b.games||[]).forEach((g,j)=>st.push(mkStep(b.pid,g,j)));
@@ -2040,6 +2041,20 @@ function planWeek(A,opt={}){
     if(!p0) continue;
     pre[pid]={pid:p0.pid, v:bp.v, games:[p0.g], date:g1.date, same:bp.same, then:bp.pid}; usedP.add(p0.pid); seq[pid]=[p0.g].concat(seq[pid].slice(1));
     preMid.push([pid, {pid:bp.pid, g:g1, date:g1.date, gain:0.05, after:g1.date, on:p0.pid}]) }
+  // A bridge look (user, 11-13: "I could always just start Clingan regardless then put in Mitchell after that"): a bench player who
+  // tips shortly before the holder's first game, still on at its tip, plays the slot first; at the holder's tip keep him on a big
+  // start, else switch, and if the holder is ruled out he just stays. After an earlier look that's over by then (Rollins 4:00 ->
+  // Clingan 7:00 -> Mitchell 7:30), or as the slot's only early look.
+  for(const [pid,q] of [...best.pick].filter(([,q])=>q.k==="hold")){
+    const c=C.find(c=>c.pid===pid), gs=holdGames(c); if(!gs.length || gs[0].live) continue; const first=gs[0].date, ft=tipAt(pid,first); if(!ft) continue;
+    const pr=pre[pid]; if(pr && (pr.then || !pr.same || pr.games[pr.games.length-1].date!==first)) continue;
+    const pe= pr? (tipAt(pr.pid,first)||0)+GAME_MS : 0; let br=null;
+    for(const o of C){ if(best.pick.has(o.pid)||usedB.has(o.pid)||usedP.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+      const og=o.x.a.future.find(h=>h.date===first && h.mu>0); if(!og) continue; const ot=tipAt(o.pid,first);
+      if(!ot || ot>ft-LOOK_GAP || ot+GAME_MS<=ft || ot<pe) continue;
+      if(!br || og.mu>br.g.mu) br={pid:o.pid, g:og, date:first} }
+    if(!br) continue; usedP.add(br.pid);
+    if(pr) pr.br=br; else pre[pid]={pid:br.pid, v:best.pick.get(pid).v, games:[br.g], date:first, same:true} }
   // Mid-week switches: a bench player whose game tips while a holder's game (not his last) is on. If the holder starts badly he
   // gets benched mid-game for that player, and he's back in for his next game either way (user, 11-08: "make sure it knows they
   // can play the player they benched later in the week if they have another game"). In the chain (tip order) that player's
@@ -2129,7 +2144,7 @@ function planWeek(A,opt={}){
       pairs.sort((a,b)=>b.gain-a.gain); const usedS=new Set();
       for(const z of pairs){ if(usedS.has(z.hp)||took.has(z.o.pid)) continue; usedS.add(z.hp); took.add(z.o.pid); (idle[z.hp] ||= []).push({pid:z.o.pid, g:z.og, date:d, post:z.tp, after:z.after}) } } }
   const total=[...best.pick.values()].reduce((t,p)=>t+p.v,0);
-  for(const h of Object.keys(backupS)){ const q=best.pick.get(h), bc=C.find(c=>c.pid===backupS[h].pid); if(!q || q.k!=="hold" || !bc || best.pick.has(backupS[h].pid) || !fitsVia(bc.pos,q.slot,h,backupS[h].date)) delete backupS[h] }
+  for(const h of Object.keys(backupS)){ const q=best.pick.get(h), bc=C.find(c=>c.pid===backupS[h].pid); if(!q || q.k!=="hold" || !bc || best.pick.has(backupS[h].pid) || usedP.has(backupS[h].pid) || !fitsVia(bc.pos,q.slot,h,backupS[h].date)) delete backupS[h] }
   const P={SL,slots,C,pick:best.pick,total,thr:{},night:null,term,backup,backup2,backupS,pre,seq,mid,idle};
   if(opt.light) return P;
   // breakeven for players whose last result is still lockable but the plan says wait (or lock)
@@ -2173,12 +2188,14 @@ function planWeek(A,opt={}){
     // Staggered tips: a slot whose player tips 2.5+ hours later can first hold an early-game free look.
     // If the early guy goes off you lock him; if not, swap the later player in before his tip.
     const tipOf=pid=>{ const c=C.find(c=>c.pid===pid); const s=c&&W.tips?.[c.x.a.info.team]?.[day]; return s? new Date(s).getTime() : null };
-    const early={};
+    const early={}, early2={};
     // same-day free looks the plan counts on (pre above): the bench player plays first in the holder's slot. ov: his game is
     // still on at the holder's tip, so keep-or-switch is decided then on his score so far
     for(const [hp,pr] of Object.entries(pre)){ if(!pr.same || night.pick.has(pr.pid)) continue; const q=best.pick.get(hp), lg=pr.games[pr.games.length-1];
       if(!q || lg.date!==day || early[q.slot]) continue; const tc=tipOf(pr.pid), th=tipOf(hp); if(tc==null || th==null) continue;
-      early[q.slot]={pid:pr.pid, tip:tc, then:hp, thenTip:th, ov: tc+GAME_MS>th};
+      const bp_= pr.br? pr.br.pid : pr.then, bt= bp_? tipOf(bp_) : null;   // the later look that day, before the regular (Clingan 7:00)
+      if(bt!=null){ early[q.slot]={pid:pr.pid, tip:tc, then:bp_, thenTip:bt, ov: tc+GAME_MS>bt}; early2[q.slot]={pid:bp_, tip:bt, then:hp, thenTip:th, ov: bt+GAME_MS>th, bridge:true} }
+      else early[q.slot]={pid:pr.pid, tip:tc, then:hp, thenTip:th, ov: tc+GAME_MS>th};
       const rest=C.find(c=>c.pid===pr.pid).x.a.future.filter(h=>h.date>day); at[pr.pid]=lockAt(C,slots,SL,pr.pid, rest.length? waitValue(rest) : null) }
     // ...and a free look on a day the holder doesn't play (Clingan Fri in UTIL, Embiid back Sun): the plan counts on it, so the To
     // do says it (user, 11-12: the slot was worth 24.9 with Clingan's look, but nothing told you to start him)
@@ -2188,7 +2205,7 @@ function planWeek(A,opt={}){
       const lt= pr.then? tipOf(pr.then) : null;   // the later look that day (Clingan at 7) comes next, before the regular
       early[q.slot]= lt? {pid:pr.pid, tip:tc, then:pr.then, thenTip:lt, ov: tc+GAME_MS>lt} : {pid:pr.pid, tip:tc, then:hp, thenTip:th, ov:false, xday:true};
       const rest=C.find(c=>c.pid===pr.pid).x.a.future.filter(h=>h.date>day); at[pr.pid]=lockAt(C,slots,SL,pr.pid, rest.length? waitValue(rest) : null) }
-    const lookers=C.filter(c=>role[c.pid]==="look" && !night.pick.has(c.pid) && !Object.values(early).some(E=>E.pid===c.pid) && !Object.values(mid).some(L=>L.some(m=>m.pid===c.pid&&m.date===day))).sort((a,b)=>b.x.a.future.find(g=>g.date===day).mu-a.x.a.future.find(g=>g.date===day).mu);
+    const lookers=C.filter(c=>role[c.pid]==="look" && !night.pick.has(c.pid) && !Object.values(early).concat(Object.values(early2)).some(E=>E.pid===c.pid) && !Object.values(mid).some(L=>L.some(m=>m.pid===c.pid&&m.date===day))).sort((a,b)=>b.x.a.future.find(g=>g.date===day).mu-a.x.a.future.find(g=>g.date===day).mu);
     for(const c of lookers){ const tc=tipOf(c.pid); if(tc==null) continue;
       for(const [pid,q] of night.pick){ if(early[q.slot] || !elig(c.pos,SL[q.slot])) continue;
         const th=tipOf(pid); if(th==null || th-tc<2.5*3600e3) continue;
@@ -2196,7 +2213,7 @@ function planWeek(A,opt={}){
         { const rest=c.x.a.future.filter(h=>h.date>day); at[c.pid]=lockAt(C,slots,SL,c.pid, rest.length? waitValue(rest) : null) }
         break } }
     const tip={}; for(const c of C){ const v=tipOf(c.pid); if(v) tip[c.pid]=v }
-    return {day, lockNow, lineup:night.pick, role, at, early, tip, lookOf};
+    return {day, lockNow, lineup:night.pick, role, at, early, early2, tip, lookOf};
   };
   const days=[...new Set(W.games.filter(g=>g.status==="pre_game").map(g=>g.date))];
   if(days.length){ P.night=planDay(days[0],days[0]); P.days=days.slice(1).map(d=>planDay(d,days[0])) }
@@ -2428,7 +2445,8 @@ function switchBar(slotPid, st, i, j){
   const T=st[j].t, ph=stepPhase(t,T), mu0= t.mu0>0? t.mu0 : t.mu, m0=phaseMin(ph);
   const obj=S=>{ const V=stepsValue(S), C=new Float64Array(N); let m=0; for(let s=0;s<N;s++){ C[s]=playSteps(S,V,s); m+=C[s] } m/=N;
     const tot=new Float64Array(N); for(let s=0;s<N;s++) tot[s]=R[s]+m+f*(C[s]-m)+wb; return titleObjD({tot,m:Rm+m+wb},v.opp,v.tab,v.median,v.wt).obj };
-  const oSw=obj(st.slice(j));
+  // switching happens at his tip, so he's playing: his sit chance is already settled (user, 11-13: Clingan 7:00 -> Mitchell 7:30)
+  const oSw=obj([{...st[j], pm:0}].concat(st.slice(j+1)));
   // kept with p so far: from that tip on he's a live game (the board's own projection for the rest), with the later steps after
   const keepAt=p=>obj([{mu:p+remMu(p,ph,mu0), mu0, cur:p, r:t.r, key:t.key, pm:0, t:t.t, ord:t.ord, f0:ph, m0, at:T, end:T+(PH_END-m0)*60e3, pid:t.pid, date:t.date}].concat(st.slice(j+1)));
   let lo= t.cur!=null? t.cur : 0, hi=lo+90;
@@ -2438,7 +2456,7 @@ function switchBar(slotPid, st, i, j){
   return v._bars[key]=hi;
 }
 // The same line in expected points (no simulated week to judge by): where the keep value meets the switch value.
-function switchBarPts(st,i,j){ const V=stepsValue(st), o=V.ov&&V.ov[i]; if(!o||!o.kv) return null; const m=o.J.indexOf(j); if(m<0) return null;
+function switchBarPts(st,i,j){ st=st.map((t,k)=>k===j? {...t, pm:0} : t); const V=stepsValue(st), o=V.ov&&V.ov[i]; if(!o||!o.kv) return null; const m=o.J.indexOf(j); if(m<0) return null;
   const T=o.kv[m], want=V.e[j], n=T.v.length; if(T.v[0]>=want) return T.lo;
   for(let g=1;g<n;g++) if(T.v[g]>=want) return T.lo+(g-1+(want-T.v[g-1])/Math.max(1e-9,T.v[g]-T.v[g-1]))*T.step;
   return T.lo+(n-1)*T.step+(want-T.v[n-1]) }
@@ -2521,8 +2539,9 @@ function todoItems(A,P){
     for(const [pid,p] of N.lockNow) plan.set(p.slot,pid);
     for(const [pid,p] of N.lineup) plan.set(p.slot,pid);
     const first=new Map(plan); for(const [slot,E] of Object.entries(N.early||{})) if(E.tip>now) first.set(+slot,E.pid);
+    for(const [slot,E] of Object.entries(N.early2||{})) if(E.tip>now && !(N.early?.[slot]?.tip>now)) first.set(+slot,E.pid);
     for(const [slot,pid] of first){ const had=prev.get(slot); if(pid===had) continue; if(N.lockNow.has(pid)) continue;
-      if(N.early?.[slot]?.pid===pid && N.early[slot].tip>now) continue;     // the free-look line below says it
+      if((N.early?.[slot]?.pid===pid && N.early[slot].tip>now) || (N.early2?.[slot]?.pid===pid && N.early2[slot].tip>now)) continue;     // the free-look line below says it
       // he doesn't play that day: nothing to set, and the slot keeps who's really in it (else the next day's item compares against a
       // lineup that never happened: "Start Kuzma to F (Buzelis out)" with Kuzma already there)
       const tw=tipAt(pid,N.day); if(!tw){ if(had!=null) plan.set(slot, [...first.values()].includes(had)? null : had); continue }   // the occupant moves to another slot that day: this one's empty
@@ -2541,12 +2560,13 @@ function todoItems(A,P){
         sub:((early&&ds!=null? nm(had)+" finished with "+ds.toFixed(2)+(lb? ", under the "+lb+" worth keeping. " : ". ") : early? nm(had)+" plays first, so leave him in for his "+clock(ht)+" game"+(lb&&!lap? " and keep his score if it's "+lb+"+ (lock it then)" : "")+". " : "")+roleNote(N,pid,P,A)+edgeNote(pid,nm)+later).trim(),
         rems:[{id:"start-"+pid+"-"+N.day, t, lead:15, title:verb+" "+last(pid)+(had?" for "+last(had):"")+" ("+P.SL[slot]+")"}]});
     }
-    for(const [slot,E] of Object.entries(N.early||{})){ if(!(E.thenTip>now)) continue;
+    for(const [slot,E] of Object.entries(N.early||{}).concat(Object.entries(N.early2||{}))){ if(!(E.thenTip>now)) continue;
       const already=prev.get(+slot)===E.pid, started=!(E.tip>now), lastG=!X(E.pid)?.a.future.some(g=>g.date>N.day);
       // his game is still on at the regular's tip: keep him or put the regular back then, on his score so far
       if(E.ov && !started){ const sl=swapLine(A,P,E.then,E.pid,N.day,E.then,N.day); if(!sl) continue;
         const keepAll=!(sl.bar>sl.lo+0.01), back=sl.bar===Infinity, bar=fx(sl.bar);
-        const so= keepAll? "Keep him in whatever he has at "+clock(E.thenTip)+"; "+nm(E.then)+" sits." : back? "Put "+nm(E.then)+" back before "+clock(E.thenTip)+" whatever he has." : "At "+clock(E.thenTip)+", keep him only if he has "+bar+"+ so far; otherwise put "+nm(E.then)+" back.";
+        const sw_= E.bridge? "start "+nm(E.then) : "put "+nm(E.then)+" back", Sw_= E.bridge? "Start "+nm(E.then) : "Put "+nm(E.then)+" back";
+        const so= (keepAll? "Keep him in whatever he has at "+clock(E.thenTip)+"; "+nm(E.then)+" sits." : back? Sw_+" before "+clock(E.thenTip)+" whatever he has." : "At "+clock(E.thenTip)+", keep him only if he has "+bar+"+ so far; otherwise "+sw_+".")+(E.bridge? " If "+last(E.then)+" is ruled out, keep him in." : "");
         out.push({t:E.tip, pid:E.pid, kind:"look", title: already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
           note:so, sub:so+(lastG? " If he stays in, it's his last game, so it counts without a lock." : " If he stays in, lock it if it ends big.")+later,
           rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
@@ -3903,7 +3923,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13a", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13b", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
