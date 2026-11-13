@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-iwOQYXH85+kFm+GxiivxGlKjfxacKCbsmiPm5dk3DCI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-q1cTUCnq9arIAmrFy5+OOGxGIfvz786EAnRYl1T1Uns='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2515,17 +2515,23 @@ function switchOdds(slotPid, st, i, j){
     const tot=new Float64Array(N); for(let s=0;s<N;s++) tot[s]=R[s]+m+f*(C[s]-m)+wb; return titleObjD({tot,m:Rm+m+wb},v.opp,v.tab,v.median,v.wt).obj };
   const rest=st.slice(j+1);
   return {keep:obj([{...st[i], pm:0}].concat(rest)), sw:obj([{...st[j], pm:0}].concat(rest))} }
+// How a player gets into slot s0 when he can't play it: one starter slides over (Stewart UTIL -> F, Clingan UTIL) or two do (Stewart
+// F -> PF, Powell UTIL -> F, Clingan UTIL; user, 11-13: "I could slide Stewart to pf"). [] = straight in, null = no way.
+function slidePath(A,P,inc,s0,skip){ const ip=(A.find(y=>y.pid===inc)?.a.info.pos)||playerInfo(inc).pos||[], SLn=P.SL;
+  if(elig(ip,SLn[s0])) return [];
+  const free=r=>r.starter && r.pid!==inc && !(skip&&skip.has(r.pid)) && !r.a.lockedOn && r.idx!=null && r.idx!==s0, R=A.filter(free);
+  for(const r1 of R) if(elig(r1.a.info.pos||[],SLn[s0]) && elig(ip,SLn[r1.idx])) return [r1];
+  for(const r1 of R) if(elig(r1.a.info.pos||[],SLn[s0])) for(const r2 of R) if(r2!==r1 && elig(r2.a.info.pos||[],SLn[r1.idx]) && elig(ip,SLn[r2.idx])) return [r1,r2];
+  return null }
 // Title odds of a lineup, planned from there the way the header's are (same plan settings, pickups and opponent)
 function teamOddsOf(R){ const v=W.vs; if(!v?.opp) return null; const Q=planWeek(R,{...(v.planBase||{force:v.force}), pins:undefined});
   return titleObjD(withPickups(teamDist(R,Q),v.pkMe),v.opp,v.tab,v.median,v.wt).obj }
 // The lineup after benching `out` mid-game for `inc`: out's game so far is gone; inc takes out's slot, or (when he can't play it)
 // a starter who can slides over and inc takes that one. Null when out isn't in the lineup or no slide works.
 function benchRows(A,P,out,inc){ const xo=A.find(y=>y.pid===out), xi=A.find(y=>y.pid===inc); if(!xo?.starter || xo.idx==null || !xi || xi.a.lockedOn) return null;
-  const s0=xo.idx, ip=xi.a.info.pos||[]; let slot=s0, sl=null;
-  if(!elig(ip,P.SL[s0])){ sl=A.find(r=>r.starter && r.pid!==out && r.pid!==inc && !r.a.lockedOn && r.idx!=null && elig(r.a.info.pos||[],P.SL[s0]) && elig(ip,P.SL[r.idx])); if(!sl) return null; slot=sl.idx }
-  const occ=A.find(r=>r.starter && r.idx===slot && r.pid!==out && (!sl || r.pid!==sl.pid));   // whoever sat in inc's new slot goes to the bench
-  if(occ && occ.a.lockedOn) return null;
-  return A.map(r=> r.pid===out? {...r, starter:false, idx:null, a:{...r.a, live:null}} : sl && r.pid===sl.pid? {...r, idx:s0} : r.pid===inc? {...r, starter:true, idx:slot} : occ && r.pid===occ.pid? {...r, starter:false, idx:null} : r) }
+  const s0=xo.idx, path=slidePath(A,P,inc,s0,new Set([out])); if(!path) return null;
+  const mv=new Map(); let into=s0; for(const r of path){ mv.set(r.pid,into); into=r.idx }   // each slider takes the slot before him; inc the last one freed
+  return A.map(r=> r.pid===out? {...r, starter:false, idx:null, a:{...r.a, live:null}} : mv.has(r.pid)? {...r, idx:mv.get(r.pid)} : r.pid===inc? {...r, starter:true, idx:into} : r) }
 // The same line in expected points (no simulated week to judge by): where the keep value meets the switch value.
 function switchBarPts(st,i,j){ st=st.map((t,k)=>k===j? {...t, pm:0} : t); const V=stepsValue(st), o=V.ov&&V.ov[i]; if(!o||!o.kv) return null; const m=o.J.indexOf(j); if(m<0) return null;
   const T=o.kv[m], want=V.e[j], n=T.v.length; if(T.v[0]>=want) return T.lo;
@@ -2773,10 +2779,9 @@ function todoItems(A,P){
   const G=new Map(); for(const c of SWQ){ const k=c.inc+"|"+c.t; const L=G.get(k)||[]; if(!L.some(y=>y.out===c.out)) L.push(c); G.set(k,L) }
   const listOr=a=>a.length<2? a.join("") : a.slice(0,-1).join(", ")+" or "+a[a.length-1];
   // the move that brings him in, by the lineup as it really is then (a C for an F: slide someone who can play F over)
-  const physBring=(inc,out)=>{ const xo=X(out); if(!xo?.starter) return "start "+last(inc); const s0=xo.idx, ip=X(inc)?.a.info.pos||playerInfo(inc).pos||[];
-    if(elig(ip,P.SL[s0])) return "start "+last(inc)+" at "+P.SL[s0];
-    for(const r of A){ if(!r.starter || r.pid===out || r.a.lockedOn || r.idx==null) continue; if(elig(r.a.info.pos,P.SL[s0]) && elig(ip,P.SL[r.idx])) return "move "+last(r.pid)+" to "+P.SL[s0]+", "+last(inc)+" at "+P.SL[r.idx] }
-    return "start "+last(inc) };
+  const physBring=(inc,out)=>{ const xo=X(out); if(!xo?.starter) return "start "+last(inc); const s0=xo.idx, path=slidePath(A,P,inc,s0,new Set([out]));
+    if(!path) return "start "+last(inc); let into=s0; const bits=[]; for(const r of path){ bits.push("move "+last(r.pid)+" to "+P.SL[into]); into=r.idx }
+    return (bits.length? bits.join(", ")+", " : "start ")+last(inc)+" at "+P.SL[into] };
   for(const L of G.values()){ const inc0=L[0].inc, inc= alias[inc0] && !X(inc0)?.starter? inc0 : inc0, t=L[0].t, anyLive=L.some(c=>{ const xa=X(c.out)?.a; return xa?.live && xa.live.date===c.date });
     let note="Decided by title odds at "+clock(t)+".";
     if(anyLive){ let best=null, sc=[];
@@ -4037,7 +4042,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13n", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13o", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
