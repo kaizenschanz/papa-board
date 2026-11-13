@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-weqIokDNzHXsP8NVrwJImednVg1/0xs3BympCEjDvVg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6PZONNQiMciqui9TPLq1sUDTrQ2af/m7/AWY7dUmaMg='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1565,6 +1565,8 @@ function liveTag(pid,g){ const tip=tipAt(pid,g.date)||Date.parse(g.date+"T19:00:
   if(/^gtd$/i.test(inj)) return "Questionable";
   if(/^out$/i.test(inj)) return "Out";
   return inj? null : "none" }
+// ruled out for that day's game: tagged Out or Doubtful (Doubtful sat 99% in the reports)
+function ruledOut(pid,date){ const g=playerWeek(pid).games.find(x=>x.date===date && !x.done); if(!g) return false; const t=liveTag(pid,g); return t==="Out"||t==="Doubtful" }
 // did he miss his team's last game (not one he sat on a fantasy bench)? This week's finished games, else the morning refit's
 function missedLast(pid){ const gs=playerWeek(pid).games.filter(g=>g.done); if(gs.length){ const g=gs[gs.length-1]; return !!g.dnp && !(g.gone>0) } return (SIT?.p?.[pid]?.[6]||0)>0 }
 // the kind of injury from ESPN's details (body part + Strain / Sprain / Surgery / Soreness...), grouped the way sit_fit groups
@@ -2566,7 +2568,7 @@ function todoItems(A,P){
       if(E.ov && !started){ const sl=swapLine(A,P,E.then,E.pid,N.day,E.then,N.day); if(!sl) continue;
         const keepAll=!(sl.bar>sl.lo+0.01), back=sl.bar===Infinity, bar=fx(sl.bar);
         const sw_= E.bridge? "start "+nm(E.then) : "put "+nm(E.then)+" back", Sw_= E.bridge? "Start "+nm(E.then) : "Put "+nm(E.then)+" back";
-        const so= (keepAll? "Keep him in whatever he has at "+clock(E.thenTip)+"; "+nm(E.then)+" sits." : back? Sw_+" before "+clock(E.thenTip)+" whatever he has." : "At "+clock(E.thenTip)+", keep him only if he has "+bar+"+ so far; otherwise "+sw_+".")+(E.bridge? " If "+last(E.then)+" is ruled out, keep him in." : "");
+        const so= (keepAll? "Keep him in whatever he has at "+clock(E.thenTip)+"; "+nm(E.then)+" sits." : back? Sw_+" before "+clock(E.thenTip)+" whatever he has." : "At "+clock(E.thenTip)+", keep him only if he has "+bar+"+ so far; otherwise "+sw_+"."); if(E.bridge && ruledOut(E.then,N.day)) so=nm(E.then)+" is out: keep him in.";
         out.push({t:E.tip, pid:E.pid, kind:"look", title: already? nm(E.pid)+" plays in "+P.SL[slot]+" at "+clock(E.tip)+" (free look)" : "Optional: start "+nm(E.pid)+" at "+P.SL[slot]+" for his "+clock(E.tip)+" game",
           note:so, sub:so+(lastG? " If he stays in, it's his last game, so it counts without a lock." : " If he stays in, lock it if it ends big.")+later,
           rems:(already? [] : [{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}])
@@ -2688,11 +2690,11 @@ function todoItems(A,P){
         note: ok||sw? "" : "Otherwise bench him mid-game and "+bring(m.pid,sIdx)+".",
         sub:(sw||ok? "" : "Check at "+clock(bt)+", "+nm(m.pid)+"'s tip. Under "+bar+", bench him and "+bring(m.pid,sIdx)+" (lock "+nm(m.pid)+"'s game only if it ends big).")+back,
         rems: ok? [] : [{id:"mid-"+pid+"-"+m.date, t:bt, lead:10, title: sw? Bring(m.pid,sIdx,last)+" for "+last(who) : last(who)+" under "+bar+" so far? "+Bring(m.pid,sIdx,last)+" for him"}]}) } }
-  // same-time backups: only if the holder is ruled out before tip (user, 11-12: "if Powell sits I can slide Stewart to F")
-  for(const [hp,b] of Object.entries(P.backupS||{})){ const x=X(hp), q=P.pick.get(hp); if(!x||!q) continue; const tb=tipAt(b.pid,b.date); if(!tb || tb<=now) continue;
-    out.push({t:tb-30*60e3, approx:true, kind:"check", title:"If "+x.a.info.name+" is ruled out: "+bring(b.pid,q.slot)+" for "+dayLabel(b.date)+" "+clock(tb),
-      sub:nm(b.pid)+(tb<tipAt(hp,b.date)-LOOK_GAP? " tips before him" : " tips with him")+", so he only covers "+last(hp)+" sitting. "+last(hp)+" is "+Math.round((1-dnpP(x.a.future.find(g=>g.date===b.date)||{date:b.date},0,hp))*100)+"% to play.",
-      rems:[{id:"cover-"+hp+"-"+b.date, t:tb-45*60e3, lead:0, title:last(hp)+" out? "+Bring(b.pid,q.slot,last)}]}) }
+  // same-time backups: shown only once the holder is actually ruled out (user, 11-13: "you don't have to put the if so and so is
+  // ruled out stuff in the to do, just update the to do if someone is ruled out"); the plan still counts on them either way
+  for(const [hp,b] of Object.entries(P.backupS||{})){ const x=X(hp), q=P.pick.get(hp); if(!x||!q) continue; const tb=tipAt(b.pid,b.date); if(!tb || tb<=now || !ruledOut(hp,b.date)) continue;
+    out.push({t:tb-30*60e3, approx:true, kind:"move", title:Bring(b.pid,q.slot)+" ("+nm(hp)+" is out)", sub:nm(hp)+" is ruled out for "+dayLabel(b.date)+".",
+      rems:[{id:"cover-"+hp+"-"+b.date, t:tb-45*60e3, lead:0, title:last(hp)+" out: "+Bring(b.pid,q.slot,last)}]}) }
   return out.sort((a,b)=>(a.t??0)-(b.t??0));
 }
 // One column per day in a sideways strip (swipe for later days; the next one peeks in), "Now" items above it. The strip keeps
@@ -3923,7 +3925,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13b", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13c", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
