@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-x/oVwqRQNTHXvWh5bPSZmPSUFAe5ebf3xsh66Uol/VY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-02xj3e60VL7sZy/Rrv2S8AmylxxluWnVSeaI+DyOOhk='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1244,7 +1244,8 @@ async function loadClocks(){
         const per=s.period||1, left=+s.clock||0;
         const f= st==="post"? 1 : per<=4? Math.min(0.99,((per-1)*720+(720-left))/2880) : 0.99;
         const label= st==="post"? "final" : (s.type?.shortDetail||("Q"+per+" "+(s.displayClock||"")));
-        for(const x of e.competitions?.[0]?.competitors||[]){ const ab=ESPN_TEAM[x.team.abbreviation]||x.team.abbreviation; (W.clock[ab] ||= {})[day]={f,label,state:st} }
+        const cs=e.competitions?.[0]?.competitors||[];
+        for(const x of cs){ const ab=ESPN_TEAM[x.team.abbreviation]||x.team.abbreviation, o=cs.find(y=>y!==x), mg= o && x.score!=null && o.score!=null? (+x.score)-(+o.score) : null; (W.clock[ab] ||= {})[day]={f,label,state:st,mg} }
       }
     }catch(err){}
   }));
@@ -1345,10 +1346,10 @@ function playerWeek(pid){
     if(isLive){
       const ls=W.stats[pid]?.[g.game_id]?.stats; cur= ls? scoreStats(ls) : 0; const mins=ls? (ls.min||0) : 0;
       const f=clk? clk.f : 0.5, preMin= pr&&pr.stats&&pr.stats.sp? pr.stats.sp/60 : 30; mu0=mu; lf=f;   // pregame mean and share played (mid-game switch model)
-      const rate= mu>0? mu/preMin : 0, pace= mins>=6? cur/mins : rate;
-      const remMin=Math.max(0, preMin*(1-f));
       sdL=sdFor(pid,mu)*Math.sqrt(Math.max(0,1-f));
-      mu= cur + remMin*(0.75*rate+0.25*pace);
+      // the rest of his game: the fitted live rule (liveRest), with his minutes, fouls and his team's margin when known
+      const mg= clk && clk.mg!=null? clk.mg : null;
+      mu= cur + (LIVE? liveRest(cur, f, mu, {min: ls? (ls.min||0) : null, pf: ls? (ls.pf||0) : 0, mg}) : (()=>{ const rate= mu>0? mu/preMin : 0, pace= mins>=6? cur/mins : rate; return Math.max(0, preMin*(1-f))*(0.75*rate+0.25*pace) })());
       clock= clk? clk.label : "live";
     }
     return {id:g.game_id, cur, clock, src:bl?.src||"", line:bl?.line||null, slp:bl?.slp, parts:bl?.parts||null, model:!!bl?.model, date:g.date, done, live: isLive, fp: played? scoreStats(st.stats) : (done?0:null), dnp: done && !played, mu, sd: sdL!=null? sdL : sdFor(pid,mu), mu0, lf};
@@ -1531,6 +1532,19 @@ const FALLBACK = {"pick":"current","w":null,"test":{"current":[5.3676,6.7769],"s
 // A prop's line moved by its prices (user, 11-12: an over at -140 isn't a coin flip): the over's no-vig chance p moves the line by
 // c x (p - 0.5) x sqrt(line), c per stat from prop_fit.py, used only while that beats the plain line on later games.
 const PROPADJ = {"use":true,"c":{"pts":4.542,"ast":2.7169,"reb":3.4107,"tpm":2.1838,"stl":3.2284,"blk":4.115},"test":{"plain":[5.5837,0.271,1123],"price":[5.5665,0.096,1123]},"test_from":"2026-11-02"};
+// The rest of a live game, fitted on this season's play-by-play (live_fit.py, user 11-13: "tune this to get more accurate"): per
+// share-of-game bucket, rest = a x (share left x pregame mean) + c x points so far + k, and with Sleeper's live minutes and fouls
+// and the scoreboard margin when they're known (blowouts, foul trouble). Tested on later days: miss 3.61 vs 3.84 for the old
+// "75% pregame rate, 25% pace" rule, which stays as the fallback without the file.
+const LIVE = {"n_games":2423,"n_samples":36345,"test_from":"2026-11-05","ph":[0.0,0.125,0.25,0.375,0.5,0.625,0.75,0.875,1.0],"test":{"current":[3.8366,5.1859],"w_bucket":[3.7127,4.9632],"linear_bucket":[3.6819,4.9397],"state_same_games":{"linear":[3.6819,4.9397],"with_state":[3.5772,4.8656],"n":15630,"no_floor":[3.612,4.8924]},"spread_crps":{"r1":2.584,"fitted":2.5758}},"state":{"G":[[0.9602798610012395,0.2791521517611955,0.9956882634997533,-0.1364142515647803,-0.27552605379788314,-0.203411635379798,0.0,0.0],[0.9510144661864478,0.13707960907228786,1.371645810602521,-0.22395132171743665,-0.6443075348134961,-0.05308362062295672,0.0,0.0],[0.9960690471861211,0.1554696523539798,0.7135374732526538,-0.0946221393767862,-0.7595499981923305,-0.12697079027824074,0.0,-0.6427624830280468],[1.0567933167461965,0.11909923422784532,0.23556515409990195,-0.06566726522435,-0.7067402898435131,-0.1463453951415329,0.0,-0.4692249484514086],[0.9487655583428773,0.0997501559431125,0.8904888105767776,-0.05657218313442481,-0.0895031970412427,-0.2056178721905943,-0.22328696521450503,-0.16233365752377052],[0.9212140637283738,0.0862733274191007,1.9657115921240857,-0.11469092286761984,0.23005195839377074,-0.3254927185282819,-0.618482035403274,-0.01738063330840566],[0.9980589379102447,0.04910513136547732,0.9708180831371206,-0.04524519749788429,0.49008555878928795,-0.4814643923010434,-0.3723070766125305,0.0],[1.2373402086480942,0.023842565488950775,0.2577593208480628,-0.010377550513392357,0.05566831806815061,-0.8075925417707693,-0.35707784379742896,0.0]],"feat":"m0,cur,1,min,fouls*m0/20,|margin|*m0/20,(fouls>=5)*m0,(fouls>=4&ph<.75)*m0"},"pick":"linear_bucket","lin":[[0.9077,0.2357,1.0906],[0.8654,0.0436,1.4294],[0.8986,0.1286,0.4701],[0.9359,0.0998,-0.0821],[0.7908,0.079,0.6071],[0.5855,0.0362,1.3487],[0.6369,0.0304,0.5761],[0.6987,0.0192,0.0866]],"r":[1.0,0.9,0.9,0.9,0.9,0.9,1.1,1.5]};
+function liveBk(f){ const E=LIVE?.ph; if(!E) return 0; let b=0; while(b<E.length-2 && f>=E[b+1]) b++; return b }
+function liveRest(cur,f,mu0,stt){ f=Math.min(1,Math.max(0,f||0)); if(f>=1) return 0; const m0=(1-f)*(mu0||0), b=liveBk(f);
+  const G=LIVE?.state?.G?.[b];
+  if(G && stt && stt.min!=null && stt.mg!=null){ const pf=stt.pf||0, x=[m0, cur, 1, stt.min, pf*m0/20, Math.abs(stt.mg)*m0/20, (pf>=5? 1 : 0)*m0, (pf>=4 && f<0.75? 1 : 0)*m0];
+    let v=0; for(let i=0;i<x.length;i++) v+=G[i]*x[i]; return Math.max(0,v) }
+  const L=LIVE?.lin?.[b]; if(L) return Math.max(0, L[0]*m0+L[1]*cur+L[2]);
+  return (1-f)*(0.75*(mu0||0)+0.25*(f>=0.125? cur/f : (mu0||0))) }
+function liveR(f){ const R=LIVE?.r; return R? (R[liveBk(f)]||1) : 1 }
 // His stat line from the props: each prop's line (moved by its prices), shooting volume scaled to the points line, turnovers to
 // points + assists, the rest Sleeper's. One function for both the projection and the stat line shown (user, 11-12).
 function propStats(L,st){ const Lp=propLine(L,"pts"), La= L.ast!=null? propLine(L,"ast") : null;
@@ -1630,7 +1644,7 @@ function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
 // a mid-game switch. A live game also carries its real clock (f0 = share played at time `at`) and its pregame mean.
 function mkStep(ppid,g,j){
   const t=tipAt(ppid,g.date), st={mu:g.mu, r:volOf(ppid), cur: g.live? (g.cur||0) : null, key:hashKey(ppid+":"+(g.id||g.date)), pm:dnpP(g,j,ppid), ...sitCond(ppid,g), ps: (g.live||g.cur!=null||g.src==="dk")? 0 : projSd(g.mu), t, pid:ppid, date:g.date};
-  if(g.live){ st.mu0= g.mu0>0? g.mu0 : g.mu; st.f0= g.lf>0? Math.min(1,g.lf) : 0; st.m0=phaseMin(st.f0); st.at=W.updated||Date.now(); st.end=st.at+(PH_END-st.m0)*60e3; st.ord= t||st.at-st.m0*60e3 }
+  if(g.live){ st.mu0= g.mu0>0? g.mu0 : g.mu; st.f0= g.lf>0? Math.min(1,g.lf) : 0; st.m0=phaseMin(st.f0); st.at=W.updated||Date.now(); st.end=st.at+(PH_END-st.m0)*60e3; st.ord= t||st.at-st.m0*60e3; st.r=(st.r||1)*liveR(st.f0) }   // rest-of-game width, fitted by game phase (live_fit)
   else { st.mu0=g.mu; if(t) st.end=t+GAME_MS; st.ord= t||Date.parse(g.date+"T19:00:00") }
   return st }
 // Steps in tip order: a bench fallback's game can come before the previous fallback's later games, never after them.
@@ -1678,7 +1692,7 @@ function overlapOf(st,i){ const t=st[i]; if(!t.end) return null; const J=[], fro
   return k>i+1? {J,k} : null }
 // What staying with him is worth given p so far: the board's live projection (rest of the game at 75% his pregame rate and 25% his
 // pace, after 6 of 48 minutes), then the final against whatever tips after his game; at an earlier look, the later looks too.
-function remMu(p,ph,mu0){ return Math.max(0,1-ph)*(0.75*mu0+0.25*(ph>=0.125? p/ph : mu0)) }
+function remMu(p,ph,mu0){ return liveRest(p,ph,mu0,null) }
 function kvAt(T,p){ const n=T.v.length, x=(p-T.lo)/T.step; if(!(x>0)) return T.v[0]; if(x>=n-1) return T.v[n-1]+(p-T.lo-(n-1)*T.step); const i=Math.floor(x); return T.v[i]+(T.v[i+1]-T.v[i])*(x-i) }
 function kvTables(t,o,st,V){
   const L=o.J.length, r=t.r||1, Tend= o.k<st.length? V.G[o.k] : null, mu0= t.mu0>0? t.mu0 : t.mu, live=t.cur!=null,
@@ -4053,7 +4067,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13p", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13q", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
