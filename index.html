@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-kysrUyipLm7FRsjf3VcwfNpEw/u/MrQLH1kPjHfTCVI='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B0gcX6PGhopVB6DYQ1AtOJBk49966xRDK4XN8tHJ/9Q='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2107,7 +2107,7 @@ function planWeek(A,opt={}){
   for(const [pid,q] of [...best.pick].filter(([,q])=>q.k==="hold")){
     const c=C.find(c=>c.pid===pid), gs=holdGames(c); if(!gs.length) continue;
     const base=waitValueT(gs,term[pid],rhoT[pid]), first=gs[0].date, ft= gs[0].live? null : tipAt(pid,first); let bp=null;
-    for(const o of C){ if(best.pick.has(o.pid)||usedB.has(o.pid)||usedP.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+    for(const o of C){ if(best.pick.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;   // shared across slots (resolveDraw)
       const g=o.x.a.future.filter(g=>g.mu>0); if(!g.length) continue;
       const lg=g[g.length-1], same=lg.date===first, lt= same? tipAt(o.pid,lg.date) : null;
       if(lg.date>first || (same && !(ft && lt && lt<ft-LOOK_GAP))) continue;
@@ -2121,7 +2121,7 @@ function planWeek(A,opt={}){
   const preMid=[];
   for(const [pid,bp] of Object.entries(pre)){ if(bp.games.length!==1) continue; const q=best.pick.get(pid); if(!q) continue;
     const g1=bp.games[0], t1=tipAt(bp.pid,g1.date); if(!t1) continue; let p0=null;
-    for(const o of C){ if(best.pick.has(o.pid)||usedB.has(o.pid)||usedP.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+    for(const o of C){ if(best.pick.has(o.pid)||o.pid===bp.pid||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
       const og=o.x.a.future.find(h=>h.date===g1.date && h.mu>0); if(!og) continue; const ot=tipAt(o.pid,og.date); if(!ot || ot>t1-LOOK_GAP) continue;
       if(!p0 || og.mu>p0.g.mu) p0={pid:o.pid, g:og} }
     if(!p0) continue;
@@ -2135,7 +2135,7 @@ function planWeek(A,opt={}){
     const c=C.find(c=>c.pid===pid), gs=holdGames(c); if(!gs.length || gs[0].live) continue; const first=gs[0].date, ft=tipAt(pid,first); if(!ft) continue;
     const pr=pre[pid]; if(pr && (pr.then || !pr.same || pr.games[pr.games.length-1].date!==first)) continue;
     const pe= pr? (tipAt(pr.pid,first)||0)+GAME_MS : 0; let br=null;
-    for(const o of C){ if(best.pick.has(o.pid)||usedB.has(o.pid)||usedP.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+    for(const o of C){ if(best.pick.has(o.pid)||(pr && o.pid===pr.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
       const og=o.x.a.future.find(h=>h.date===first && h.mu>0); if(!og) continue; const ot=tipAt(o.pid,first);
       if(!ot || ot>ft-LOOK_GAP || ot+GAME_MS<=ft || ot<pe) continue;
       if(!br || og.mu>br.g.mu) br={pid:o.pid, g:og, date:first} }
@@ -2145,7 +2145,7 @@ function planWeek(A,opt={}){
   // when it's his score so far against the look (user, 11-13); the chain starts with him
   for(const [hp,pr] of Object.entries(pre)){ if(!pr.same) continue; const q=best.pick.get(hp); if(!q) continue;
     const g1=pr.games[0], t1=tipAt(pr.pid,g1.date); if(!t1) continue;
-    const occ=A.find(x=>x.starter && x.idx===q.slot); if(!occ || occ.pid===hp || occ.pid===pr.pid || occ.a.lockedOn || best.pick.has(occ.pid) || usedP.has(occ.pid) || usedB.has(occ.pid)) continue;
+    const occ=A.find(x=>x.starter && x.idx===q.slot); if(!occ || occ.pid===hp || occ.pid===pr.pid || occ.a.lockedOn || best.pick.has(occ.pid) || usedP.has(occ.pid)) continue;
     const og= occ.a.live && occ.a.live.date===g1.date? occ.a.live : occ.a.future.find(h=>h.date===g1.date && h.mu>0); if(!og) continue;
     const ot= tipAt(occ.pid,og.date); if(!ot || ot>t1-LOOK_GAP || ot+GAME_MS<=t1) continue;
     pr.lead={pid:occ.pid, g:og}; usedP.add(occ.pid) }
@@ -2221,7 +2221,12 @@ function planWeek(A,opt={}){
         // stay where he is, then the narrowest (the lock step's order).
         const free=x.opts.filter(o=>!usedS.has(o.s.hp)), top=Math.max(-Infinity,...free.map(o=>o.gain));
         const o=free.filter(o=>o.gain>=top-0.25).sort((a,b)=>here(b.s.slot)-here(a.s.slot) || tier(SL[a.s.slot])-tier(SL[b.s.slot]) || b.gain-a.gain)[0];
-        if(!o) continue; usedS.add(o.s.hp); (idle[o.s.hp] ||= []).push({pid:x.c.pid, g:x.g, date:d}) } }
+        if(!o) continue; usedS.add(o.s.hp); (idle[o.s.hp] ||= []).push({pid:x.c.pid, g:x.g, date:d}) }
+      // ...and every other open slot he'd help (user, 11-13: "I need this to represent reality"): his game is an option in each of
+      // them, and the simulation gives it to whichever slot gains most in that draw (resolveDraw), the way it already does backups.
+      // The placement above stays the To do's suggestion; these are alt (no To do line of their own).
+      for(const x of cand){ const prim=Object.keys(idle).find(hp=>(idle[hp]||[]).some(m=>m.pid===x.c.pid && m.date===d && !m.alt));
+        for(const o of x.opts) if(o.s.hp!==prim && o.gain>0.05 && !(idle[o.s.hp]||[]).some(m=>m.pid===x.c.pid && m.date===d)) (idle[o.s.hp] ||= []).push({pid:x.c.pid, g:x.g, date:d, alt:true}) } }
     // Same-night looks, after another game in the slot is over: the holder played early, or an off-day look did, and a bench
     // player tips once that game has ended (user, 11-10: Hartenstein and McCain at 8 PM, behind Embiid's and Rollins' early
     // games, had no To do line). Free unless the earlier score gets locked; the lock check comes first. One per slot a night,
@@ -2288,7 +2293,8 @@ function planWeek(A,opt={}){
     const early={}, early2={};
     // same-day free looks the plan counts on (pre above): the bench player plays first in the holder's slot. ov: his game is
     // still on at the holder's tip, so keep-or-switch is decided then on his score so far
-    for(const [hp,pr] of Object.entries(pre)){ if(!pr.same || night.pick.has(pr.pid)) continue; const q=best.pick.get(hp), lg=pr.games[pr.games.length-1];
+    const earlyHas=pid=>Object.values(early).some(E=>E.pid===pid);   // a shared look gets one To do line (his best use)
+    for(const [hp,pr] of Object.entries(pre)){ if(!pr.same || night.pick.has(pr.pid) || earlyHas(pr.pid)) continue; const q=best.pick.get(hp), lg=pr.games[pr.games.length-1];
       if(!q || lg.date!==day || early[q.slot]) continue; const tc=tipOf(pr.pid), th=tipOf(hp); if(tc==null || th==null) continue;
       const bp_= pr.br? pr.br.pid : pr.then, bt= bp_? tipOf(bp_) : null;   // the later look that day, before the regular (Clingan 7:00)
       if(bt!=null){ early[q.slot]={pid:pr.pid, tip:tc, then:bp_, thenTip:bt, ov: tc+GAME_MS>bt}; early2[q.slot]={pid:bp_, tip:bt, then:hp, thenTip:th, ov: bt+GAME_MS>th, bridge:true} }
@@ -2296,7 +2302,7 @@ function planWeek(A,opt={}){
       const rest=C.find(c=>c.pid===pr.pid).x.a.future.filter(h=>h.date>day); at[pr.pid]=lockAt(C,slots,SL,pr.pid, rest.length? waitValue(rest) : null) }
     // ...and a free look on a day the holder doesn't play (Clingan Fri in UTIL, Embiid back Sun): the plan counts on it, so the To
     // do says it (user, 11-12: the slot was worth 24.9 with Clingan's look, but nothing told you to start him)
-    for(const [hp,pr] of Object.entries(pre)){ if(pr.same || night.pick.has(pr.pid)) continue; const q=best.pick.get(hp); if(!q || early[q.slot]) continue;
+    for(const [hp,pr] of Object.entries(pre)){ if(pr.same || night.pick.has(pr.pid) || earlyHas(pr.pid)) continue; const q=best.pick.get(hp); if(!q || early[q.slot]) continue;
       const g=pr.games.find(h=>h.date===day); if(!g) continue; const hc=C.find(c=>c.pid===hp); if(!hc || hc.x.a.future.some(h=>h.date===day)) continue;
       const nx=hc.x.a.future.find(h=>h.date>day); const tc=tipOf(pr.pid), th= nx? tipAt(hp,nx.date) : null; if(tc==null || th==null) continue;
       const lt= pr.then? tipOf(pr.then) : null;   // the later look that day (Clingan at 7) comes next, before the regular
@@ -3974,7 +3980,7 @@ async function backtestDays(w){
       if(/bt=2s/.test(location.search)){ const fin=si=>{ const pid=T.starters[si]; if(!pid||pid==="0") return 0; const g=gamesOf(pid), gid=T.sg[pid], li= gid!=null? g.findIndex(x=>x.id===String(gid)) : g.map(x=>x.fp!=null).lastIndexOf(true); return li>=0? (g[li].fp||0) : 0 };
         const SR=(window.__btS ||= []), dIdx=days.indexOf(day);
         for(const [pid,q] of Q.pick){ const pt=Dd.parts.get(pid); if(!pt) continue; const st= q.k==="lock"? [] : slotSteps(A,Q,pid), nOwn=st.filter(x=>x.pid===pid).length, held= heldScore(A.find(y=>y.pid===pid))>0;
-          SR.push({w, d:dIdx, k:q.k, n:st.length, own:nOwn, held, proj:+pt.m.toFixed(2), act:+fin(q.slot).toFixed(2), slot:SL[q.slot]}) }
+          const fp_=T.starters[q.slot]; SR.push({w, d:dIdx, k:q.k, n:st.length, own:nOwn, held, proj:+pt.m.toFixed(2), act:+fin(q.slot).toFixed(2), slot:SL[q.slot], later: !!fp_ && fp_!=="0" && !players.includes(fp_), rid:T.rid}) }
         for(const x of A) if(x.starter && x.a.lockedOn) SR.push({w, d:dIdx, k:"locked", n:0, own:0, held:false, proj:x.a.lockedOn.fp, act:+fin(x.idx).toFixed(2), slot:SL[x.idx]}) }
       res.push({tot:Dd.tot, m:Dd.m, rid:T.rid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
     const realT=Object.fromEntries((LG.past?.[w-1]||[]).map(x=>[x.roster_id, x.points]));
@@ -4170,7 +4176,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13y", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13z", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
