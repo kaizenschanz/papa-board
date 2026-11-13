@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-q1cTUCnq9arIAmrFy5+OOGxGIfvz786EAnRYl1T1Uns='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-x/oVwqRQNTHXvWh5bPSZmPSUFAe5ebf3xsh66Uol/VY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1811,12 +1811,15 @@ function playPath(st,V,s,risk,blocked,sharedPid,x0=0){
 // was free for him from t on with a player who could slide into slot a. Null when every slide is real.
 function rotCheck(slots,keptOf){
   for(let a=0;a<slots.length;a++){ const S=slots[a]; if(!S.rot) continue; const k=keptOf(a); if(k<0 || !S.rot[k]) continue;
-    const p=S.st[k].pid, t=S.st[k].t||S.st[k].ord; let ok=false;
-    for(let b=0;b<slots.length && !ok;b++){ if(b===a) continue; const T=slots[b]; if(!T.sn || !elig(S.pos(p),T.sn)) continue;
-      const kb=keptOf(b), tb= kb<0? -Infinity : (T.st[kb].t||T.st[kb].ord); if(tb>t) continue;   // he was bumped by someone later
-      if(kb>=0 && !elig(S.pos(T.st[kb].pid),S.sn)) continue;                                 // whoever was there can't slide over
-      ok=true }
-    if(!ok) return {a,k,t,p} }
+    const p=S.st[k].pid, t=S.st[k].t||S.st[k].ord; if(!rotHost(slots,keptOf,a,p,t)) return {a,k,t,p} }
+  return null }
+// A slot b he can play that nobody took after t, whose player slides into slot a straight or through a third slot c (also untouched
+// after t). Returns [b] or [b,c], null when there's none.
+function rotHost(slots,keptOf,a,p,t){ const S=slots[a], at=b=>{ const kb=keptOf(b); return kb<0? null : slots[b].st[kb] }, late=b=>{ const q=at(b); return q && (q.t||q.ord)>t };
+  for(let b=0;b<slots.length;b++){ if(b===a) continue; const T=slots[b]; if(!T.sn || !elig(S.pos(p),T.sn) || late(b)) continue;
+    const qb=at(b); if(!qb || elig(S.pos(qb.pid),S.sn)) return [b];
+    for(let c=0;c<slots.length;c++){ if(c===a || c===b) continue; const U=slots[c]; if(!U.sn || late(c)) continue; const qc=at(c);
+      if(elig(S.pos(qb.pid),U.sn) && (!qc || elig(S.pos(qc.pid),S.sn))) return [b,c] } }
   return null }
 function resolveDraw(slots,s,risk,sharedPid){
   const blk=new Array(slots.length).fill(null), res=slots.map(S=>playPath(S.st,S.V,s,risk,null,sharedPid,S.x0||0));
@@ -1830,10 +1833,15 @@ function resolveDraw(slots,s,risk,sharedPid){
       // player there); whichever leaves the two slots with more
       const S=slots[c.a], bA=new Set(blk[c.a]||[]); bA.add(S.st[c.k].key); const rA=playPath(S.st,S.V,s,risk,bA,sharedPid,S.x0||0);
       let best={gain:rA.val-res[c.a].val, a:c.a, blk:bA, r:rA};
+      const cut=b=>{ const T=slots[b], bB=new Set(blk[b]||[]); for(const q of T.st) if((q.t||q.ord)>c.t) bB.add(q.key); return {b, blk:bB, r:playPath(T.st,T.V,s,risk,bB,sharedPid,T.x0||0)} };
       for(let b=0;b<slots.length;b++){ if(b===c.a) continue; const T=slots[b]; if(!T.sn || !elig(S.pos(c.p),T.sn)) continue;
-        const bB=new Set(blk[b]||[]); for(const q of T.st) if((q.t||q.ord)>c.t) bB.add(q.key); const rB=playPath(T.st,T.V,s,risk,bB,sharedPid,T.x0||0);
-        if(rB.kept>=0 && !elig(S.pos(T.st[rB.kept].pid),S.sn)) continue; const g=rB.val-res[b].val; if(g>best.gain) best={gain:g, a:b, blk:bB, r:rB} }
-      blk[best.a]=best.blk; res[best.a]=best.r; continue }
+        const B=cut(b), qb= B.r.kept>=0? T.st[B.r.kept] : null;
+        if(!qb || elig(S.pos(qb.pid),S.sn)){ const g=B.r.val-res[b].val; if(g>best.gain) best={gain:g, set:[B]}; continue }
+        for(let u=0;u<slots.length;u++){ if(u===c.a || u===b) continue; const U=slots[u]; if(!U.sn || !elig(S.pos(qb.pid),U.sn)) continue;
+          const Cc=cut(u), qc= Cc.r.kept>=0? U.st[Cc.r.kept] : null; if(qc && !elig(S.pos(qc.pid),S.sn)) continue;
+          const g=B.r.val-res[b].val+Cc.r.val-res[u].val; if(g>best.gain) best={gain:g, set:[B,Cc]} } }
+      if(best.set) for(const z of best.set){ blk[z.b]=z.blk; res[z.b]=z.r } else { blk[best.a]=best.blk; res[best.a]=best.r }
+      continue }
     (blk[hit.lose] ||= new Set()).add(hit.key);
     res[hit.lose]=playPath(slots[hit.lose].st,slots[hit.lose].V,s,risk,blk[hit.lose],sharedPid,slots[hit.lose].x0||0) }
   for(let a=0;a<slots.length;a++){ slots[a].arr[s]=slots[a].wb+res[a].val; slots[a].fin[s]=res[a].kept }
@@ -2004,11 +2012,12 @@ function planWeek(A,opt={}){
   // even when he can't play that holder's slot himself, as long as another unlocked holder can slide into it and free a slot he
   // can play (Clingan, C/UTIL, replacing Buzelis at PF while Hayes slides UTIL -> PF). Totals only care who plays, not where.
   const fitsVia=(pos,slot,hp,date)=>{ if(elig(pos,SL[slot])) return true;
-    for(const [h2,q2] of best.pick){ if(h2===hp || q2.k!=="hold" || q2.slot===slot) continue; const c2=C.find(c=>c.pid===h2); if(!c2) continue;
-      if(elig(c2.pos,SL[slot]) && elig(pos,SL[q2.slot])) return true;
-      // ...or the free look playing that slot that day slides over (Stewart, C/PF, from UTIL to PF so Clingan takes UTIL)
-      const lk= date? pre[h2] : null, lc= lk && lk.games.some(g=>g.date===date)? C.find(c=>c.pid===lk.pid) : null;
-      if(lc && elig(lc.pos,SL[slot]) && elig(pos,SL[q2.slot])) return true }
+    // who can be in each other open slot then: its holder, or the free look playing it that day (Stewart, C/PF, in UTIL)
+    const occ=[]; for(const [h2,q2] of best.pick){ if(h2===hp || q2.k!=="hold" || q2.slot===slot) continue; const c2=C.find(c=>c.pid===h2); if(c2) occ.push({slot:q2.slot, pos:c2.pos});
+      const lk= date? pre[h2] : null, lc= lk && lk.games.some(g=>g.date===date)? C.find(c=>c.pid===lk.pid) : null; if(lc) occ.push({slot:q2.slot, pos:lc.pos}) }
+    // one slide (Stewart UTIL -> PF, Clingan UTIL) or two (Stewart F -> PF, Powell UTIL -> F, Clingan UTIL; user, 11-13)
+    for(const o1 of occ) if(elig(o1.pos,SL[slot])){ if(elig(pos,SL[o1.slot])) return true;
+      for(const o2 of occ) if(o2.slot!==o1.slot && elig(o2.pos,SL[o1.slot]) && elig(pos,SL[o2.slot])) return true }
     return false };
   // A last game isn't forced if a bench player can take the slot in a later game: give each slot holder the best unused
   // eligible fallback whose games come after his, and value the holder's chain with that fallback at the end.
@@ -2575,8 +2584,10 @@ function todoItems(A,P){
   // (user, 11-12: "move Hayes to PF and put Clingan at UTIL")
   const bring=(pid,slot,nmf=nm)=>{ const pos=X(pid)?.a.info.pos||playerInfo(pid).pos||[], verb= X(pid)?.starter? "move "+nmf(pid)+" to " : "start "+nmf(pid)+" at ";
       if(slot==null || elig(pos,P.SL[slot])) return X(pid)?.starter? "move "+nmf(pid)+" to "+P.SL[slot] : "start "+nmf(pid)+(slot!=null? " at "+P.SL[slot] : "");
-      for(const [h2,q2] of Object.entries(P.pre||{}).map(([hp,pr])=>[pr.pid,{k:"hold",slot:P.pick.get(hp)?.slot}]).concat([...P.pick])){ if(q2.k!=="hold" || q2.slot==null || q2.slot===slot) continue; const h=X(h2); if(!h || h.a.lockedOn) continue;
-        if(elig(h.a.info.pos,P.SL[slot]) && elig(pos,P.SL[q2.slot])) return "move "+nmf(h2)+" to "+P.SL[slot]+" and "+verb+P.SL[q2.slot] }
+      const oc=Object.entries(P.pre||{}).map(([hp,pr])=>[pr.pid,{k:"hold",slot:P.pick.get(hp)?.slot}]).concat([...P.pick]).filter(([h2,q2])=>q2.k==="hold" && q2.slot!=null && q2.slot!==slot && X(h2) && !X(h2).a.lockedOn);
+      for(const [h2,q2] of oc) if(elig(X(h2).a.info.pos,P.SL[slot]) && elig(pos,P.SL[q2.slot])) return "move "+nmf(h2)+" to "+P.SL[slot]+" and "+verb+P.SL[q2.slot];
+      for(const [h2,q2] of oc) if(elig(X(h2).a.info.pos,P.SL[slot])) for(const [h3,q3] of oc) if(q3.slot!==q2.slot && elig(X(h3).a.info.pos,P.SL[q2.slot]) && elig(pos,P.SL[q3.slot]))
+        return "move "+nmf(h2)+" to "+P.SL[slot]+", "+nmf(h3)+" to "+P.SL[q2.slot]+" and "+verb+P.SL[q3.slot];
       return verb+P.SL[slot] },
     Bring=(pid,slot,nmf)=>{ const t=bring(pid,slot,nmf); return t[0].toUpperCase()+t.slice(1) };   // lock-screen reminders: last names, verb first
   // waiver claim for later days (clears overnight), only if it raises title odds; the runners-up go in the note.
@@ -4042,7 +4053,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-13o", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-13p", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
