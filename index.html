@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-FNs2o0Ust4SPtTIO1fVIQgaTrR2nC0MywnALhUkQj1k='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nwdee+CrmY9HP7onf/fNlMqdCd1C6o01tNQbbet3U/Y='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1354,18 +1354,19 @@ function playerWeek(pid){
     if(bl) mu=bl.mu;
     // live game: points so far + the rest of his projection for the share of the game left (in-game pace counts 25%)
     const clk=W.clock?.[info.team]?.[g.date], isLive=!done && (g.status!=="pre_game" || !!clk);
-    let cur=null, clock=null, sdL=null, mu0=null, lf=null;
+    let cur=null, clock=null, sdL=null, mu0=null, lf=null, onNow=null;
     if(isLive){
       const ls=W.stats[pid]?.[g.game_id]?.stats; cur= ls? scoreStats(ls) : 0; const mins=ls? (ls.min||0) : 0;
       const f=clk? clk.f : 0.5, preMin= pr&&pr.stats&&pr.stats.sp? pr.stats.sp/60 : 30; mu0=mu; lf=f;   // pregame mean and share played (mid-game switch model)
       sdL=sdFor(pid,mu)*Math.sqrt(Math.max(0,1-f));
       // the rest of his game: the fitted live rule (liveRest), with his minutes, fouls and his team's margin when known
       const mg= clk && clk.mg!=null? clk.mg : null, oc=[g.home?.on_court, g.away?.on_court], on= oc.some(a=>Array.isArray(a) && a.length)? oc.some(a=>Array.isArray(a) && a.includes(pid)) : null;
+      onNow=on;
       const stl=[g.home?.starters, g.away?.starters], st= stl.some(a=>Array.isArray(a) && a.length)? stl.some(a=>Array.isArray(a) && a.includes(pid)) : null;
       mu= cur + (LIVE? liveRest(cur, f, mu, {min: ls? (ls.min||0) : null, pf: ls? (ls.pf||0) : 0, mg, on, st, pid}) : (()=>{ const rate= mu>0? mu/preMin : 0, pace= mins>=6? cur/mins : rate; return Math.max(0, preMin*(1-f))*(0.75*rate+0.25*pace) })());
       clock= clk? clk.label : "live";
     }
-    return {id:g.game_id, cur, clock, src:bl?.src||"", line:bl?.line||null, slp:bl?.slp, parts:bl?.parts||null, model:!!bl?.model, date:g.date, done, live: isLive, fp: played? scoreStats(st.stats) : (done?0:null), dnp: done && !played, mu, sd: sdL!=null? sdL : sdFor(pid,mu), mu0, lf};
+    return {id:g.game_id, cur, clock, src:bl?.src||"", line:bl?.line||null, slp:bl?.slp, parts:bl?.parts||null, model:!!bl?.model, date:g.date, done, live: isLive, fp: played? scoreStats(st.stats) : (done?0:null), dnp: done && !played, mu, sd: sdL!=null? sdL : sdFor(pid,mu), mu0, lf, on:onNow};
   });
   return {info, games};
 }
@@ -3110,7 +3111,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       if(side==="me" && x.starter && !a.live && a.latest && !a.latest.dnp && a.future.length){ let l=null; try{ l=lineFor(R,Q,{...x, idx: tgt??x.idx},a.latest.date) }catch(e){}
         const lk= a.call?.c==="lock" || (l!=null && a.latest.fp>=l);
         own=(lk? '<span class="badge lock">Lock</span> ' : '')+'Can lock '+a.latest.fp.toFixed(2)+(tgt!=null&&SL[tgt]? ' at '+SL[tgt] : '')+(l!=null&&isFinite(l)? ' · lock at '+l.toFixed(1)+'+' : '')+' · '+(SL[x.idx]? SL[x.idx]+' ' : '') }
-      return '<div class="pc"><span class="n">'+esc(a.info.name)+'</span><span class="s">'+(own? own : ln0>0&&isFinite(ln0)? (a.live? 'lock at ' : dayLabel(g0.date)+': lock at ')+ln0.toFixed(1)+'+ · else ' : '')+'→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
+      return '<div class="pc"><span class="n">'+esc(a.info.name)+(a.live?.on?' 🏀':'')+'</span><span class="s">'+(own? own : ln0>0&&isFinite(ln0)? (a.live? 'lock at ' : dayLabel(g0.date)+': lock at ')+ln0.toFixed(1)+'+ · else ' : '')+'→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
     // the opponent's plan locks it (Flagg's 49.20): say so plainly instead of "Can lock · next game" (user, 11-10)
     const lnO= !mine && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? lnOf(a.latest.date) : null;   // mid-game: nothing to lock (user, 11-11: Eason)   // his line, when it's worked out: the badge follows it
     const oppLock= !mine && x.starter && !a.lockedOn && !a.live && a.latest && (lnO!=null? a.latest.fp>=lnO : (L? (L.locks||[]).includes(x.pid) : W.vs && R===W.vs.oppRows && Q?.pick?.get(x.pid)?.k==="lock"));   // any team's plan (League tab: from its own view)
@@ -3132,7 +3133,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       else if(!g && !a.live && !now) bits.push('done');
       s=bits.join(' · '); if(p && !val) val='~'+slotShown(p, a.live&&x.starter? (a.live.cur||0) : 0).toFixed(2) }
     const back= W.injESPN?.[x.pid]?.ret && a.future[0] && W.injESPN[x.pid].ret<=a.future[0].date;   // ESPN has him back for his next game: the old tag is stale
-    return '<div class="pc"><span class="n">'+esc(a.info.name)+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn&&!back? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
+    return '<div class="pc"><span class="n">'+esc(a.info.name)+(a.live?.on?' <span title="on the floor">🏀</span>':'')+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn&&!back? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
   const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA,LA)+cell(b,DB,QB,B,false,LB)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null,LA):'<div></div>')+(b?playerDetail(b,mineA? false : null,LB):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
   let h='<div class="mhd"><span></span><span>'+esc(nameA)+'</span><span>'+esc(nameB)+'</span></div>';
@@ -4258,7 +4259,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-14c", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-14d", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
