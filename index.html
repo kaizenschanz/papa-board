@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nwdee+CrmY9HP7onf/fNlMqdCd1C6o01tNQbbet3U/Y='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-s3cEjjHmR8AIWBr4bN2nh+dHd/n09Nxq7c1VILEOAQs='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3369,7 +3369,9 @@ function renderWeek(){
       else if(!p){ a.call={c:"idle",t:"Bench"}; a.why= a.future.length? "Others are worth more in the open slots." : "No games left." }
     }
     const vc=W.vs?.calls[x.pid];
-    if((vc || (p && p.k==="hold" && a.latest && !a.latest.dnp && a.future.length)) && x.starter && !a.lockedOn){   // no call record: still his line, not the plan's older "would need" number (Donovan Mitchell, 11-11)
+    // any starter with a lockable score gets the lock-vs-play odds, even when the plan would rather use his slot for someone else
+    // (user, 11-13: "for clingan still put the odds of lock vs not lock like every other player")
+    if((vc || (a.latest && !a.latest.dnp && a.future.length && startedWholeGame(x.rid, x.pid, a.latest.date))) && x.starter && !a.lockedOn){   // no call record: still his line, not the plan's older "would need" number (Donovan Mitchell, 11-11)
       // One line for the call (user, 11-09: "lock at 41.0+ but also needs 43.7 which is it"): keep his score if it clears the line
       // for playing on from his next tip (keepBars). The lock-now-vs-hold comparison (calls) also counts waiting to lock at that
       // tip, so its "wait" only means there's no rush; the decision itself is this line.
@@ -4259,7 +4261,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-14d", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-14e", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
