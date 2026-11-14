@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+a4L2AYwozY2t6ewmrmRk/wmZbi7cSrhsZVar/OgzvQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-a4ndy2tg2XWiL5GVnTpwD5/L2SG889bqvTGciSOdZak='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3833,7 +3833,7 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=6;   // 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
+const GRADE_V=7;   // 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
       else if(v && typeof v==="object"){ const o=(P[k] ||= {}); for(const [k2,v2] of Object.entries(v)) o[k2]=(o[k2]||0)+v2 } } } }
@@ -4069,16 +4069,20 @@ async function gradeWeek(w, rows, logs, SL, per){
     const lockedNow= !(r.open && r.open.has(pid)) && li>=0 && endOf(g[li])<=D && (r.current || closed(li) || !fut.length), lk=known.length? known[known.length-1] : null, held= lk && !closed(g.indexOf(lk))? lk : null;
     return {pid, rid:null, starter:true, idx:sl.si, slot:SL[sl.si], a:{info, live:null, lockedOn: lockedNow? {fp:g[li].fp, date:g[li].date} : null,
       latest: held? {id:held.id, date:held.date, fp:held.fp, dnp:false, done:true, live:false} : null, future:fut}} };
-  const totOf=(A,Q)=>{ const d=teamDist(A,Q,N); return d.tot || new Float64Array(N).fill(d.m) };
+  // this week, everyone's waiver adds still to come count, as on the Lock-in tab (user, 11-13: "even with tonight's results 2 wins
+  // is crazy, i only have a 75% chance to win this week": without them the opponent's week looked short and locks read 2.00 wins)
+  const pkC=new Map(), pkOf=r=>{ if(!pkC.has(r.rid)){ let pk=null; try{ pk=pickupFor(r.rid) }catch(e){} pkC.set(r.rid,pk) } return pkC.get(r.rid) };   // once per team
+  const totOf=(A,Q,r)=>{ let d=teamDist(A,Q,N); if(r?.current){ const pk=pkOf(r); if(pk) d=withPickups(d,pk) } return d.tot || new Float64Array(N).fill(d.m) };
   const now0=Date.now(), teamMemo=new Map();
   for(const D of [...deadlines].sort((a,b)=>a-b)){
     await tick();   // a breath between deadlines: the page stays tappable (user, 11-10: "doesn't let me switch between tabs")
     // every team at deadline D: its board then, planned the way the live board plans it
     // This week a lock is graded when it's made, which can be before its deadline: the board is taken as it stands now (games
     // still to come stay in the plan, and a starter who hasn't locked isn't treated as locked on his last score).
-    const teams=rows.map(r=>{ const Dv= r.current? Math.min(D,now0) : D, mk=r.rid+"|"+Dv, hit=teamMemo.get(mk); if(hit) return hit;   // deadlines still ahead share one board: now
-      const ids=[...new Set(r.starters.concat(r.players||[]))].filter(q=>q&&q!=="0"), A=ids.map(q=>rowAt(r,q,Dv)), T={r, A, tot:totOf(A,planWeek(A,{light:true}))};
+    const teamsAt=D=>rows.map(r=>{ const Dv= r.current? Math.min(D,now0) : D, mk=r.rid+"|"+Dv, hit=teamMemo.get(mk); if(hit) return hit;   // deadlines still ahead share one board: now
+      const ids=[...new Set(r.starters.concat(r.players||[]))].filter(q=>q&&q!=="0"), A=ids.map(q=>rowAt(r,q,Dv)), T={r, A, tot:totOf(A,planWeek(A,{light:true}),r)};
       teamMemo.set(mk,T); return T });
+    const teams=teamsAt(D);
     for(const T of teams){ const r=T.r, opp=teams.find(x=>x.r.mid===r.mid && x.r.rid!==r.rid); if(!opp) continue;
       const others=teams.filter(x=>x!==T), wt= isPlayoffWeek(w)? {perWin:1, perPt:0} : LG.wtFor? LG.wtFor(r.rid) : null;
       const P=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
@@ -4094,25 +4098,30 @@ async function gradeWeek(w, rows, logs, SL, per){
         if(r.current && !nextTipped && !locked) continue;                        // not decided yet
         // a lock proves he started; a 'wait' needs the history
         const futP=g.slice(i+1).filter((x,k)=>!(k===0 && x.dnp)); if(!futP.length) continue;   // he sat the rest: his score stood either way
-        const me=T.A.find(z=>z.pid===sl.pid); if(!me) continue;
-        const swap=x=>T.A.map(z=> z.pid===sl.pid? x : z);
-        const ev=(tot,shift=0)=>{ let h=0, md=0, m=0; const w=new Float64Array(N); for(let q=0;q<N;q++){ const mine=tot[q]+shift; m+=mine; if(mine>opp.tot[q]){ h++; w[q]++ }
-            if(median){ let up=0; for(const x of others) if(x.tot[q]>mine) up++; if(up<=Math.floor(others.length/2)){ md++; w[q]++ } } }
+        // A lock made this week whose next game hasn't tipped yet: graded from just after the locked game ended (when the call was
+        // made), not from the board now, which already has tonight's results and everyone's later locks (user, 11-13: "2 wins is
+        // nuts i haven't confirmed won anything yet": Bones and Powell read 2.00 wins locked)
+        let T1=T, opp1=opp, others1=others;
+        if(r.current && locked && D>now0){ const tl=teamsAt(Math.min(now0, endOf(g[i])+60e3)); T1=tl.find(x=>x.r===r); opp1=tl.find(x=>x.r===opp.r); others1=tl.filter(x=>x!==T1) }
+        const me=T1.A.find(z=>z.pid===sl.pid); if(!me) continue;
+        const swap=x=>T1.A.map(z=> z.pid===sl.pid? x : z);
+        const ev=(tot,shift=0)=>{ let h=0, md=0, m=0; const w=new Float64Array(N); for(let q=0;q<N;q++){ const mine=tot[q]+shift; m+=mine; if(mine>opp1.tot[q]){ h++; w[q]++ }
+            if(median){ let up=0; for(const x of others1) if(x.tot[q]>mine) up++; if(up<=Math.floor(others.length/2)){ md++; w[q]++ } } }
           return {h:h/N, md:median? md/N : 0, m:m/N, w} };
         const obj=o=> wt? wt.perWin*(o.h+o.md)+wt.perPt*o.m : o.h+o.md;
         // waiting: his score is gone and his remaining games (one he sat at that very tip is known and dropped) go back in the
         // pool; the whole lineup is re-planned, bench included
         const AW=swap({...me, a:{...me.a, lockedOn:null, latest:null, future:futP.map((x,k)=>gm(sl.pid,x,k===0))}}), QW=planWeek(AW,{light:true});
-        const totW= !me.a.lockedOn && !me.a.latest? T.tot : totOf(AW,QW), bk= !!(QW.idle?.[sl.pid]?.length || QW.backup?.[sl.pid] || QW.pre?.[sl.pid]);
+        const totW= !me.a.lockedOn && !me.a.latest? T1.tot : totOf(AW,QW,r), bk= !!(QW.idle?.[sl.pid]?.length || QW.backup?.[sl.pid] || QW.pre?.[sl.pid]);
         // locking: a lock that was made is priced where it was made; a pass is priced as a lock in the cheapest open slot he fits
         // (a forward in UTIL locks at a forward slot), everyone else re-planned around it either way
         let totL=null;
-        if(locked){ if(me.a.lockedOn) totL=T.tot; else { const AL=swap({...me, a:{...me.a, lockedOn:{fp:s, date:g[i].date}, latest:null, future:[]}}); totL=totOf(AL,planWeek(AL,{light:true})) } }
+        if(locked){ if(me.a.lockedOn) totL=T1.tot; else { const AL=swap({...me, a:{...me.a, lockedOn:{fp:s, date:g[i].date}, latest:null, future:[]}}); totL=totOf(AL,planWeek(AL,{light:true}),r) } }
         else { const AL=swap({...me, asStarted:true, a:{...me.a, lockedOn:null, latest:{id:g[i].id, date:g[i].date, fp:s, dnp:false, done:true, live:false}, future:[]}});
           const shut=new Set(AL.filter(z=>z.starter&&z.a.lockedOn).map(z=>z.idx)); let bo=-Infinity;
           for(let k=0;k<SL.length;k++){ if(shut.has(k) || !elig(me.a.info.pos,SL[k])) continue;
             const QL=planWeek(AL,{light:true, pinLock:{pid:sl.pid, slot:k, from:sl.si}}); if(QL.pick.get(sl.pid)?.slot!==k) continue;
-            const t=totOf(AL,QL), o=obj(ev(t)); if(o>bo){ bo=o; totL=t } } }
+            const t=totOf(AL,QL,r), o=obj(ev(t)); if(o>bo){ bo=o; totL=t } } }
         if(!totL) continue;
         const L=ev(totL), Wt=ev(totW);
         // the lock line this call was graded against: the score where locking and waiting come out even (shown in the managers' list)
@@ -4155,7 +4164,7 @@ async function gradeWeek(w, rows, logs, SL, per){
         const shut=new Set(AL.filter(z=>z.starter&&z.a.lockedOn).map(z=>z.idx)); let bo=-Infinity, totL=null;
         for(let k=0;k<SL.length;k++){ if(shut.has(k) || !elig(me.a.info.pos,SL[k])) continue;
           const QL=planWeek(AL,{light:true, pinLock:{pid:gs.pid, slot:k, from:gs.si}}); if(QL.pick.get(gs.pid)?.slot!==k) continue;
-          const t=totOf(AL,QL), o=obj(ev(t)); if(o>bo){ bo=o; totL=t } }
+          const t=totOf(AL,QL,r), o=obj(ev(t)); if(o>bo){ bo=o; totL=t } }
         if(!totL) continue;
         const L=ev(totL), Wt=ev(T.tot);
         let line=null; { const tg=obj(Wt); let lo=0, hi=Math.max(90,s+40); if(obj(ev(totL,lo-s))>=tg) line=0; else if(obj(ev(totL,hi-s))>=tg){ for(let it=0;it<14;it++){ const mid=(lo+hi)/2; if(obj(ev(totL,mid-s))>=tg) hi=mid; else lo=mid } line=hi } }
@@ -4262,7 +4271,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-14f", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-14g", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
