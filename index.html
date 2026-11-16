@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CuQDOdp9twJP9vpc/Y9dBwA8tFt3AyZktlxt1zPexGY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PGRV14nHcwTroy1LI4hIER0DSsJP9CTTuRfpXPJwUvY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1717,6 +1717,10 @@ function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
       if(wi>=0){ const q=Math.min(Math.max(p,1e-4),1-1e-4); p=1/(1+Math.exp(-(TM.a+TM.b*Math.log(q/(1-q))+(lt==="Questionable"? (TM.q[wi]||0) : 0)))) } } }
     // near tip: whether DraftKings has his props up, once the board's own log has taught it what that's worth (sit_fit "live")
     const LV=SIT.live; if(LV && !prev){ const tip=tipAt(pid,g.date); if(tip && tip-(W.updated||Date.now())<3*3600e3){ const q=Math.min(Math.max(p,1e-4),1-1e-4); const lt=liveTag(pid,g); p=1/(1+Math.exp(-(LV.a+LV.b*Math.log(q/(1-q))+(g.src==="dk"? LV.dk : 0)+(lt==="Questionable"? (LV.q||0) : lt==="none"? (LV.none||0) : 0)))) } }
+    // the last hour before tip and still on nobody's report (user, 11-16: Powell announced as a starter and still ~50%): the report is
+    // updated right up to tip, so an unlisted player then almost always plays. The board's own last looks agree so far (unlisted at
+    // its last look before tip: 44 games, 0 sat, it had said 2.6%). Capped at 2% until the tag-timing learner has enough to replace it.
+    if(!prev){ const tip=tipAt(pid,g.date), mn= tip? (tip-(W.updated||Date.now()))/60e3 : null; if(mn!=null && mn<=60 && mn>-10 && liveTag(pid,g)==="none") p=Math.min(p,0.02) }
     p=Math.min(0.995,p); DNPM.set(mk,p); return p }
   const d=(SHAPE&&SHAPE.dnp)||[0.05,0.08]; return j===0? d[0] : d[1] }
 // A chain step knows when it tips (t) and roughly when it ends, so a later game that tips while it's still on can be handled as
