@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-oCDurp7wlApZwqkYUCW4gTbU3Ui6FsQUqifmr9kBS44='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UU9ncAKDZyT03T6omJkK3WMVP3b76lAYNKgbrIBmVmM='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3099,7 +3099,9 @@ function replanLine(A,P,x,date,claims){
   // a game still to come counts as started (a bench player the plan starts had no lock option here, so his To do line fell
   // back to the old chain line: Hartenstein 20.3 against 23.6 this way, 11-11)
   const row=r=>({...r, starter:true, idx:xi, asStarted:!known});
-  const xL={...row(x), a:{...a, live:null, latest:{...g, fp, dnp:false, done:true, live:false}, future:rest}};
+  // locked: his later games are gone, so they can't fill another slot on the lock side (11-16: Tre Jones' Monday line read "lock at
+  // 0.00+" because his Wednesday-Sunday games still covered other slots after the lock, so locking cost nothing)
+  const xL={...row(x), a:{...a, live:null, latest:{...g, fp, dnp:false, done:true, live:false}, future:[]}};
   const xW={...row(x), a:{...a, live:null, latest:{...g, fp:0, dnp:true, done:true, live:false}, future:rest}};
   // A game still to come: the call is made after it, so the board is taken as it'll stand at his tip. Everyone else's games
   // that tip before his are over by then (and weren't locked: their scores are gone), so locking him can't cost those nights.
@@ -3123,7 +3125,7 @@ function replanLine(A,P,x,date,claims){
   // and or Sunday"; the shared pickup line let a lock take a slot a Saturday add would have used, for free). Every waiver run left.
   const rid= x.rid ?? viewRoster()?.roster_id, pkOf=R=>{ try{ return pickupFor(rid,{rows:R, from:0}) }catch(e){ return v.pkMe } };
   const NN= known || (a.live && a.live.date===date)? DUE_N : SIM_N, OPP=oppDN(NN);   // due now: the bigger run
-  const QW=planWeek(AW,base), DW=withPickups(teamDist(AW,QW,NN),pkOf(AW));
+  const QW=planWeek(AW,base), pkW=pkOf(AW), DW=withPickups(teamDist(AW,QW,NN),pkW);
   // every open slot he fits, the same ones the lock step picks from (lockSlotFor): a forward sitting in UTIL gets locked at
   // SF/PF/F, which keeps the UTILs for the centers, so that's the lock his line has to price (Walker in UTIL was priced as a
   // UTIL lock, 22.4, 11-11). The cheapest slot counts.
@@ -3132,7 +3134,10 @@ function replanLine(A,P,x,date,claims){
     const occ= i===xi? null : B.find(y=>y.starter&&y.idx===i&&y.pid!==x.pid); if(occ && occ.a.live && !(from!=null && elig(occ.a.info.pos,SLn[from]))) continue;   // can't free that slot mid-game
     const QL=planWeek(AL,{...base, pinLock:{pid:x.pid, slot:i, from}}); if(QL.pick.get(x.pid)?.slot!==i) continue;
     const ALk=AL.map(r=> r.pid===x.pid? {...r, starter:true, idx:i, a:{...r.a, lockedOn:{fp, date}}} : (r.starter && r.idx===i && from!=null)? {...r, idx:from} : r);
-    const DLi=withPickups(teamDist(AL,QL,NN),pkOf(ALk)), l=lockBarD(DLi, fp, DW, OPP, OPP, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi } }
+    // before and during the game both sides get the same pickups (11-16: Tre Jones' Monday line read "lock at 0.00+": the lock side
+    // was credited ~30 points of waiver adds against 1.2 for waiting; the lines only came right once the game was over)
+    const DLi=withPickups(teamDist(AL,QL,NN), known? pkOf(ALk) : pkW), l=lockBarD(DLi, fp, DW, OPP, OPP, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi }
+    if(typeof LOGX!=="undefined" && (W._dbgLine===x.pid)) (W._dbgOut ||= []).push({slot:SLn[i], l, mL:DLi.m, mW:DW.m, fp, wL:titleObjD(DLi,OPP,v.tab,v.median,v.wt), wW:titleObjD(DW,OPP,v.tab,v.median,v.wt), pickL:[...QL.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), pickW:[...QW.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), partsL:[...DLi.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), partsW:[...DW.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), pkL:DLi.pk, pkW:DW.pk, baseL:DLi.base, baseW:DW.base}) }
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   return best==null? null : {l:best, slot:at, odds: known? {L:titleObjD(DLb,OPP,v.tab,v.median,v.wt), W:titleObjD(DW,OPP,v.tab,v.median,v.wt)} : null} }
 function lineFor(A,P,x,date,noClaims){
@@ -3164,7 +3169,11 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     const lnOf=date=> L? (L[x.pid]??null) : side? lineOf(x,R,Q,side,date) : null;   // L: that team's own lines (League tab), else your matchup's
     // the slot's row shows who the plan gives THIS slot to, also when its current player is headed to another slot (user, 11-10:
     // Buzelis sat in F and was planned at PF, so both rows showed him and his value; F is Powell's)
-    const hp= x.starter&&!a.lockedOn? holderAt(Q, x.idx) : null, other= hp&&hp!==x.pid? hp : null;
+    // a starter the plan only slides to another slot (for a lock later, or a shuffle) isn't a switch now (user, 11-16: "no need to switch
+    // mccain and ajay mitchell from sg to utility unless you're locking one of em"): both rows read as they stand; the To do says
+    // "move X to SG, then lock" when it's time
+    const hp0= x.starter&&!a.lockedOn? holderAt(Q, x.idx) : null, slide= hp0 && hp0!==x.pid && R.find(y=>y.pid===hp0)?.starter && Q?.pick?.has(x.pid),
+      hp= slide? x.pid : hp0, other= hp&&hp!==x.pid? hp : null;
     if(other){ const o=R.find(y=>y.pid===other), q=D.parts.get(other);
       // his own game first (Hyland Thu before Mitchell Fri): the score worth keeping instead of handing the slot over
       const g0= side==="me"? (a.live || a.future.find(f=>f.mu>0)) : null, og=o?.a?.future?.[0], ln0= g0?.date && !(og && og.date<g0.date)? lnOf(g0.date) : null;
@@ -3185,7 +3194,8 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp;
       // his slot value belongs on the row of the slot the plan has him in: if that's another slot and nobody is planned here,
       // this row says where he's headed and shows no value (so one value never shows on two rows)
-      const pq=Q?.pick?.get(x.pid), away= x.starter && pq && pq.slot!==x.idx, p= x.starter && !away && D.parts.get(x.pid);
+      const pq=Q?.pick?.get(x.pid), toStarter= pq && R.some(y=>y.starter && y.idx===pq.slot && y.pid!==x.pid && Q?.pick?.has(y.pid)),   // a slide between two starters: not shown (11-16)
+        away= x.starter && pq && pq.slot!==x.idx && !toStarter, p= x.starter && !away && D.parts.get(x.pid);
       if(away) bits.push('→ '+SL[pq.slot]);
       if(a.live) bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):''));
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
@@ -4353,7 +4363,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16c", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16d", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
@@ -4726,7 +4736,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
   WR.forEach(([n,g,set])=>{ const f=g(); set(function(...a){ if(depth[n]) return f.apply(this,a); depth[n]=1; const t=performance.now(); try{ return f.apply(this,a) } finally{ depth[n]=0; const o=(acc[n] ||= [0,0]); o[0]+=performance.now()-t; o[1]++ } }) }) }
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
-if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD} }
+if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={replanLine,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD} }
 if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
