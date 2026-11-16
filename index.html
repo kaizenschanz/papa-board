@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sTJX0DFazL3AFrw4A8JCoTvDmfb6s0/X8vmyBJ+7l0U='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-QyvD2V0t6BzI1mkreVlXKOIwtWEK5EEmRdzBFsqP1J4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2432,7 +2432,11 @@ function calibrateField(){
   // week), once it has at least 3 readings from finished weeks; until then the simulation stands (k=1). The old pull toward past
   // weeks' medians was a hand-set rule nobody tested (user, 11-12: "just calibrate it ... it sounds made up"), so it's gone.
   let prior=null, sp=null, M=sim, k=1, ss=null;
-  if(sim!=null && (C.n||0)>=3 && bias){ M=sim-bias*phi;
+  // the season-to-date replay's correction (calibrate_odds "openK": real totals against simulated ones, per point of the week still
+  // open, from every finished day of the season) scales every team's open part; it's far more data than the median log below
+  const oK=(typeof CALIB!=="undefined"&&CALIB&&CALIB.openK); const atK=k_=>medianOf(raw.map(t=>t.base+k_*(t.m-t.base)));
+  if(sim!=null && oK>0.5 && oK<1.5){ k=oK; M=atK(k) }
+  else if(sim!=null && (C.n||0)>=3 && bias){ M=sim-bias*phi;
     const at=k=>medianOf(raw.map(t=>t.base+k*(t.m-t.base)));
     if(at(0.5)>=M) k=0.5; else if(at(1.5)<=M) k=1.5; else { let lo=0.5, hi=1.5; for(let i=0;i<30;i++){ const mid=(lo+hi)/2; if(at(mid)<M) lo=mid; else hi=mid } k=(lo+hi)/2 }
     M=at(k) }
@@ -4074,7 +4078,7 @@ async function backtestDays(w){
   const logs={}, gamesOf=pid=>{ if(logs[pid]) return logs[pid]; const team=playerInfo(pid).team;
     return logs[pid]=wg.filter(g=>g.home?.team===team||g.away?.team===team).sort((a,b)=>a.date<b.date?-1:1).map(g=>{ const st=box[pid+":"+g.game_id], pl= st && ((st.min||0)>0||(st.sp||0)>0);
       return {id:String(g.game_id), date:g.date, t:tipAt(pid,g.date)||Date.parse(g.date+"T19:00:00"), fp: pl? scoreStats(st) : null, dnp:!pl, mu: pmu[pid+":"+g.game_id] ?? null, best: MODEL?.bestpast?.[pid]?.[g.date] ?? null} }) };
-  const teams=legs.map(l=>({rid:l.roster_id, starters:l.starters||[], sg:l.starters_games||{}, players:(l.players||[]).filter(p=>p&&p!=="0")}));
+  const teams=legs.map(l=>({rid:l.roster_id, mid:l.matchup_id, starters:l.starters||[], sg:l.starters_games||{}, players:(l.players||[]).filter(p=>p&&p!=="0")}));
   const adds=(W.tx||[]).filter(t=>t.status==="complete" && +t.leg===w);
   const days=[...new Set(wg.map(g=>g.date))].sort(), act=pastMedians().find(x=>x.w===w)?.med ?? null, out=[];
   for(const day of days){
@@ -4102,9 +4106,18 @@ async function backtestDays(w){
         for(const [pid,q] of Q.pick){ const pt=Dd.parts.get(pid); if(!pt) continue; const st= q.k==="lock"? [] : slotSteps(A,Q,pid), nOwn=st.filter(x=>x.pid===pid).length, held= heldScore(A.find(y=>y.pid===pid))>0;
           const fp_=T.starters[q.slot]; SR.push({w, d:dIdx, k:q.k, n:st.length, own:nOwn, held, proj:+pt.m.toFixed(2), act:+fin(q.slot).toFixed(2), slot:SL[q.slot], later: !!fp_ && fp_!=="0" && !players.includes(fp_), rid:T.rid}) }
         for(const x of A) if(x.starter && x.a.lockedOn) SR.push({w, d:dIdx, k:"locked", n:0, own:0, held:false, proj:x.a.lockedOn.fp, act:+fin(x.idx).toFixed(2), slot:SL[x.idx]}) }
-      res.push({tot:Dd.tot, m:Dd.m, rid:T.rid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
+      res.push({tot:Dd.tot, m:Dd.m, rid:T.rid, mid:T.mid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
     const realT=Object.fromEntries((LG.past?.[w-1]||[]).map(x=>[x.roster_id, x.points]));
-    out.push({w, day, proj:+expMedian(res).toFixed(1), act, teams: /bt=2d/.test(location.search)? res.map(t=>[t.rid, +t.m.toFixed(1), +(realT[t.rid]||0).toFixed(1), +t.locked.toFixed(1)]) : undefined}) }
+    // calibration rows (user, 11-16: "do some monte carlo sims of past data and calibrate over time"): per team that day, the simulated
+    // mean and spread (today's spread factor taken out), where the real total fell among the simulated ones, the head-to-head chance
+    // against that week's opponent and the chance of a top-half (median) finish, from the same draws
+    let cal;
+    if(/bt=2d/.test(location.search)){ const f0=calF(), N=Math.min(...res.map(t=>t.tot.length)), n=res.length, top=new Float64Array(n), v=new Float64Array(n);
+      for(let q=0;q<N;q++){ for(let i=0;i<n;i++) v[i]=res[i].tot[q]; const srt=Array.from(v).sort((a,b)=>b-a), cut=srt[Math.floor(n/2)-1]; for(let i=0;i<n;i++) if(v[i]>=cut && v[i]>srt[Math.floor(n/2)]) top[i]++ }
+      cal=res.map((t,i)=>{ const o=res.find(u=>u.mid===t.mid && u.rid!==t.rid); let h=0, sd=0, below=0; const r=realT[t.rid]||0;
+        for(let q=0;q<N;q++){ if(o && t.tot[q]>o.tot[q]) h++; sd+=(t.tot[q]-t.m)**2; if(t.tot[q]<r) below++ }
+        return {rid:t.rid, m:+t.m.toFixed(2), sdRaw:+(Math.sqrt(sd/N)/f0).toFixed(2), real:+r.toFixed(2), locked:+t.locked.toFixed(1), pit:+(below/N).toFixed(4), pWin: o? +(h/N).toFixed(4) : null, won: o? ((realT[o.rid]||0)<r? 1 : 0) : null, pMed:+(top[i]/N).toFixed(4)} }) }
+    out.push({w, day, proj:+expMedian(res).toFixed(1), act, f0: calF(), teams: /bt=2d/.test(location.search)? res.map(t=>[t.rid, +t.m.toFixed(1), +(realT[t.rid]||0).toFixed(1), +t.locked.toFixed(1)]) : undefined, cal}) }
   return out }
 if(typeof location!=="undefined" && /bt=2/.test(location.search)) setTimeout(async function btRun2(){ if(!W.vs || !LG.past){ setTimeout(btRun2,2000); return }
   const out=[]; for(let w=1; w<W.week; w++){ try{ out.push(...await backtestDays(w)) }catch(e){ out.push({w, err:String(e)}) } } window.__bt2=out; console.log("BACKTEST2", JSON.stringify(out)) }, 4000);
@@ -4363,7 +4376,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16d", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16e", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
