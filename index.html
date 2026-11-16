@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-QyvD2V0t6BzI1mkreVlXKOIwtWEK5EEmRdzBFsqP1J4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DxhVqAoaTbz74n/7cAtmUTWEHtf7TZMzqDPn8vq6SBw='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1540,7 +1540,7 @@ const DUE_N = 10000;
 // the opponent's week at N draws (the comparison needs as many draws on his side), worked out once per view
 function oppDN(N){ const v=W.vs; if(!v || N<=SIM_N || !v.oppRows || !v.oppPlan) return v?.opp; const k=N+"|"+(v._oppOwn? 1 : 0)+"|"+(W.updated||0);
   if(v._oppN?.k===k) return v._oppN.D; let D=v.opp; try{ D=withPickups(teamDist(v.oppRows,v.oppPlan,N),v.pkOpp) }catch(e){} v._oppN={k,D}; return D }
-const CALIB = {"med":{"n":2,"weeks":[4],"bias":1.3,"sd0":12.64,"raw_bias":5.2},"f":1.1079,"n":22,"prior_n":12,"weeks":[3,4],"raw_f":1.1625,"brier":0.1519,"games":23,"bins":[{"from":0.5,"n":2,"said":0.512,"won":1.0},{"from":0.6,"n":2,"said":0.674,"won":0.5},{"from":0.7,"n":5,"said":0.737,"won":0.8},{"from":0.8,"n":5,"said":0.832,"won":0.6},{"from":0.9,"n":9,"said":0.953,"won":1.0}],"asof":"2026-11-16","wait":{"single":{"bias":0.0,"n":0,"raw":null,"z_sd":null},"multi":{"bias":0.152,"n":3,"raw":0.657,"z_sd":0.312}},"calls":[{"call":"lock","promised":0.46,"got":0.0},{"call":"lock","promised":-0.1,"got":0.0},{"call":"lock","promised":-3.9,"got":0.0},{"call":"lock","promised":-5.89,"got":0.0},{"call":"lock","promised":-0.05,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.01,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.0,"got":0.9},{"call":"lock","promised":0.03,"got":0.0},{"call":"lock","promised":0.0,"got":0.0}]};
+const CALIB = {"replay":{"team_weeks":48,"team_days":312,"weeks":[1,2,3,4],"f":1.123,"raw_f":1.1517,"open_bias":-0.0212,"openK":0.9894,"at":1794872664},"openK":0.9894,"med":{"n":2,"weeks":[4],"bias":1.3,"sd0":12.64,"raw_bias":5.2},"f":1.123,"n":22,"prior_n":12,"weeks":[3,4],"raw_f":1.1625,"brier":0.1519,"games":23,"bins":[{"from":0.5,"n":2,"said":0.512,"won":1.0},{"from":0.6,"n":2,"said":0.674,"won":0.5},{"from":0.7,"n":5,"said":0.737,"won":0.8},{"from":0.8,"n":5,"said":0.832,"won":0.6},{"from":0.9,"n":9,"said":0.953,"won":1.0}],"asof":"2026-11-16","wait":{"single":{"bias":0.0,"n":0,"raw":null,"z_sd":null},"multi":{"bias":0.152,"n":3,"raw":0.657,"z_sd":0.312}},"calls":[{"call":"lock","promised":0.46,"got":0.0},{"call":"lock","promised":-0.1,"got":0.0},{"call":"lock","promised":-3.9,"got":0.0},{"call":"lock","promised":-5.89,"got":0.0},{"call":"lock","promised":-0.05,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.01,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.0,"got":0.9},{"call":"lock","promised":0.03,"got":0.0},{"call":"lock","promised":0.0,"got":0.0}]};
 function calF(){ const f=CALIB&&CALIB.f; return f>0.5&&f<2? f : 1 }
 // Learned correction to what an open slot is worth, from grading the board's own slot predictions against how weeks ended
 // (calibrate_odds.py): one bias for slots down to their last game, one for slots that can still wait for a better game.
@@ -1840,9 +1840,9 @@ function uAtF(Us,f){ if(Us.length===1) return Us[0][2]; let k=1; while(k<Us.leng
 // (x0: an unlocked score already in it). A later player tipping while his game is on gets the slot then if the score so far
 // says so (risk: chase upside, as below). Ends with whatever the slot holds.
 let PS_KEPT=-1;   // the step whose score playSteps ended with (-1: what the slot already held)
-function playSteps(st,V,s,risk=0,x0=0){
-  const n=st.length; let i=0, x=x0, force=false; PS_KEPT=-1;
-  while(i<n){ const t=st[i], f=projF(t,s);
+function playSteps(st,V,s,risk0=0,x0=0){
+  const n=st.length, rf= typeof risk0==="function"; let i=0, x=x0, force=false, risk= rf? 0 : risk0; PS_KEPT=-1;
+  while(i<n){ const t=st[i], f=projF(t,s); if(rf) risk=risk0(i,x);
     if(!force){ if(sitAt(st,i,s)){ i++; continue }        // he sits (known by his tip): the slot keeps x
       if(!(uAtF(V.U[i],f)+risk>gAt(V.G[i+1],x))){ i++; continue } }           // keeping x beats playing him
     force=false;
@@ -1980,7 +1980,10 @@ function ovRho(pid,g,T){
   const rem= live? Math.max(1,g.mu-(g.cur||0)) : g.mu, s=g.sd||sdFor(pid,rem); if(!(s>0)) return 1;
   return s*s/(s*s+BRIDGE_C*rem*(1-psi)/psi) }
 // risk: points added to every keep-or-swap bar (a team that needs a big night only keeps big scores).
-function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false){
+// pos (optional): {m, sd, k} the opponent's week and how hard to play to the position: each slot's calls are replayed knowing, at each
+// decision, what the other slots have already ended with in that draw and the gap to the opponent (behind: chase upside; ahead: take
+// the sure score). Risk per call = -k x 4 x (that gap in standard deviations, capped at 2): up to 8 points either way.
+function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false,pos=null){
   if(!SHAPE) return teamDistNormal(A,P);
   const cs=calShift(A[0]?.rid);
   let base=0; for(const x of A){ if(x.starter && x.a.lockedOn) base+=x.a.lockedOn.fp }
@@ -1990,7 +1993,7 @@ function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false){
     const st=slotSteps(A,P,pid); SL.push({pid, st, V:stepsValue(st), wb:waitBias(st.length), arr:new Float64Array(N), fin:new Int16Array(N).fill(-1), slot:p.slot, x0:heldScore(A.find(y=>y.pid===pid))}) }
   // the same simulated week comes up again and again (every refresh, every plan compared), so it's kept by its exact inputs:
   // locks, every slot's chain (players, games, projections, scores so far, sit-out risk, tips) and the play style
-  const sig=N+"|"+risk+"|"+calF()+"|"+cs.toFixed(3)+"|"+(wantOwn?1:0)+"|"+base.toFixed(2)+"|"+[...P.pick].map(([pid,p])=>pid+(p.k==="lock"? "L"+p.v : "")).join(",")+"|"+SL.map(S=>S.pid+"@"+S.x0+":"+S.st.map(x=>x.key+","+x.mu.toFixed(2)+","+(x.cur??"")+","+(x.pm||0)+","+(x.t||0)+","+(x.f0??"")+","+(x.at||"")+","+(x.mu0||0).toFixed(1)).join(";")).join("/");
+  const sig=N+"|"+risk+"|"+(pos? pos.k+":"+pos.m.toFixed(1)+":"+pos.sd.toFixed(1) : "")+"|"+calF()+"|"+cs.toFixed(3)+"|"+(wantOwn?1:0)+"|"+base.toFixed(2)+"|"+[...P.pick].map(([pid,p])=>pid+(p.k==="lock"? "L"+p.v : "")).join(",")+"|"+SL.map(S=>S.pid+"@"+S.x0+":"+S.st.map(x=>x.key+","+x.mu.toFixed(2)+","+(x.cur??"")+","+(x.pm||0)+","+(x.t||0)+","+(x.f0??"")+","+(x.at||"")+","+(x.mu0||0).toFixed(1)).join(";")).join("/");
   const hit=TD_CACHE.get(sig); if(hit) return hit;
   // A bench player can be the fallback in several slots' chains, but each of his games goes to one slot per draw (and once his
   // score counts in a slot he's stuck there): slots that share someone are played together (resolveDraw), the rest alone.
@@ -2012,6 +2015,17 @@ function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false){
     const owner=new Int32Array(ns).fill(-1);
     for(let s=0;s<N;s++) if(!fastDraw(joint,s,risk,owner,pidOf)) resolveDraw(joint,s,risk,sharedPid);
   }
+  // Second pass, playing to the position (11-16, item 1: "VeeBugh decided Eason after seeing Diabaté's result"). Slots played on
+  // their own are replayed; slots that share bench players keep the first pass (their joint settling isn't redone).
+  if(pos && pos.k>0 && SL.length){ const ends=SL.map(S=>{ const e=new Float64Array(N); for(let s=0;s<N;s++){ const k=S.fin[s]; e[s]= k<0? 0 : (S.st[k].t||S.st[k].ord||0)+GAME_MS } return e }),
+      mean=SL.map(S=>{ let m=0; for(let s=0;s<N;s++) m+=S.arr[s]; return m/N }), vr=SL.map((S,a)=>{ let v=0; for(let s=0;s<N;s++) v+=(S.arr[s]-mean[a])**2; return v/N });
+    const lockedSum=base+[...P.pick].filter(([,p])=>p.k==="lock").reduce((t,[,p])=>t+p.v,0), K=pos.k;
+    SL.forEach((S,j)=>{ if(joint.includes(S)) return; const arr2=new Float64Array(N);
+      for(let s=0;s<N;s++){ const rf=(i,x)=>{ const t=S.st[i].t||S.st[i].ord||0; let g=lockedSum-pos.m, v=pos.sd*pos.sd;
+          for(let a=0;a<SL.length;a++){ if(a===j) continue; if(ends[a][s]<=t) g+=SL[a].arr[s]; else { g+=mean[a]; v+=vr[a] } }
+          g+=Math.max(x, mean[j]); v+=vr[j]; const z=g/Math.sqrt(Math.max(v,1)); return -K*4*Math.max(-2,Math.min(2,z)) };
+        arr2[s]=S.wb+playSteps(S.st,S.V,s,rf,S.x0); S.fin[s]=PS_KEPT }
+      S.arr=arr2 }) }
   // Each row's value by where the points physically end up (user, 11-13: "Clingan can't play forward"): when a slot's chain ends
   // with a player who can't play it (Clingan, a C, "in for" Powell at F), the swap really went through a slide (Stewart UTIL -> F,
   // Clingan in UTIL), so for the row display the two slots trade those draws' scores. The total and the odds don't change.
@@ -4106,18 +4120,26 @@ async function backtestDays(w){
         for(const [pid,q] of Q.pick){ const pt=Dd.parts.get(pid); if(!pt) continue; const st= q.k==="lock"? [] : slotSteps(A,Q,pid), nOwn=st.filter(x=>x.pid===pid).length, held= heldScore(A.find(y=>y.pid===pid))>0;
           const fp_=T.starters[q.slot]; SR.push({w, d:dIdx, k:q.k, n:st.length, own:nOwn, held, proj:+pt.m.toFixed(2), act:+fin(q.slot).toFixed(2), slot:SL[q.slot], later: !!fp_ && fp_!=="0" && !players.includes(fp_), rid:T.rid}) }
         for(const x of A) if(x.starter && x.a.lockedOn) SR.push({w, d:dIdx, k:"locked", n:0, own:0, held:false, proj:x.a.lockedOn.fp, act:+fin(x.idx).toFixed(2), slot:SL[x.idx]}) }
-      res.push({tot:Dd.tot, m:Dd.m, rid:T.rid, mid:T.mid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
+      res.push({A, Q, tot:Dd.tot, m:Dd.m, rid:T.rid, mid:T.mid, locked:A.filter(x=>x.a.lockedOn).reduce((a,x)=>a+x.a.lockedOn.fp,0)}) }
     const realT=Object.fromEntries((LG.past?.[w-1]||[]).map(x=>[x.roster_id, x.points]));
     // calibration rows (user, 11-16: "do some monte carlo sims of past data and calibrate over time"): per team that day, the simulated
     // mean and spread (today's spread factor taken out), where the real total fell among the simulated ones, the head-to-head chance
     // against that week's opponent and the chance of a top-half (median) finish, from the same draws
-    let cal;
+    let cal, cal2;
+    // item 1 test (?pos=1): each team replayed playing to its position against its opponent's week, the strength (0, 1, 2) that
+    // gives it the best chance; then the same calibration rows from those weeks
+    if(/bt=2d/.test(location.search) && /pos=1/.test(location.search)){ const N2=Math.min(...res.map(t=>t.tot.length)), sdOf=t=>{ let v=0; for(let q=0;q<N2;q++) v+=(t.tot[q]-t.m)**2; return Math.sqrt(v/N2) };
+      const pw=(a,b)=>{ let h=0; for(let q=0;q<N2;q++) if(a[q]>b[q]) h++; return h/N2 };
+      const tot2=res.map(t=>{ const o=res.find(u=>u.mid===t.mid && u.rid!==t.rid); if(!o) return {tot:t.tot, k:0}; const tg={m:o.m, sd:sdOf(o)}; let best={tot:t.tot, k:0, p:pw(t.tot,o.tot)};
+        for(const k of [1,2]){ const D=teamDist(t.A,t.Q,SIM_N,0,false,{...tg,k}), p=pw(D.tot,o.tot); if(p>best.p+0.002) best={tot:D.tot, k, p} } return best });
+      cal2=res.map((t,i)=>{ const oi=res.findIndex(u=>u.mid===t.mid && u.rid!==t.rid), r=realT[t.rid]||0; if(oi<0) return null; const a=tot2[i].tot, b=tot2[oi].tot; let below=0, m=0; for(let q=0;q<N2;q++){ if(a[q]<r) below++; m+=a[q] }
+        return {rid:t.rid, k:tot2[i].k, m:+(m/N2).toFixed(2), pit:+(below/N2).toFixed(4), pWin:+pw(a,b).toFixed(4), won:(realT[res[oi].rid]||0)<r? 1 : 0} }).filter(Boolean) }
     if(/bt=2d/.test(location.search)){ const f0=calF(), N=Math.min(...res.map(t=>t.tot.length)), n=res.length, top=new Float64Array(n), v=new Float64Array(n);
       for(let q=0;q<N;q++){ for(let i=0;i<n;i++) v[i]=res[i].tot[q]; const srt=Array.from(v).sort((a,b)=>b-a), cut=srt[Math.floor(n/2)-1]; for(let i=0;i<n;i++) if(v[i]>=cut && v[i]>srt[Math.floor(n/2)]) top[i]++ }
       cal=res.map((t,i)=>{ const o=res.find(u=>u.mid===t.mid && u.rid!==t.rid); let h=0, sd=0, below=0; const r=realT[t.rid]||0;
         for(let q=0;q<N;q++){ if(o && t.tot[q]>o.tot[q]) h++; sd+=(t.tot[q]-t.m)**2; if(t.tot[q]<r) below++ }
         return {rid:t.rid, m:+t.m.toFixed(2), sdRaw:+(Math.sqrt(sd/N)/f0).toFixed(2), real:+r.toFixed(2), locked:+t.locked.toFixed(1), pit:+(below/N).toFixed(4), pWin: o? +(h/N).toFixed(4) : null, won: o? ((realT[o.rid]||0)<r? 1 : 0) : null, pMed:+(top[i]/N).toFixed(4)} }) }
-    out.push({w, day, proj:+expMedian(res).toFixed(1), act, f0: calF(), teams: /bt=2d/.test(location.search)? res.map(t=>[t.rid, +t.m.toFixed(1), +(realT[t.rid]||0).toFixed(1), +t.locked.toFixed(1)]) : undefined, cal}) }
+    out.push({w, day, proj:+expMedian(res).toFixed(1), act, f0: calF(), teams: /bt=2d/.test(location.search)? res.map(t=>[t.rid, +t.m.toFixed(1), +(realT[t.rid]||0).toFixed(1), +t.locked.toFixed(1)]) : undefined, cal, cal2}) }
   return out }
 if(typeof location!=="undefined" && /bt=2/.test(location.search)) setTimeout(async function btRun2(){ if(!W.vs || !LG.past){ setTimeout(btRun2,2000); return }
   const out=[]; for(let w=1; w<W.week; w++){ try{ out.push(...await backtestDays(w)) }catch(e){ out.push({w, err:String(e)}) } } window.__bt2=out; console.log("BACKTEST2", JSON.stringify(out)) }, 4000);
