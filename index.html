@@ -421,10 +421,8 @@ details.fold #poolSeg{margin-bottom:6px}
       <div class="lg-scroll"><table class="lg-table num" id="lgTable"></table></div>
     </div>
 
-    <div class="card">
-      <h2>Manager tendencies</h2>
-      <div id="lgTend" class="num"><div class="empty">Loading…</div></div>
-    </div>
+    <!-- Manager tendencies moved to the Calls tab (11-17): every graded call, with or against the board. The grading still runs here
+         (the Calls tab, the recap and the matchup rows' ✓/✗ use it); renderTend skips when #lgTend isn't on the page. -->
   </section>
 
   <section class="wk lk" id="weekView" hidden>
