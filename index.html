@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DxhVqAoaTbz74n/7cAtmUTWEHtf7TZMzqDPn8vq6SBw='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PrQ5+FgOVPbNXJOPjqAoEzFqCmGi7gKAzhz5PwxD2V0='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1859,8 +1859,8 @@ function playSteps(st,V,s,risk0=0,x0=0){
 }
 // playSteps that also notes which shared bench games it played (S.buf: step indices, S.nu of them) and which step's score counts
 // (S.kept). Same play as playSteps step for step.
-function playLite(S,s,risk){ const st=S.st, V=S.V, n=st.length; S.nu=0; S.kept=-1; let i=0, x=S.x0||0, force=false;
-  while(i<n){ const t=st[i], f=projF(t,s);
+function playLite(S,s,risk0){ const st=S.st, V=S.V, n=st.length; S.nu=0; S.kept=-1; let i=0, x=S.x0||0, force=false, risk=risk0;
+  while(i<n){ const t=st[i], f=projF(t,s); if(S.rfun) risk=S.rfun(i,x,s);
     if(!force){ if(sitAt(st,i,s)){ i++; continue }
       if(!(uAtF(V.U[i],f)+risk>gAt(V.G[i+1],x))){ i++; continue } }
     force=false; if(S.sid[i]>=0) S.buf[S.nu++]=i;
@@ -1889,9 +1889,9 @@ function fastDraw(slots,s,risk,owner,pidOf){
 // playSteps for slots that share a bench player: the same play, plus which shared players' games it used (gain: what that game
 // was worth to this slot over doing without it, judged at his tip) and the step whose score counts (kept). blocked: games
 // another slot got in this draw, skipped like a game he misses.
-function playPath(st,V,s,risk,blocked,sharedPid,x0=0){
-  const n=st.length, used=[]; let i=0, x=x0, kept=-1, force=false, gain=Infinity;
-  while(i<n){ const t=st[i], f=projF(t,s);
+function playPath(st,V,s,risk0,blocked,sharedPid,x0=0){
+  const n=st.length, used=[], rf= typeof risk0==="function"; let i=0, x=x0, kept=-1, force=false, gain=Infinity, risk= rf? 0 : risk0;
+  while(i<n){ const t=st[i], f=projF(t,s); if(rf) risk=risk0(i,x);
     if(!force){ if(blocked && blocked.has(t.key)){ i++; continue }                 // another slot has his game in this draw
       if(sitAt(st,i,s)){ i++; continue }
       const u=uAtF(V.U[i],f), h=gAt(V.G[i+1],x); if(!(u+risk>h)){ i++; continue } gain=u-h }   // gain: playing him over keeping x
@@ -1927,7 +1927,8 @@ function rotHost(slots,keptOf,a,p,t){ const S=slots[a], at=b=>{ const kb=keptOf(
       if(elig(S.pos(qb.pid),U.sn) && (!qc || elig(S.pos(qc.pid),S.sn))) return [b,c] } }
   return null }
 function resolveDraw(slots,s,risk,sharedPid){
-  const blk=new Array(slots.length).fill(null), res=slots.map(S=>playPath(S.st,S.V,s,risk,null,sharedPid,S.x0||0));
+  const RK=S=> S.rfun? (i,x)=>S.rfun(i,x,s) : risk;
+  const blk=new Array(slots.length).fill(null), res=slots.map(S=>playPath(S.st,S.V,s,RK(S),null,sharedPid,S.x0||0));
   for(let guard=0;guard<16;guard++){ let hit=null;
     for(let a=0;a<res.length;a++) for(const u of res[a].used) for(let b=a+1;b<res.length;b++) for(const w of res[b].used)
       if(u.key===w.key && (!hit || u.at<hit.at)) hit={at:u.at, key:u.key, lose: u.gain>=w.gain? b : a};
@@ -1936,9 +1937,9 @@ function resolveDraw(slots,s,risk,sharedPid){
     if(!hit){ const c=rotCheck(slots,a=>res[a].kept); if(!c) break;
       // either he doesn't come in (slot a plays on without that game) or a slot he can play holds him from then on (no later
       // player there); whichever leaves the two slots with more
-      const S=slots[c.a], bA=new Set(blk[c.a]||[]); bA.add(S.st[c.k].key); const rA=playPath(S.st,S.V,s,risk,bA,sharedPid,S.x0||0);
+      const S=slots[c.a], bA=new Set(blk[c.a]||[]); bA.add(S.st[c.k].key); const rA=playPath(S.st,S.V,s,RK(S),bA,sharedPid,S.x0||0);
       let best={gain:rA.val-res[c.a].val, a:c.a, blk:bA, r:rA};
-      const cut=b=>{ const T=slots[b], bB=new Set(blk[b]||[]); for(const q of T.st) if((q.t||q.ord)>c.t) bB.add(q.key); return {b, blk:bB, r:playPath(T.st,T.V,s,risk,bB,sharedPid,T.x0||0)} };
+      const cut=b=>{ const T=slots[b], bB=new Set(blk[b]||[]); for(const q of T.st) if((q.t||q.ord)>c.t) bB.add(q.key); return {b, blk:bB, r:playPath(T.st,T.V,s,RK(T),bB,sharedPid,T.x0||0)} };
       for(let b=0;b<slots.length;b++){ if(b===c.a) continue; const T=slots[b]; if(!T.sn || !elig(S.pos(c.p),T.sn)) continue;
         const B=cut(b), qb= B.r.kept>=0? T.st[B.r.kept] : null;
         if(!qb || elig(S.pos(qb.pid),S.sn)){ const g=B.r.val-res[b].val; if(g>best.gain) best={gain:g, set:[B]}; continue }
@@ -1948,7 +1949,7 @@ function resolveDraw(slots,s,risk,sharedPid){
       if(best.set) for(const z of best.set){ blk[z.b]=z.blk; res[z.b]=z.r } else { blk[best.a]=best.blk; res[best.a]=best.r }
       continue }
     (blk[hit.lose] ||= new Set()).add(hit.key);
-    res[hit.lose]=playPath(slots[hit.lose].st,slots[hit.lose].V,s,risk,blk[hit.lose],sharedPid,slots[hit.lose].x0||0) }
+    res[hit.lose]=playPath(slots[hit.lose].st,slots[hit.lose].V,s,RK(slots[hit.lose]),blk[hit.lose],sharedPid,slots[hit.lose].x0||0) }
   for(let a=0;a<slots.length;a++){ slots[a].arr[s]=slots[a].wb+res[a].val; slots[a].fin[s]=res[a].kept }
 }
 function stepDraw(t,s,f=1){ const u=uAt(t.key,s), r=t.r||1; return t.cur!=null? t.cur+drawScore(Math.max(0,t.mu-t.cur),u,r) : drawScore(t.mu*f,u,r) }
@@ -1983,8 +1984,12 @@ function ovRho(pid,g,T){
 // pos (optional): {m, sd, k} the opponent's week and how hard to play to the position: each slot's calls are replayed knowing, at each
 // decision, what the other slots have already ended with in that draw and the gap to the opponent (behind: chase upside; ahead: take
 // the sure score). Risk per call = -k x 4 x (that gap in standard deviations, capped at 2): up to 8 points either way.
+// Both teams of the matchup on screen play to their position (user, 11-16: "just ship it"): set from the last refresh's two weeks,
+// strength 1 (up to 4 points on a call). Other teams, and the managers' replays, play as before.
+let POS_CTX=null;
 function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false,pos=null){
   if(!SHAPE) return teamDistNormal(A,P);
+  if(!pos && POS_CTX && A.length){ const r_=A.find(y=>y.rid!=null)?.rid; if(r_!=null && POS_CTX[r_]) pos=POS_CTX[r_] }
   const cs=calShift(A[0]?.rid);
   let base=0; for(const x of A){ if(x.starter && x.a.lockedOn) base+=x.a.lockedOn.fp }
   const tot=new Float64Array(N).fill(base), parts=new Map(), SL=[];
@@ -2020,12 +2025,15 @@ function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false,pos=null){
   if(pos && pos.k>0 && SL.length){ const ends=SL.map(S=>{ const e=new Float64Array(N); for(let s=0;s<N;s++){ const k=S.fin[s]; e[s]= k<0? 0 : (S.st[k].t||S.st[k].ord||0)+GAME_MS } return e }),
       mean=SL.map(S=>{ let m=0; for(let s=0;s<N;s++) m+=S.arr[s]; return m/N }), vr=SL.map((S,a)=>{ let v=0; for(let s=0;s<N;s++) v+=(S.arr[s]-mean[a])**2; return v/N });
     const lockedSum=base+[...P.pick].filter(([,p])=>p.k==="lock").reduce((t,[,p])=>t+p.v,0), K=pos.k;
-    SL.forEach((S,j)=>{ if(joint.includes(S)) return; const arr2=new Float64Array(N);
-      for(let s=0;s<N;s++){ const rf=(i,x)=>{ const t=S.st[i].t||S.st[i].ord||0; let g=lockedSum-pos.m, v=pos.sd*pos.sd;
-          for(let a=0;a<SL.length;a++){ if(a===j) continue; if(ends[a][s]<=t) g+=SL[a].arr[s]; else { g+=mean[a]; v+=vr[a] } }
-          g+=Math.max(x, mean[j]); v+=vr[j]; const z=g/Math.sqrt(Math.max(v,1)); return -K*4*Math.max(-2,Math.min(2,z)) };
-        arr2[s]=S.wb+playSteps(S.st,S.V,s,rf,S.x0); S.fin[s]=PS_KEPT }
-      S.arr=arr2 }) }
+    const P1=SL.map(S=>Float64Array.from(S.arr));
+    SL.forEach((S,j)=>{ S.rfun=(i,x,s)=>{ const t=S.st[i].t||S.st[i].ord||0; let g=lockedSum-pos.m, v=pos.sd*pos.sd;
+        for(let a=0;a<SL.length;a++){ if(a===j) continue; if(ends[a][s]<=t) g+=P1[a][s]; else { g+=mean[a]; v+=vr[a] } }
+        g+=Math.max(x, mean[j]); v+=vr[j]; const z=g/Math.sqrt(Math.max(v,1)); return -K*4*Math.max(-2,Math.min(2,z)) } });
+    for(const S of SL){ if(joint.includes(S)) continue; for(let s=0;s<N;s++){ S.arr[s]=S.wb+playSteps(S.st,S.V,s,(i,x)=>S.rfun(i,x,s),S.x0); S.fin[s]=PS_KEPT } }
+    if(joint.length){ const owner=new Int32Array(joint.reduce((m,S)=>Math.max(m, S.sid? Math.max(-1,...S.sid)+1 : 0),0)).fill(-1), pidOf2=[];
+      for(const S of joint) if(S.sid) S.st.forEach((x,i)=>{ if(S.sid[i]>=0) pidOf2[S.sid[i]]=x.pid });
+      for(let s=0;s<N;s++) if(!fastDraw(joint,s,risk,owner,pidOf2)) resolveDraw(joint,s,risk,sharedPid) }
+    for(const S of SL) delete S.rfun }
   // Each row's value by where the points physically end up (user, 11-13: "Clingan can't play forward"): when a slot's chain ends
   // with a player who can't play it (Clingan, a C, "in for" Powell at F), the swap really went through a slide (Stewart UTIL -> F,
   // Clingan in UTIL), so for the row display the two slots trade those draws' scores. The total and the odds don't change.
@@ -3251,6 +3259,8 @@ function buildMatchup(me, isMe, main, pre, pins, holds){
   // assumes the other side sees it and answers as well as it can.
   let vs=null;
   const oppRoster= opp && S.rosters[opp.roster_id];
+  { const pv=W.vs; if(main && oppRoster && pv?.me?.tot && pv?.opp?.tot && pv.rid===oppRoster.roster_id){ const sd=D=>Math.sqrt(Math.max(1,D.v||0));
+      POS_CTX={[me.roster_id]:{m:pv.opp.m, sd:sd(pv.opp), k:1}, [oppRoster.roster_id]:{m:pv.me.m, sd:sd(pv.me), k:1}} } else if(main) POS_CTX=null }
   if(oppRoster){
     const B=rowsFor(oppRoster, opp, false), pkOpp=pickupFor(oppRoster.roster_id,{rows:B, focal:true});
     const P0=P;
@@ -4398,7 +4408,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16e", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16f", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
