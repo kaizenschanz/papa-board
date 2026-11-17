@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PxamIPFNvoitrQ0AbJ+ptssAJQt5ED5ysX2GRCVlKmg='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dbRwV5rUGQY1tE4AmlHgrSPKovyPiffAkOHvLdwcjpI='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4107,7 +4107,8 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=9;   // 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
+const GRADE_V=10;   // 10: calls on games before he joined the team aren't graded (11-17)
+// grade versions: 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
       else if(v && typeof v==="object"){ const o=(P[k] ||= {}); for(const [k2,v2] of Object.entries(v)) o[k2]=(o[k2]||0)+v2 } } } }
@@ -4329,6 +4330,12 @@ if(typeof location!=="undefined" && /bt=2/.test(location.search)) setTimeout(asy
   const out=[]; for(let w=1; w<W.week; w++){ try{ out.push(...await backtestDays(w)) }catch(e){ out.push({w, err:String(e)}) } } window.__bt2=out; console.log("BACKTEST2", JSON.stringify(out)) }, 4000);
 if(typeof location!=="undefined" && /bt=1/.test(location.search)) setTimeout(async function btRun(){ if(!W.vs || !LG.past){ setTimeout(btRun,2000); return }
   const out=[]; for(let w=1; w<=W.week; w++){ try{ out.push(await backtestMedian(w)) }catch(e){ out.push({w, err:String(e)}) } } window.__bt=out; console.log("BACKTEST", JSON.stringify(out)) }, 4000);
+// Was he on this team's roster when his game tipped (t)? From Sleeper's transactions: the last add or drop of him for the team before t
+// decides; with none before, a first move after t that's an add means he wasn't there yet (11-17).
+function onRosterAt(rid, pid, t){ let last=null, next=null;
+  for(const x of (W.tx||[])){ if(x.status!=="complete") continue; const at=x.status_updated||x.created||0, add=x.adds&&x.adds[pid]===rid, drop=x.drops&&x.drops[pid]===rid; if(!add&&!drop) continue;
+    if(at<=t){ if(!last||at>last.at) last={at, add} } else if(!next||at<next.at) next={at, add} }
+  return last? last.add : next? !next.add : true }
 async function gradeWeek(w, rows, logs, SL, per){
   const N=400, median=medianOn(w);
   // waiting is played the way the board plays it: each call at the next tip, holding the slot's unlocked score (x0)
@@ -4408,6 +4415,7 @@ async function gradeWeek(w, rows, logs, SL, per){
       for(const sl of r.slots){ const g=sl.g; if(sl.idx<0 || g.length<2) continue;
         const i=g.findIndex((x,k)=>k<g.length-1 && tipOf(g[k+1])===D); if(i<0 || i>sl.idx) continue;
         if(g[i].fp==null) continue;
+        if(!onRosterAt(r.rid, sl.pid, tipOf(g[i]))) continue;   // he wasn't on this team for that game: nothing to lock (11-17: Fears' 40.26, claimed the next morning)
         const started=startedThatDay(r.rid, sl.pid, g[i].date); if(started===false) continue;   // he wasn't in the lineup for that game (lineup history)
         // This week (user, 11-10: "neither section includes players they've actually locked... doesn't include players they've
         // passed"): a lock is final the moment it's made, so it's graded then; a pass only once his next game has tipped (a
