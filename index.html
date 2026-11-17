@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-rOY5g3AXV/TM2znvzgcSRpu5h7F6BOTP5m9oC1H69aY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-SMoDT6DPqqW4nlE5jEGNUcf5sj+QywdvMsZT6dPsxhY='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1059,11 +1059,13 @@ async function loadWeek(force){
     // A refresh that brought nothing new (same scores, locks, live clocks, injuries, lineups; projections not re-read) doesn't
     // redraw: a redraw is a few seconds of simulation the page can't scroll through. Still redrawn at least every 10 minutes and
     // whenever a game has tipped since the last draw (deadlines move then).
-    const dsig=[week, slow? Date.now() : "", JSON.stringify(matchups.map(m=>[m.roster_id,m.starters,m.players_points,m.points])), stats.length,
+    const dsig=[week, "", JSON.stringify(matchups.map(m=>[m.roster_id,m.starters,m.players_points,m.points])), stats.length,
       stats.reduce((t,r)=>t+(r.stats?.pts||0)*7+(r.stats?.min||0),0).toFixed(1), JSON.stringify(W.legs||null), JSON.stringify(W.clock||{}),
       JSON.stringify(W.injESPN||{}), Object.keys(LINEUPS).length, W.games.map(g=>g.status).join("")].join("#");   // game statuses: a tip or a final redraws
     const tipped= W.updated && W.games.some(g=>{ const t=Date.parse(g.start_time||g.date+"T19:00:00"); return t>W.updated && t<=Date.now() });
-    const same= W.loaded && W.dsig===dsig && !force && !tipped && Date.now()-(W.drawnAt||0)<10*60e3;
+    // a load that re-read projections always redraws; the one after it compares like for like (the old timestamp in dsig made
+    // every load after a slow one redraw too, 11-17)
+    const same= W.loaded && W.dsig===dsig && !force && !slow && !tipped && Date.now()-(W.drawnAt||0)<10*60e3;
     W.dsig=dsig; W.loaded=true; W.err=null; W.checked=Date.now();
     $("wkMsg").textContent="";
     if(same){ W.lastOk=Date.now(); renderClock(); return }
@@ -3607,6 +3609,10 @@ function renderWeek(){
     const html=opts.map(r=>'<option value="'+r.roster_id+'"'+(r.roster_id===me.roster_id?' selected':'')+'>'+esc(rosterName(r.roster_id))+'</option>').join("");
     if(sel.dataset.h!==html){ sel.innerHTML=html; sel.dataset.h=html } }
   calibrateField();
+  // the opponent's own plan first (user, 11-17: "the wheel spins constantly"): it used to be worked out after the page was drawn,
+  // and then the whole page was drawn again against it, on every update. Now the page is drawn once, already against it.
+  { const mm=W.matchups.find(x=>x.roster_id===me.roster_id), om=mm&&W.matchups.find(x=>x.matchup_id===mm.matchup_id&&x.roster_id!==me.roster_id);
+    if(om){ const c=TL[om.roster_id]; if(!(c && c.vs?.D?.tot && c.sig===teamSig(om.roster_id))) try{ teamLinesRun(om.roster_id) }catch(e){} } }
   let M=fullMatchup(me, isMe, true); W.vs=M.vs;
   if(W.vs) W.vs.calAt=W._cal?.at;   // the League tab borrows these numbers only if they're on the same calibration
   const A=M.A; let P=M.P;
