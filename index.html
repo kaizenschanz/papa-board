@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-y75H7NEfZCDXmZ0dQfez5akMTodIYP0fl6A301Yl4Ro='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8RBiFAA4EXSOGj5Nd7b38X90rVUFPAS9ywv9/ZutoI4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3162,7 +3162,9 @@ function replanLine(A,P,x,date,claims){
     const ALk=AL.map(r=> r.pid===x.pid? {...r, starter:true, idx:i, a:{...r.a, lockedOn:{fp, date}}} : (r.starter && r.idx===i && from!=null)? {...r, idx:from} : r);
     // before and during the game both sides get the same pickups (11-16: Tre Jones' Monday line read "lock at 0.00+": the lock side
     // was credited ~30 points of waiver adds against 1.2 for waiting; the lines only came right once the game was over)
-    const DLi=withPickups(teamDist(AL,QL,NN), known? pkOf(ALk) : pkW), l=lockBarD(DLi, fp, DW, OPP, OPP, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi }
+    // one pickup estimate per line, the no-lock side's, for every slot tried (11-16: per-slot estimates were ~11 s of a 36 s redraw,
+    // and the lock side's could come out ~30 points too high: Tre Jones "lock at 0.00+")
+    const DLi=withPickups(teamDist(AL,QL,NN), pkW), l=lockBarD(DLi, fp, DW, OPP, OPP, v.tab, v.median, v.wt); if(best==null || l<best){ best=l; at=i; DLb=DLi }
     if(typeof LOGX!=="undefined" && (W._dbgLine===x.pid)) (W._dbgOut ||= []).push({slot:SLn[i], l, mL:DLi.m, mW:DW.m, fp, wL:titleObjD(DLi,OPP,v.tab,v.median,v.wt), wW:titleObjD(DW,OPP,v.tab,v.median,v.wt), pickL:[...QL.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), pickW:[...QW.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), partsL:[...DLi.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), partsW:[...DW.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), pkL:DLi.pk, pkW:DW.pk, baseL:DLi.base, baseW:DW.base}) }
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   return best==null? null : {l:best, slot:at, odds: known? {L:titleObjD(DLb,OPP,v.tab,v.median,v.wt), W:titleObjD(DW,OPP,v.tab,v.median,v.wt)} : null} }
@@ -4410,7 +4412,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16g", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16h", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
