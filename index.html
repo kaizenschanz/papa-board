@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dbRwV5rUGQY1tE4AmlHgrSPKovyPiffAkOHvLdwcjpI='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-GkB9+C813MDlwU5I8648wqTkC1Q8sUI1Dc6v8ipBw/Y='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1057,6 +1057,7 @@ async function loadWeek(force){
       (W.logs[r.player_id] ||= new Map()).set(r.game_id,{date:r.date, fp:scoreStats(s), min:s.min||(s.sp||0)/60}) }
     try{ const lu=await fetch("lineups.json?t="+Date.now(),{cache:"no-store"}); if(lu.ok){ const d=await lu.json(); for(const k in d) LINEUPS[k]=d[k] } }catch(e){}
     if(!W.projH){ try{ const ph=await fetch("proj_hist.json?t="+Date.now(),{cache:"no-store"}); if(ph.ok) W.projH=await ph.json() }catch(e){} }
+    if(!W.medlog){ try{ const ml=await fetch("medlog.json?t="+Date.now(),{cache:"no-store"}); if(ml.ok) W.medlog=await ml.json() }catch(e){} }
     if(!GRADES.site){ try{ const gr=await fetch("grades.json?t="+Date.now(),{cache:"no-store"}); if(gr.ok){ const d=await gr.json(); if(d && d.v===GRADE_V && String(d.league)===String(lid)){ GRADES.site=d.g||{}; if(GRADES.m) GRADES.m={...GRADES.site, ...GRADES.m} } } }catch(e){} }
     await loadLegs(lid,week);
     await loadClocks();
@@ -4107,7 +4108,7 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=10;   // 10: calls on games before he joined the team aren't graded (11-17)
+const GRADE_V=11;   // 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
 // grade versions: 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
@@ -4409,6 +4410,13 @@ async function gradeWeek(w, rows, logs, SL, per){
       teamMemo.set(mk,T); return T });
     // the boards at D are built only if a call there still needs grading (every graded call is kept for good: gradeGet)
     let teams0=null; const teamsL=()=>teams0||(teams0=teamsAt(D));
+    // the league median as the live board had it then (user, 11-17: the grader put Saturday's median near 251 when the board showed
+    // ~247 and Dalton's sure 22.20 was 98% to clear it): where the Mac logged the board's projected median (medlog.json, from week 3's
+    // end), the other teams' simulated weeks are shifted so the median lands there; before that, as simulated
+    let dlt=null; const medShift=()=>{ if(dlt!=null) return dlt; dlt=0; const L=W.medlog?.[String(w)]; if(!L||!L.length) return dlt;
+      let ML=null; for(const e of L){ if(e[0]<=D) ML=e[1]; else break } if(ML==null) return dlt;
+      const ts=teamsL(), n=ts.length, v=new Float64Array(n); let sm=0; for(let q=0;q<N;q++){ for(let k=0;k<n;k++) v[k]=ts[k].tot[q]; v.sort(); sm+= n%2? v[(n-1)/2] : (v[n/2-1]+v[n/2])/2 }
+      dlt=ML-sm/N; return dlt };
     for(const r of rows){ let T=null, opp=null, others=null; const ctx=()=>{ if(!T){ const ts=teamsL(); T=ts.find(x=>x.r===r); opp=ts.find(x=>x.r.mid===r.mid && x.r.rid!==r.rid)||null; others=ts.filter(x=>x!==T) } return !!opp };
       const wt= isPlayoffWeek(w)? {perWin:1, perPt:0} : LG.wtFor? LG.wtFor(r.rid) : null;
       const P=(per[r.rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
@@ -4436,7 +4444,7 @@ async function gradeWeek(w, rows, logs, SL, per){
         const me=T1.A.find(z=>z.pid===sl.pid); if(!me) continue;
         const swap=x=>T1.A.map(z=> z.pid===sl.pid? x : z);
         const ev=(tot,shift=0)=>{ let h=0, md=0, m=0; const w=new Float64Array(N); for(let q=0;q<N;q++){ const mine=tot[q]+shift; m+=mine; if(mine>opp1.tot[q]){ h++; w[q]++ }
-            if(median){ let up=0; for(const x of others1) if(x.tot[q]>mine) up++; if(up<=Math.floor(others.length/2)){ md++; w[q]++ } } }
+            if(median){ let up=0; const ds=medShift(); for(const x of others1) if(x.tot[q]+ds>mine) up++; if(up<=Math.floor(others.length/2)){ md++; w[q]++ } } }
           return {h:h/N, md:median? md/N : 0, m:m/N, w} };
         const obj=o=> wt? wt.perWin*(o.h+o.md)+wt.perPt*o.m : o.h+o.md;
         // waiting: his score is gone and his remaining games (one he sat at that very tip is known and dropped) go back in the
