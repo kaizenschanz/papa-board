@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UO3qBd78RZNR1YIPnXnkHpKPLmfUnSe3NwLtrc+mS7A='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PxamIPFNvoitrQ0AbJ+ptssAJQt5ED5ysX2GRCVlKmg='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -400,9 +400,12 @@ details.fold #poolSeg{margin-bottom:6px}
   <div class="seg views" role="tablist" aria-label="View" id="viewSeg">
     <button type="button" role="tab" data-view="week" aria-pressed="false">Matchup</button>
     <button type="button" role="tab" data-view="league" aria-pressed="false">League</button>
+    <button type="button" role="tab" data-view="calls" aria-pressed="false">Calls</button>
     <button type="button" role="tab" data-view="draft" aria-pressed="true">Draft board</button>
   </div>
 
+  <!-- Calls: every call where a team went against the board and what happened (user, 11-17), made by disagree.py on the Mac -->
+  <section class="wk" id="callsView" hidden><iframe id="callsFrame" title="Board vs teams" loading="lazy" style="width:100%;height:calc(100vh - 150px);min-height:520px;border:0;border-radius:12px;background:transparent"></iframe></section>
   <section class="wk" id="leagueView" hidden>
     <div class="card">
       <div class="wk-top"><h2 id="lgTitle">League</h2><button class="btn ghost" type="button" id="lgRefresh">Refresh now</button></div>
@@ -4910,7 +4913,8 @@ function renderLeague(){
 
 function showView(v,persist){
   W.view=v; document.body.dataset.view=v; if(persist) store.set("view",v); press("viewSeg","view",v);
-  $("weekView").hidden = v!=="week"; $("draftView").hidden = v!=="draft"; $("leagueView").hidden = v!=="league";
+  $("weekView").hidden = v!=="week"; $("draftView").hidden = v!=="draft"; $("leagueView").hidden = v!=="league"; $("callsView").hidden = v!=="calls";
+  if(v==="calls") $("callsFrame").setAttribute("src","calls/?t="+Math.floor(Date.now()/60000));
   if(v==="week"){ if(W.weekDirty && W.loaded){ W.weekDirty=false; renderWeekBusy() } loadWeek(false) }
   if(v==="league"){ loadLeague(false) }
   if(v==="draft" && !S.draft && S.league) loadDraft().catch(()=>{});
@@ -5107,9 +5111,9 @@ function pageBoot(){
     else if(m.t==="warn") console.warn("board:", m.msg); else if(m.t==="status"){ window.__last=m.st; const r=asks.get(m.id); if(r){ asks.delete(m.id); r({mode:"worker", bench:BENCH, ...(m.st||{})}) } } };
   // at once, before the worker has anything: the last board drawn on this device (dimmed), the wheel, and instant tab switches
   const get=(k,d)=>{ try{ const v=ls.getItem("prb:"+k); if(v!=null) return JSON.parse(v) }catch(e){} return d };
-  const show=v=>{ document.body.dataset.view=v; DOMH.press("viewSeg","view",v); $("weekView").hidden= v!=="week"; $("draftView").hidden= v!=="draft"; $("leagueView").hidden= v!=="league" };
+  const show=v=>{ document.body.dataset.view=v; DOMH.press("viewSeg","view",v); $("weekView").hidden= v!=="week"; $("draftView").hidden= v!=="draft"; $("leagueView").hidden= v!=="league"; const cv=$("callsView"); if(cv){ cv.hidden= v!=="calls"; if(v==="calls") $("callsFrame").setAttribute("src","calls/?t="+Math.floor(Date.now()/60000)) } };
   try{ document.body.classList.add("busy"); const c=get("paint",null), v=qs.get("view")||get("view","week");
-    if(v==="league") show("league");
+    if(v==="league") show("league"); else if(v==="calls") show("calls");
     else if(c && c.h && v==="week" && Date.now()-c.at<18*3600e3 && c.lid===get("league",null)){ show("week");
       for(const id in c.h){ const e=$(id); if(e && c.h[id]!=null) e.innerHTML=c.h[id] } ["wkTodoCard","wkMatchCard"].forEach(id=>{ const e=$(id); if(e) e.hidden=false });
       $("weekView").classList.add("stale"); $("wkMsg").textContent="Updating…" } }catch(e){}
