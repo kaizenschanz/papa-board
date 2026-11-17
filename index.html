@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-pNED4nrzVJ5pihrAt3MipQiZQd4jTDnkzuydsbIHrY4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-10807+k/aESI4istg+F7Q+qu7yMdu0KAL7XOiIVe+mc='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2561,12 +2561,14 @@ function lockSlotFor(A,pid,fix){
   const v=W.vs, x=A.find(y=>y.pid===pid); if(!v||!x||!x.starter||!x.a.latest) return null;
   const fx=fix? Object.fromEntries(Object.entries(fix).filter(([q])=>q!==pid)) : null, key="ls|"+pid+(fx? "|"+JSON.stringify(fx) : ""); v._ls ||= {}; if(key in v._ls) return v._ls[key];
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR"), locked=new Set(A.filter(y=>y.starter&&y.a.lockedOn).map(y=>y.idx).concat(fx? Object.values(fx) : []));
-  const opts=[];
+  const nt=x.a.future?.[0], ntT= nt? (tipAt(pid,nt.date)||Date.parse(nt.date+"T19:00:00")) : 0, due= !nt || ntT-(W.updated||Date.now())<6*3600e3, opts=[];
   for(let i=0;i<SL.length;i++){ if(locked.has(i)||!elig(x.a.info.pos,SL[i])) continue;
     const occ=A.find(y=>y.starter&&y.idx===i&&y.pid!==pid); if(occ&&occ.a.live&&!elig(occ.a.info.pos,SL[x.idx])) continue;   // can't free that slot mid-game
     const b0=v.planBase||{force:v.force}, pn0= (b0.pins||fx)? Object.fromEntries(Object.entries({...(b0.pins||{}), ...(fx||{})}).filter(([q])=>q!==pid)) : undefined;   // his own pin aside: every slot is tried
-    // the full planner (slides, shared bench, looks): the quick one left every slot even for Tre Jones (11-16)
-    const Q=planWeek(A,{...b0,pins:pn0,pinLock:{pid,slot:i,from:x.idx}}); if(Q.pick.get(pid)?.slot!==i) continue;
+    // the full planner (slides, shared bench, looks) when the call is due within ~6 hours; the quick one for calls days away (where
+    // it left every slot even for Tre Jones and the scarcest-slot tiebreak below decides). Full everywhere made a live-night redraw
+    // too slow for the Mac's sync (11-16).
+    const Q=planWeek(A,{...b0,pins:pn0,pinLock:{pid,slot:i,from:x.idx}, light:!due}); if(Q.pick.get(pid)?.slot!==i) continue;
     const o=titleObjD(withPickups(teamDist(A,Q),v.pkMe),v.opp,v.tab,v.median,v.wt).obj; opts.push({slot:i, name:SL[i], o, Q, occ}) }
   if(!opts.length) return v._ls[key]=null;
   // Lock order (user, 11-09): narrow first, but only where the narrow slot's pool sits inside the wider one's (PG or SG inside G,
@@ -4425,7 +4427,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16j", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16k", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
