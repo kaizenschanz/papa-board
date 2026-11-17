@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8RBiFAA4EXSOGj5Nd7b38X90rVUFPAS9ywv9/ZutoI4='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-om8BkosdL6bWFJNSnSAkXPxt0RBJntda0nztG/VfcwQ='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1041,6 +1041,7 @@ async function loadWeek(force){
     for(const r of (W.prevRows||[]).concat(stats)){ const s=r.stats; if(!s || !((s.min||0)>0 || (s.sp||0)>0)) continue;
       (W.logs[r.player_id] ||= new Map()).set(r.game_id,{date:r.date, fp:scoreStats(s), min:s.min||(s.sp||0)/60}) }
     try{ const lu=await fetch("lineups.json?t="+Date.now(),{cache:"no-store"}); if(lu.ok){ const d=await lu.json(); for(const k in d) LINEUPS[k]=d[k] } }catch(e){}
+    if(!W.projH){ try{ const ph=await fetch("proj_hist.json?t="+Date.now(),{cache:"no-store"}); if(ph.ok) W.projH=await ph.json() }catch(e){} }
     if(!GRADES.site){ try{ const gr=await fetch("grades.json?t="+Date.now(),{cache:"no-store"}); if(gr.ok){ const d=await gr.json(); if(d && d.v===GRADE_V && String(d.league)===String(lid)){ GRADES.site=d.g||{}; if(GRADES.m) GRADES.m={...GRADES.site, ...GRADES.m} } } }catch(e){} }
     await loadLegs(lid,week);
     await loadClocks();
@@ -2560,7 +2561,8 @@ function lockSlotFor(A,pid,fix){
   for(let i=0;i<SL.length;i++){ if(locked.has(i)||!elig(x.a.info.pos,SL[i])) continue;
     const occ=A.find(y=>y.starter&&y.idx===i&&y.pid!==pid); if(occ&&occ.a.live&&!elig(occ.a.info.pos,SL[x.idx])) continue;   // can't free that slot mid-game
     const b0=v.planBase||{force:v.force}, pn0= (b0.pins||fx)? Object.fromEntries(Object.entries({...(b0.pins||{}), ...(fx||{})}).filter(([q])=>q!==pid)) : undefined;   // his own pin aside: every slot is tried
-    const Q=planWeek(A,{...b0,pins:pn0,light:true,pinLock:{pid,slot:i,from:x.idx}}); if(Q.pick.get(pid)?.slot!==i) continue;
+    // the full planner (slides, shared bench, looks): the quick one left every slot even for Tre Jones (11-16)
+    const Q=planWeek(A,{...b0,pins:pn0,pinLock:{pid,slot:i,from:x.idx}}); if(Q.pick.get(pid)?.slot!==i) continue;
     const o=titleObjD(withPickups(teamDist(A,Q),v.pkMe),v.opp,v.tab,v.median,v.wt).obj; opts.push({slot:i, name:SL[i], o, Q, occ}) }
   if(!opts.length) return v._ls[key]=null;
   // Lock order (user, 11-09): narrow first, but only where the narrow slot's pool sits inside the wider one's (PG or SG inside G,
@@ -2573,14 +2575,19 @@ function lockSlotFor(A,pid,fix){
   let best=opts[0]; for(let moved=true; moved;){ moved=false; for(const o of opts) if(nests(o.name,best.name) && o.o>=best.o-bar){ best=o; moved=true; break } }
   // Stay put unless another slot is clearly better (user, 11-14: every time Dalton made the board's move it asked him to move back:
   // Zion at SF, then F, then SF, on simulation noise). A slot of the same kind (UTIL and UTIL) is never a move.
-  const cur=opts.find(o=>o.slot===x.idx); if(cur && (cur.name===best.name || cur.o>=best.o-bar)) best=cur;
+  // Slots even on title odds: lock him where the fewest of your other players can play (user, 11-16: Tre Jones, PG/SG/SF, "most
+  // certainly should be a sf lock": SG has guards to spare, SF doesn't), then where he already is (no move on noise)
+  const cov=nm=>A.filter(y=>y.pid!==pid && y.slot!=="IR" && !(y.starter&&y.a.lockedOn) && y.a.future?.some(g=>g.mu>0) && elig(y.a.info.pos,nm)).length;
+  const even=opts.filter(o=>o.o>=best.o-bar), cur=opts.find(o=>o.slot===x.idx);
+  if(even.length>1){ const mc=Math.min(...even.map(o=>cov(o.name))), scarce=even.filter(o=>cov(o.name)===mc); best= scarce.find(o=>cur && o.name===cur.name) || scarce[0] }
+  if(cur && cur.name===best.name) best=cur;
   const worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
   // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
   let how="";
   if(best.slot!==x.idx){ const o=best.occ, to=o? best.Q.pick.get(o.pid)?.slot : null;
     how= o? "Move "+o.a.info.name+" to "+(to!=null? SL[to] : SL[x.idx])+" and "+x.a.info.name+" to "+SL[best.slot]+", then lock." : "Move him to "+SL[best.slot]+", then lock." }
   const gap=best.o-worst.o;
-  return v._ls[key]={slot:best.slot, name:best.name, how, gap, n:opts.length,
+  return v._ls[key]={slot:best.slot, name:best.name, how, gap, n:opts.length, all:opts.map(o=>[o.name, +o.o.toFixed(5)]),
     why: opts.length<2? "" : gap>2e-6? "Locking him at "+best.name+" instead of "+worst.name+" adds "+tChance(gap)+" title chance (keeps the right slots open for your bench)." : "Every open slot he fits is even on title chances, so use the narrowest ("+best.name+") and keep the wide slots open."};
 }
 // Why this player and not the next one in line: the title-odds edge from re-planning without him.
@@ -3940,7 +3947,7 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=8;   // 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
+const GRADE_V=9;   // 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
       else if(v && typeof v==="object"){ const o=(P[k] ||= {}); for(const [k2,v2] of Object.entries(v)) o[k2]=(o[k2]||0)+v2 } } } }
@@ -4203,9 +4210,12 @@ async function gradeWeek(w, rows, logs, SL, per){
   // week re-plan as the live lock lines, planWeek + teamDist, instead of fixed slot chains with bench looks dealt by a rule of
   // thumb). Starters sit where the week ended; a slot locked by then is fixed; an open starter's last score can be locked only
   // until his next game tips; remaining games carry the projection as it stood (gstep's rules; the next one is known to be on).
-  const gm=(pid,x,next)=>{ const bp= next && x.best>0? x.best : null, mu= bp ?? (x.mu>0 && !x.fin? x.mu*dkrOf(pid) : x.mu); return {id:x.id, date:x.date, mu, sd:sdFor(pid,mu), src: bp!=null? "dk" : "", sure:next, done:false, live:false, fp:null, dnp:false} };
+  // the current model's view from what was known then (user, 11-16: "pretend they don't have access to the board, just evaluate their
+  // decision based on the info of the players and scores they had at the time"; it can change when the model does), not what the
+  // board showed
+  const gm=(pid,x,next,D)=>{ const bp= next && x.best>0? x.best : null, mu= bp ?? (x.mu>0 && !x.fin? x.mu*dkrOf(pid) : x.mu); return {id:x.id, date:x.date, mu, sd:sdFor(pid,mu), src: bp!=null? "dk" : "", sure:next, done:false, live:false, fp:null, dnp:false} };
   const rowAt=(r,pid,D)=>{ const g=logs[pid]||[], sl=r.slots.find(z=>z.pid===pid), pi=playerInfo(pid), info={...pi, pos:pi.pos||[]};
-    const fut=g.filter(x=>endOf(x)>D && !(x.dnp && tipOf(x)<=D)).map((x,k)=>gm(pid,x,k===0));
+    const fut=g.filter(x=>endOf(x)>D && !(x.dnp && tipOf(x)<=D)).map((x,k)=>gm(pid,x,k===0,D));
     if(!sl) return {pid, rid:null, starter:false, slot:"BN", a:{info, live:null, latest:null, lockedOn:null, future:fut}};
     // locked by then: a lock on record whose next game has tipped (this week's locks are known as soon as they're made)
     const known=g.filter(x=>endOf(x)<=D && x.fp!=null), li=sl.idx, closed=k=>g.slice(k+1).some(x=>tipOf(x)<=D);   // a later game has tipped: game k can't be locked any more
@@ -4258,7 +4268,7 @@ async function gradeWeek(w, rows, logs, SL, per){
         const obj=o=> wt? wt.perWin*(o.h+o.md)+wt.perPt*o.m : o.h+o.md;
         // waiting: his score is gone and his remaining games (one he sat at that very tip is known and dropped) go back in the
         // pool; the whole lineup is re-planned, bench included
-        const AW=swap({...me, a:{...me.a, lockedOn:null, latest:null, future:futP.map((x,k)=>gm(sl.pid,x,k===0))}}), QW=planWeek(AW,{light:true});
+        const AW=swap({...me, a:{...me.a, lockedOn:null, latest:null, future:futP.map((x,k)=>gm(sl.pid,x,k===0,D))}}), QW=planWeek(AW,{light:true});
         const totW= !me.a.lockedOn && !me.a.latest? T1.tot : totOf(AW,QW,r), bk= !!(QW.idle?.[sl.pid]?.length || QW.backup?.[sl.pid] || QW.pre?.[sl.pid]);
         // locking: a lock that was made is priced where it was made; a pass is priced as a lock in the cheapest open slot he fits
         // (a forward in UTIL locks at a forward slot), everyone else re-planned around it either way
@@ -4280,9 +4290,8 @@ async function gradeWeek(w, rows, logs, SL, per){
         if(close) ok=true;
         // A call is judged against the line the board showed for it at the time, when the Mac's sync recorded one (user, 11-11:
         // "you told me to lock in luka but now you're saying it was a bad lock"): the replay's own line is only the stand-in.
-        { const sn=W.decSnap?.[w+"|"+r.rid+"|"+sl.pid+"|"+g[i].date]; if(sn && Math.abs(sn[0]-s)<0.02){
-            if(sn[1]!=null){ line=sn[1]; const want= s>=line; if(locked===want) ok=true; else if(!close) ok=false }
-            else if(sn[2]){ const want= sn[2]==="lock"; if(locked===want) ok=true; else if(!close) ok=false } } }   // the board's recorded call when it showed no line
+        // (no override by the line the board showed then, user 11-16: "it was always about what info did the player have at the time,
+        // not necessarily what the model said"; the replay itself now uses what the board knew, projections included)
         const cost= ok? 0 : Math.abs((L.h+L.md)-(Wt.h+Wt.md)), moot= Math.abs((L.h+L.md)-(Wt.h+Wt.md))<0.005;   // couldn't change anything
         // Is the board over-valuing waiting? Same decision, his own remaining games only: what the board expected waiting to
         // deliver vs what playing it right (same keep thresholds) actually delivered with the real scores that followed.
@@ -4412,7 +4421,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16h", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16i", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
