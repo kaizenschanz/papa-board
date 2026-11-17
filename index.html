@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TqH5W5OgMaPH8dYQLAi1+T1jkOMoIEkImDcc+5sP4bw='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ASNCDbfhHAyGrq91sX6wQqdbzLkn+KOPWT3Dx7hfpeM='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -248,6 +248,12 @@ details.lgm .lgg{padding:4px 0 12px}
 .sb-top{display:flex;gap:8px;align-items:center}
 #teamSel{flex:1;min-width:0;font:700 15px/1.2 var(--body);padding:7px 8px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 #teamSel.ask{border:2px solid var(--accent,#f0a050);color:var(--ink)}
+/* week arrows and list, like Sleeper's (user, 11-16) */
+.wknav{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto}.wknav[hidden]{display:none}
+.wkarr{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:5px;min-width:34px;min-height:36px;font:700 20px/1 var(--body);cursor:pointer;padding:0 6px}
+.wkarr:disabled{opacity:.35;cursor:default}
+.lghd{display:flex;align-items:center;justify-content:space-between;gap:10px}.lghd h2{margin:0}
+#lgWkSel{font:700 15px/1.2 var(--body);padding:7px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 #wkSel{flex:0 0 auto;font:700 15px/1.2 var(--body);padding:7px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 .ask-me{padding:14px 2px 6px;font-size:15px;line-height:1.45;color:var(--muted,inherit)} .ask-me b{color:var(--ink);display:block;font-size:17px;margin-bottom:4px}
 .btn.icon{padding:5px 11px;font-size:17px;line-height:1}
@@ -403,7 +409,7 @@ details.fold #poolSeg{margin-bottom:6px}
       <div class="acc num" id="lgAcc" hidden></div>
     </div>
     <div class="card">
-      <h2>This week</h2>
+      <div class="lghd"><h2 id="lgWeekH">This week</h2><span class="wknav" id="lgNav" hidden><button type="button" class="wkarr" data-step="-1" aria-label="Previous week">&lsaquo;</button><select id="lgWkSel" aria-label="Week"></select><button type="button" class="wkarr" data-step="1" aria-label="Next week">&rsaquo;</button></span></div>
       <div id="lgWeek" class="num"></div>
     </div>
     <div class="card">
@@ -421,7 +427,7 @@ details.fold #poolSeg{margin-bottom:6px}
       <div class="who" id="whoBox" hidden></div>
       <div class="sb-top">
         <select id="teamSel" aria-label="Team to show"></select>
-        <select id="wkSel" aria-label="Week" hidden></select>
+        <span class="wknav" id="wkNav" hidden><button type="button" class="wkarr" data-step="-1" aria-label="Previous week">&lsaquo;</button><select id="wkSel" aria-label="Week"></select><button type="button" class="wkarr" data-step="1" aria-label="Next week">&rsaquo;</button></span>
         <button class="btn ghost icon" type="button" id="wkRefresh" aria-label="Refresh" title="Refresh">&#8635;</button>
       </div>
       <div id="wkScore" class="num"><div class="empty">Loading…</div></div>
@@ -1077,31 +1083,52 @@ function weekOver(){ return W.games.length>0 && W.games.every(g=>g.status==="com
 // past weeks too (user, 11-16, item 4: "allow users to go back to previous weeks matchups"): a finished week shows its final
 // matchup from the lock records; this week and next stay the live board
 function renderWkSel(){ const el=$("wkSel"), b=W.baseWeek; if(!el) return;
-  if(!b || (b<2 && !W.hasNext)){ el.hidden=true; return }
+  const nav=$("wkNav"); if(!b || (b<2 && !W.hasNext)){ if(nav) nav.hidden=true; return }
   const ws=[...Array(b-1).keys()].map(i=>i+1).concat([b]).concat(W.hasNext? [b+1] : []), cur=W.pastWk||W.week;
   const html=ws.map(w=>'<option value="'+w+'"'+(w===cur?' selected':'')+'>Wk '+w+'</option>').join("");
-  if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html } el.value=String(cur); el.hidden=false }
+  if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html } el.value=String(cur); if(nav){ nav.hidden=false; const bs=nav.querySelectorAll(".wkarr"); if(bs[0]) bs[0].disabled= cur<=ws[0]; if(bs[1]) bs[1].disabled= cur>=ws[ws.length-1] } }
+// the League tab's week bar: every week through this one (next week once it's out); a finished week shows its final matchups
+function renderLgWkSel(){ const el=$("lgWkSel"), nav=$("lgNav"), b=W.baseWeek; if(!el||!nav||!b) return;
+  const ws=[...Array(b).keys()].map(i=>i+1), cur=LG.pastWk||W.week||b;
+  const html=ws.map(w=>'<option value="'+w+'"'+(w===cur?' selected':'')+'>Wk '+w+'</option>').join("");
+  if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html } el.value=String(cur); nav.hidden= ws.length<2;
+  const bs=nav.querySelectorAll(".wkarr"); if(bs[0]) bs[0].disabled= cur<=1; if(bs[1]) bs[1].disabled= cur>=b }
 // A finished week's matchup for the team on screen: each slot's player and the score that counted (the game his lock was on, else
 // his last game that week), both totals, the result and the league median.
-async function renderPastWeek(w){
-  const legs=W.legsPastSnap?.[w] || W.legsPast?.[w], me=viewRoster()?.roster_id, SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
-  const box=$("wkMatch"), sc=$("wkScore"); if($("wkTodo")) $("wkTodo").innerHTML=""; if($("wkSum")) $("wkSum").innerHTML="";
-  if(!legs){ sc.innerHTML='<div class="empty">No lock records for week '+w+'.</div>'; box.innerHTML=""; return }
-  W._pst ||= {}; if(!W._pst[w]){ sc.innerHTML='<div class="empty">Loading week '+w+'…</div>'; try{ W._pst[w]=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular") }catch(e){ W._pst[w]=[] } }
-  if(W.pastWk!==w) return;
+// A finished week from the lock records: the score that counted for each starter (the game his lock was on, else his last game
+// that week), team totals, the median. Shared by the Matchup tab and the League tab.
+async function pastWeekData(w){
+  const legs=W.legsPastSnap?.[w] || W.legsPast?.[w]; if(!legs) return null;
+  W._pst ||= {}; if(!W._pst[w]){ try{ W._pst[w]=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular") }catch(e){ W._pst[w]=[] } }
   const games={}; for(const r of W._pst[w]){ const st=r.stats||{}; if(!((st.min||0)>0||(st.sp||0)>0)) continue; (games[r.player_id] ||= []).push({gid:String(r.game_id), date:r.date, opp:r.opponent, fp:scoreStats(st)}) }
   for(const k in games) games[k].sort((a,b)=>a.date<b.date?-1:1);
-  const A=legs.find(l=>l.roster_id===me), B=A&&legs.find(l=>l.matchup_id===A.matchup_id&&l.roster_id!==me); if(!A){ sc.innerHTML='<div class="empty">No week '+w+' record for this team.</div>'; box.innerHTML=""; return }
   const counted=(L,pid)=>{ const g=games[pid]||[], gid=L.starters_games?.[pid]; const x= gid!=null? g.find(z=>z.gid===String(gid)) : g[g.length-1]; return x? {...x, locked: gid!=null} : null };
-  const tot=L=>L? (L.starters||[]).reduce((t,pid)=>t+(counted(L,pid)?.fp||0),0) : 0, ta=tot(A), tb=tot(B), med=pastMedians().find(x=>x.w===w)?.med;
-  const res= tb? (ta>tb? 'Won' : ta<tb? 'Lost' : 'Tied') : '', mres= med!=null? (ta>med? ' · beat the median ('+med.toFixed(1)+')' : ' · under the median ('+med.toFixed(1)+')') : '';
-  sc.innerHTML='<div class="plan-note"><b>Week '+w+' final</b> · '+esc(rosterName(me))+' '+ta.toFixed(2)+' – '+tb.toFixed(2)+' '+esc(B? rosterName(B.roster_id) : '')+' · <b>'+res+'</b>'+mres+'</div>';
-  const cell=(L,pid)=>{ if(!pid||pid==="0") return '<div class="pc"><span class="n">—</span></div>'; const c=counted(L,pid), nm=playerInfo(pid).name||pid;
+  const tot=L=>L? (L.starters||[]).reduce((t,pid)=>t+(counted(L,pid)?.fp||0),0) : 0;
+  return {w, legs, counted, tot, med: pastMedians().find(x=>x.w===w)?.med ?? null} }
+function pastGrid(d,A,B){ const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
+  const cell=(L,pid)=>{ if(!L||!pid||pid==="0") return '<div class="pc"><span class="n">—</span></div>'; const c=d.counted(L,pid), nm=playerInfo(pid).name||pid;
     return '<div class="pc"><span class="n">'+esc(nm)+'</span><span class="s">'+(c? (c.locked? 'Locked · ' : 'Rode it · ')+dayLabel(c.date)+(c.opp? ' vs '+esc(c.opp) : '') : 'No game')+'</span><span class="v lk">'+(c? c.fp.toFixed(2) : '0.00')+'</span></div>' };
-  let h='<div class="mhd"><span></span><span>'+esc(rosterName(me))+'</span><span>'+esc(B? rosterName(B.roster_id) : '')+'</span></div>';
-  SL.forEach((lab,i)=>{ h+='<div class="mr"><div class="pastrow"><span class="sl">'+lab+'</span>'+cell(A,A.starters?.[i])+cell(B,B?.starters?.[i])+'</div></div>' });
-  h+='<div class="mtot"><span class="sl">Total</span><div class="pc"><span class="v">'+ta.toFixed(2)+'</span></div><div class="pc"><span class="v">'+tb.toFixed(2)+'</span></div></div>';
-  box.innerHTML=h }
+  let h='<div class="mhd"><span></span><span>'+esc(rosterName(A.roster_id))+'</span><span>'+esc(B? rosterName(B.roster_id) : '')+'</span></div>';
+  SL.forEach((lab,i)=>{ h+='<div class="pastrow"><span class="sl">'+lab+'</span>'+cell(A,A.starters?.[i])+cell(B,B?.starters?.[i])+'</div>' });
+  return h+'<div class="mtot"><span class="sl">Total</span><div class="pc"><span class="v">'+d.tot(A).toFixed(2)+'</span></div><div class="pc"><span class="v">'+d.tot(B).toFixed(2)+'</span></div></div>' }
+async function renderPastWeek(w){
+  const me=viewRoster()?.roster_id, box=$("wkMatch"), sc=$("wkScore"); if($("wkTodo")) $("wkTodo").innerHTML=""; if($("wkSum")) $("wkSum").innerHTML="";
+  if(!W._pst?.[w]){ sc.innerHTML='<div class="empty">Loading week '+w+'…</div>' }
+  const d=await pastWeekData(w); if(W.pastWk!==w) return;
+  if(!d){ sc.innerHTML='<div class="empty">No lock records for week '+w+'.</div>'; box.innerHTML=""; return }
+  const A=d.legs.find(l=>l.roster_id===me), B=A&&d.legs.find(l=>l.matchup_id===A.matchup_id&&l.roster_id!==me); if(!A){ sc.innerHTML='<div class="empty">No week '+w+' record for this team.</div>'; box.innerHTML=""; return }
+  const ta=d.tot(A), tb=d.tot(B), res= B? (ta>tb? 'Won' : ta<tb? 'Lost' : 'Tied') : '', mres= d.med!=null? (ta>d.med? ' · beat the median ('+d.med.toFixed(1)+')' : ' · under the median ('+d.med.toFixed(1)+')') : '';
+  sc.innerHTML='<div class="plan-note"><b>Week '+w+' final</b> · '+esc(rosterName(me))+' '+ta.toFixed(2)+' – '+tb.toFixed(2)+' '+esc(B? rosterName(B.roster_id) : '')+' · <b>'+res+'</b>'+mres+'</div>';
+  box.innerHTML=pastGrid(d,A,B) }
+// The League tab's list for a finished week: every matchup's final, the winner, who beat the median; tap one for both lineups
+async function renderLeaguePast(w){ const el=$("lgWeek"); if(!el) return; const H=$("lgWeekH"); if(H) H.textContent="Week "+w+" final";
+  if(!W._pst?.[w]) el.innerHTML='<div class="empty">Loading week '+w+'…</div>';
+  const d=await pastWeekData(w); if(LG.pastWk!==w) return; if(!d){ el.innerHTML='<div class="empty">No lock records for week '+w+'.</div>'; return }
+  const seen=new Set(), myRid=myRoster()?.roster_id, md=t=> d.med==null? '' : (t>d.med? ' · median ✓' : ' · median ✗');
+  el.innerHTML=d.legs.filter(l=>{ if(seen.has(l.matchup_id)) return false; seen.add(l.matchup_id); return true }).map(A=>{ const B=d.legs.find(l=>l.matchup_id===A.matchup_id&&l.roster_id!==A.roster_id), ta=d.tot(A), tb=d.tot(B);
+    const side=(L,t,win,r)=>'<div class="side'+(r?' r':'')+'"><span class="tn'+(L&&L.roster_id===myRid?' me':'')+'">'+esc(L? rosterName(L.roster_id) : '')+'</span><span class="sc">'+(win?'<b>':'')+t.toFixed(2)+(win?'</b> · W':'')+md(t)+'</span></div>';
+    return '<details class="lgm"><summary><div class="mu">'+side(A,ta,ta>tb,false)+'<span class="vs">final</span>'+side(B,tb,tb>ta,true)+'</div></summary><div class="lgg">'+pastGrid(d,A,B)+'</div></details>' }).join("")
+    +(d.med!=null? '<div class="plan-note">League median: <b>'+d.med.toFixed(2)+'</b></div>' : '') }
 
 function tokPayloadOk(tok){
   const parts=tok.split("."); if(parts.length!==3) return false;
@@ -4472,7 +4499,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16q", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16r", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
@@ -4746,11 +4773,12 @@ function renderLeague(){
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+(P.seed[k]/P.N*100).toFixed(1)+'%)'+'</span>') }
   if(O.median && !isPlayoffWeek(W.week)){ const pm=pastMedians(), mp=(W.vs? weekMedian() : null) ?? expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(1):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(1)+'</b>').join(", "):'')+'</span>') }
-  // this week's matchups
+  // this week's matchups (or a finished week's, picked in the week bar)
+  renderLgWkSel(); if(LG.pastWk) renderLeaguePast(LG.pastWk); else { const H=$("lgWeekH"); if(H) H.textContent="This week" }
   LG.openM ||= new Set();
   const pairs=pairsOf(W.matchups), lo=(()=>{ try{ return leagueOdds() }catch(e){ return [] } })(), myRid=myRoster()?.roster_id;
   const gridOf=(a,b)=>{ try{ return lgMatchGrid(a,b) }catch(e){ return '<div class="empty">Couldn\'t build this matchup.</div>' } };
-  keepOpen($("lgWeek"), pairs.map(([a,b])=>{
+  if(!LG.pastWk) keepOpen($("lgWeek"), pairs.map(([a,b])=>{
     const A=T.find(t=>t.rid===a), B=T.find(t=>t.rid===b); if(!A||!B) return "";
     // same simulation as the Lock-in tab; your own matchup uses the Lock-in number exactly (with how your opponent plays)
     const mine= W.vs && viewingMe() && (a===myRid||b===myRid) && W.vs.rid===(a===myRid?b:a), m=lo.find(x=>x.a===a&&x.b===b);
@@ -4796,6 +4824,10 @@ function showView(v,persist){
 $("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b) showView(b.dataset.view,true)});
 $("wkRefresh").addEventListener("click",()=>loadWeek(true));
 $("teamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) return; if(!myRoster()){ setMe(v); return } W.viewRid=v; store.set(vrKey(), v); renderWeekBusy() });
+// the arrows step the week list one way or the other (Matchup and League tabs)
+document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest(".wkarr"); if(!b||b.disabled) return; const nav=b.closest(".wknav"), sel=nav&&nav.querySelector("select"); if(!sel) return;
+  const i=sel.selectedIndex+(+b.dataset.step); if(i<0||i>=sel.options.length) return; sel.selectedIndex=i; sel.dispatchEvent(new Event("change",{bubbles:true})) });
+$("lgWkSel").addEventListener("change",e=>{ const w=+e.target.value; if(!w) return; LG.pastWk= w<(W.baseWeek||W.week)? w : null; renderLgWkSel(); if(LG.pastWk) renderLeaguePast(w); else renderLeague() });
 $("wkSel").addEventListener("change",e=>{ const w=+e.target.value; if(!w||!W.baseWeek) return;
   if(w<W.baseWeek){ W.pastWk=w; renderPastWeek(w); return }   // a finished week: its final matchup
   if(W.pastWk){ W.pastWk=null; if(w===W.week){ renderWeek(); return } }
