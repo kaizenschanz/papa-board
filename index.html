@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Qj1GcbXAtUBoAv4tGJbEjQcKoiKV8NYqM3jZ5liwGIw='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2r+8spJbSQEESPg6kX2u2wpCJVkpnz8k30QxiWkBmzQ='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3335,11 +3335,15 @@ function replanLine(A,P,x,date,claims){
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   return best==null? null : {l:best, slot:at, odds: known? (()=>{ const L=titleObjD(DLb,OPP,v.tab,v.median,v.wt), Wo=titleObjD(DW,OPP,v.tab,v.median,v.wt);
     return {L, W:Wo, conf: callConf(DLb,DW,OPP,v.tab,v.median, L.obj>=Wo.obj)} })() : null} }
-// Confidence in a lock call (11-17): of the simulated weeks where locking and playing on come out differently (matchup win, median
-// chance), the share where the board's side comes out ahead. Same draws both ways, so it's the call's own odds of being right.
+// Confidence in a lock call (11-17): across the simulated weeks, each weighted by how much the choice changed it (a matchup flip = 1,
+// plus the change in median chance), the share of the total difference that went the board's way. Same draws both ways. (Counting
+// weeks instead let tiny median-chance nudges count as much as a matchup flip: Clingan read 59%, weighted 53%.)
 function callConf(DL,DW,O,tab,median,lockBetter){ if(!DL?.tot||!DW?.tot||!O?.tot) return null; const N=Math.min(DL.tot.length,DW.tot.length,O.tot.length); let n=0, k=0;
-  for(let s=0;s<N;s++){ const a=(DL.tot[s]>O.tot[s]?1:0)+(median&&tab? pTopAt(tab,DL.tot[s]) : 0), b=(DW.tot[s]>O.tot[s]?1:0)+(median&&tab? pTopAt(tab,DW.tot[s]) : 0), d=a-b;
-    if(Math.abs(d)>1e-6){ n++; if((d>0)===lockBetter) k++ } } return n? k/n : 0.5 }
+  const dbg={N, lockBetter, hL:0, hW:0, mdL:0, mdW:0, same:0, mdLsum:0, mdWsum:0};
+  for(let s=0;s<N;s++){ const hl=DL.tot[s]>O.tot[s]?1:0, hw=DW.tot[s]>O.tot[s]?1:0, ml=median&&tab? pTopAt(tab,DL.tot[s]) : 0, mw=median&&tab? pTopAt(tab,DW.tot[s]) : 0, a=hl+ml, b=hw+mw, d=a-b;
+    if(Math.abs(d)>1e-6){ n+=Math.abs(d); if((d>0)===lockBetter) k+=Math.abs(d); if(hl!==hw){ if(hl>hw) dbg.hL++; else dbg.hW++ } else if(ml>mw){ dbg.mdL++; dbg.mdLsum+=ml-mw } else { dbg.mdW++; dbg.mdWsum+=mw-ml } } else dbg.same++ }
+  if(typeof window!=="undefined") window.__confDbg=dbg;
+  return n? k/n : 0.5 }
 const confLabel=c=> c==null? "" : (c<0.55? "Toss-up" : c<0.65? "Lean" : c<0.8? "Likely" : "Clear")+" ("+Math.round(c*100)+"%)";
 function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
@@ -4134,7 +4138,7 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=17;   // 17: pc, the confidence of the board's side   // 15: rg, both sides of each call replayed on real scores, whole lineup   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
+const GRADE_V=18;   // 18: confidence weighted by how much each simulated week changed   // 17: pc, the confidence of the board's side   // 15: rg, both sides of each call replayed on real scores, whole lineup   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
 // grade versions: 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
@@ -4521,7 +4525,7 @@ async function gradeWeek(w, rows, logs, SL, per){
         let rLW=null; const rg=(()=>{ if(!rAL||!rQL) return null; const one=(A_,Q_)=>{ REAL=RM; REAL_MISS=false; try{ const d=teamDist(A_,Q_,1); return REAL_MISS? null : (d.tot? d.tot[0] : d.m) } catch(e){ return null } finally{ REAL=null } };
           const a=one(rAL,rQL), b=one(AW,QW); rLW=[a,b]; return a==null||b==null? null : +(a-b).toFixed(2) })();
         const st1={i, sc:s, line, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven, wr, rg, rt: rLW? rLW.map(x=>x==null? null : +x.toFixed(2)) : null, pc:(()=>{   // confidence: of the simulated weeks where the two choices end differently, the share the board's side wins (11-17)
-          let n=0, k=0; for(let q=0;q<N;q++){ const d=L.w[q]-Wt.w[q]; if(d!==0){ n++; if((d>0)===bestL) k++ } } return n? +(k/n).toFixed(3) : 0.5 })()};
+          let n=0, k=0; for(let q=0;q<N;q++){ const d=L.w[q]-Wt.w[q]; if(d!==0){ n+=Math.abs(d); if((d>0)===bestL) k+=Math.abs(d) } } return n? +(k/n).toFixed(3) : 0.5 })()};
         tallyGrade(P,st1); waitChkFor(r,sl,g,i,s,st1); (sl.steps ||= []).push(st1); gradeSet(gk,st1);
       }
       // benched with a lockable score: his score locked in a slot he fits (whoever holds his old slot at the week's end goes to
