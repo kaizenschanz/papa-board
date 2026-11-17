@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VeXXlbKmVWmzoJV0k9Ay0H4vCqHk+6rtPGKewiMQkck='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PbzjXnViJUESDWqDYkjIu9btX0NMYAPl1DkT3IFjYG8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2585,7 +2585,9 @@ function lockSlotFor(A,pid,fix){
   // certainly should be a sf lock": SG has guards to spare, SF doesn't), then where he already is (no move on noise)
   const cov=nm=>A.filter(y=>y.pid!==pid && y.slot!=="IR" && !(y.starter&&y.a.lockedOn) && y.a.future?.some(g=>g.mu>0) && elig(y.a.info.pos,nm)).length;
   const even=opts.filter(o=>o.o>=best.o-bar), cur=opts.find(o=>o.slot===x.idx);
-  if(even.length>1){ const mc=Math.min(...even.map(o=>cov(o.name))), scarce=even.filter(o=>cov(o.name)===mc); best= scarce.find(o=>cur && o.name===cur.name) || scarce[0] }
+  // even on title odds: no move first (user, 11-16: "do whatever optimal one takes less switching, i.e. if clingan was already at
+  // center just leave him and lock"), then the scarcest slot
+  if(even.length>1){ const stay= cur && even.find(o=>o.name===cur.name); if(stay) best=stay; else { const mc=Math.min(...even.map(o=>cov(o.name))); best=even.find(o=>cov(o.name)===mc) } }
   if(cur && cur.name===best.name) best=cur;
   const worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
   // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
@@ -4432,7 +4434,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16l", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16m", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
