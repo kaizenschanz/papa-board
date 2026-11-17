@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-10807+k/aESI4istg+F7Q+qu7yMdu0KAL7XOiIVe+mc='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VeXXlbKmVWmzoJV0k9Ay0H4vCqHk+6rtPGKewiMQkck='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3453,8 +3453,11 @@ function fullMatchup(me, isMe, main){
     // the line decides both ways (Nembhard, 11-11: the points plan locked his 21.06 under a 21.09 line, so his row read "Lock")
     const pins={}, used=new Set(), v0=W.vs, holds=M.A.filter(y=>{ if(!own(y)) return false; const l=slotLine(M.A,M.P,y,y.a.latest.date); return l!=null && y.a.latest.fp<l }).map(y=>y.pid);
     // clearest first: how far his score clears his line; each one then takes his best slot with the ones before him fixed in theirs
+    // ...in the order they're due (user, 11-16: Clingan's lock is due before his Tuesday tip, Embiid's before Wednesday, so Clingan
+    // takes C and Embiid, decided later, takes the UTIL anyone can fill); clearest first among ones due together
     const clr=y=>{ const l= ll[y.pid] ?? slotLine(M.A,M.P,y,y.a.latest.date); return l!=null? y.a.latest.fp-l : 0 };
-    { for(const x of M.A.filter(y=>(ll[y.pid]!=null || own(y)) && !holds.includes(y.pid)).sort((p,q)=>clr(q)-clr(p))){ let ls=null; try{ ls=lockSlotFor(M.A,x.pid,pins) }catch(e){}
+    const dueAt=y=>{ const g=y.a.future?.[0]; return g? (tipAt(y.pid,g.date)||Date.parse(g.date+"T19:00:00")) : 0 };
+    { for(const x of M.A.filter(y=>(ll[y.pid]!=null || own(y)) && !holds.includes(y.pid)).sort((p,q)=>(dueAt(p)-dueAt(q)) || (clr(q)-clr(p)))){ let ls=null; try{ ls=lockSlotFor(M.A,x.pid,pins) }catch(e){}
         const opts=[ls?.slot, v0._lfs?.get(x.pid+"|"+x.a.latest.date+"|"+x.idx+"|1"), x.idx].filter(q=>q!=null), sl=opts.find(q=>!used.has(q)); if(sl!=null){ pins[x.pid]=sl; used.add(sl) } }
       if(Object.keys(ll).length || holds.length || Object.keys(pins).some(q=>M.P.pick.get(q)?.slot!==pins[q])){ M=buildMatchup(me, isMe, main, ll, pins, holds); W.vs=M.vs; if(W.vs) W.vs.lineLocks=ll } } }
   return M }
@@ -4210,7 +4213,9 @@ async function gradeWeek(w, rows, logs, SL, per){
   rows.forEach(r=>{ r.gone=[]; if(!LINEUPS?.[r.rid]?.length) return;
     for(const pid of new Set(r.players||[])){ if(!pid||pid==="0"||r.starters.includes(pid)) continue; const g=logs[pid]||[];
       for(let i=0;i<g.length-1;i++){ if(g[i].fp==null) continue; const lw=lineupWhole(r.rid,pid,tipOf(g[i])); if(!lw) continue;
-        const D=Math.min(tipOf(g[i+1]), lw.out??Infinity); if(r.current && D>Date.now()) continue;
+        // judged at his next tip, like every pass (snapping to the minute he was benched made a new set of twelve boards per bench move:
+        // the managers' list took 20+ minutes to grade, 11-16)
+        const D=tipOf(g[i+1]); if(r.current && Math.min(D, lw.out??Infinity)>Date.now()) continue;
         r.gone.push({pid, si:lw.si, g, i, D, steps:[]}); deadlines.add(D) } } });
   // The board at a deadline, as rows the live planner takes (user, 11-11, "fix all": past calls are priced with the same whole-
   // week re-plan as the live lock lines, planWeek + teamDist, instead of fixed slot chains with bench looks dealt by a rule of
@@ -4265,7 +4270,7 @@ async function gradeWeek(w, rows, logs, SL, per){
         // made), not from the board now, which already has tonight's results and everyone's later locks (user, 11-13: "2 wins is
         // nuts i haven't confirmed won anything yet": Bones and Powell read 2.00 wins locked)
         let T1=T, opp1=opp, others1=others;
-        if(r.current && locked && D>now0){ const tl=teamsAt(Math.min(now0, endOf(g[i])+60e3)); T1=tl.find(x=>x.r===r); opp1=tl.find(x=>x.r===opp.r); others1=tl.filter(x=>x!==T1) }
+        if(r.current && locked && D>now0){ const e0=endOf(g[i])+60e3, snap=[...deadlines].filter(t=>t>=e0).sort((a,b)=>a-b)[0], tl=teamsAt(Math.min(now0, snap??now0)); T1=tl.find(x=>x.r===r); opp1=tl.find(x=>x.r===opp.r); others1=tl.filter(x=>x!==T1) }
         const me=T1.A.find(z=>z.pid===sl.pid); if(!me) continue;
         const swap=x=>T1.A.map(z=> z.pid===sl.pid? x : z);
         const ev=(tot,shift=0)=>{ let h=0, md=0, m=0; const w=new Float64Array(N); for(let q=0;q<N;q++){ const mine=tot[q]+shift; m+=mine; if(mine>opp1.tot[q]){ h++; w[q]++ }
@@ -4427,7 +4432,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16k", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16l", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
