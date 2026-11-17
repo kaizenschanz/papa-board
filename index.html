@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+4c5S2+wF1F+XutWeKd5fezvbAPoK7aBGeohVyFWMmo='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Hh9N/tlBBjzpj077ca7ZLj2XG9wggJaU3KEoRMC4kBo='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4108,7 +4108,7 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=13;   // 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
+const GRADE_V=14;   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
 // grade versions: 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
@@ -4480,7 +4480,16 @@ async function gradeWeek(w, rows, logs, SL, per){
         const cost= ok? 0 : Math.abs((L.h+L.md)-(Wt.h+Wt.md)), moot= Math.abs((L.h+L.md)-(Wt.h+Wt.md))<0.005;   // couldn't change anything
         // Is the board over-valuing waiting? Same decision, his own remaining games only: what the board expected waiting to
         // deliver vs what playing it right (same keep thresholds) actually delivered with the real scores that followed.
-        const st1={i, sc:s, line, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven};
+        // what not locking really ended with (user, 11-17: "we talked about including the chain"): his slot in the waiting plan, played
+        // on the real scores by the board's own keep rule at each step (play the step when it's worth more than what the slot holds,
+        // later options included), bench steps and all. Null until every step's game is over.
+        const wr=(()=>{ try{ const ent=[...QW.pick].find(([,q])=>q.slot===me.idx); if(!ent) return null; const [hp,q]=ent; if(q.k==="lock") return +q.v.toFixed(2);
+          const st=slotSteps(AW,QW,hp); if(!st.length) return 0; const V=stepsValue(st); let x=0;
+          for(let k=0;k<st.length;k++){ const t=st[k], G=(logs[t.pid]||[]).find(y=>y.date===t.date);
+            if(!G) return null; if(G.fp==null){ if(endOf(G)>Date.now()) return null; continue }   // still to play / he sat
+            if(uAtF(V.U[k],1)>gAt(V.G[k+1],x)) x=G.fp }
+          return +x.toFixed(2) }catch(e){ return null } })();
+        const st1={i, sc:s, line, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven, wr};
         tallyGrade(P,st1); waitChkFor(r,sl,g,i,s,st1); (sl.steps ||= []).push(st1); gradeSet(gk,st1);
       }
       // benched with a lockable score: his score locked in a slot he fits (whoever holds his old slot at the week's end goes to
