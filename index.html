@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YoEx/jIBTmJoajCrS8jJRkXDV5UirxMqWbrK15a53J8='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TqH5W5OgMaPH8dYQLAi1+T1jkOMoIEkImDcc+5sP4bw='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1259,9 +1259,17 @@ function seasonAvail(pid, inj){
   const e=W.injESPN?.[pid];
   if(e && e.ret){
     const start=addDay(W.games.length? W.games[W.games.length-1].date : todayStr(), 1);
+    // when he's really back (espn_notes_test.py, 72 injuries over two seasons, user 11-16 "we have to test the accuracy of such
+    // notes"): ESPN's date ran a week early (median +7 days, about the low end of the note's range); the high end of a "four-to-six
+    // weeks" range came out centered (median 0). So the note's high end when it gives a range, else ESPN's date plus a week.
+    const ret=(()=>{ const n=(e.note||"").toLowerCase(), wd={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12}, nv=t=>wd[t]??(+t||null), W_="(\\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)";
+      const m=n.match(new RegExp(W_+"\\s*(?:-to-|-|–|to)\\s*"+W_+"\\s*weeks")) || n.match(new RegExp("at least "+W_+"\\s*weeks")), base=e.at? new Date(e.at) : null;
+      let hiW=null; if(m){ hiW= m[2]!=null? nv(m[2]) : nv(m[1])*1.5 }
+      if(hiW && base){ const d=new Date(base.getTime()+hiW*7*864e5), iso=d.toISOString().slice(0,10); return iso>e.ret? iso : e.ret }
+      return addDay(e.ret,7) })();
     const cut=S.league.settings?.playoff_teams||8, rounds=Math.max(1,Math.ceil(Math.log2(cut)));
     const fw=(LG.sched? Object.keys(LG.sched).length : Math.max(0,(S.league.settings?.playoff_week_start||22)-1-W.week))+rounds;
-    const miss=Math.max(0,(new Date(e.ret+"T12:00:00")-new Date(start+"T12:00:00"))/864e5);
+    const miss=Math.max(0,(new Date(ret+"T12:00:00")-new Date(start+"T12:00:00"))/864e5);
     return Math.max(0, 1-miss/(7*Math.max(1,fw))) }
   if(/^(IR|Suspension)$/i.test(inj||"")) return 0.5;
   if(/^Out$/i.test(inj||"")) return 0.8;
@@ -4464,7 +4472,7 @@ function renderTend(){
 // grades them against what happened, so every level can be measured and tuned (user, 11-10: "as accurate as possible and
 // learning to get better over time"). SIM_V names the simulation that made them: bump it whenever the simulation or the
 // projections change what they predict, so results from different versions are never mixed.
-const SIM_V="2026-11-16p", LOGX=new URLSearchParams(location.search).get("log")==="1";
+const SIM_V="2026-11-16q", LOGX=new URLSearchParams(location.search).get("log")==="1";
 const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)} } };
 // every rostered player's games that haven't tipped: [pid, date, projection, source, sit chance, Sleeper's own number, injury tag
 // (Questionable, GTD...; user, 11-12: "add the questionable or gtd to the history tracker as well to learn")]
