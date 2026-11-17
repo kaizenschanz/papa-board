@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-K94WPgzgKF5HKm3G7VWXLklvR5PGkDiG/pDWAXy4UJA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-O7+N4q2T3TfmPECMe7vIrOHnwOeqh9I3+PWoUxyHdeA='; worker-src blob:; child-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -409,7 +409,7 @@ details.fold #poolSeg{margin-bottom:6px}
       <div class="acc num" id="lgAcc" hidden></div>
     </div>
     <div class="card">
-      <div class="lghd"><h2 id="lgWeekH">This week</h2><span class="wknav" id="lgNav" hidden><button type="button" class="wkarr" data-step="-1" aria-label="Previous week">&lsaquo;</button><select id="lgWkSel" aria-label="Week"></select><button type="button" class="wkarr" data-step="1" aria-label="Next week">&rsaquo;</button></span></div>
+      <div class="lghd"><h2 id="lgWeekH">This week</h2><a href="recap/" style="font-size:13px;margin-left:auto;margin-right:10px;white-space:nowrap">Week recap &rsaquo;</a><span class="wknav" id="lgNav" hidden><button type="button" class="wkarr" data-step="-1" aria-label="Previous week">&lsaquo;</button><select id="lgWkSel" aria-label="Week"></select><button type="button" class="wkarr" data-step="1" aria-label="Next week">&rsaquo;</button></span></div>
       <div id="lgWeek" class="num"></div>
     </div>
     <div class="card">
@@ -3638,6 +3638,8 @@ function renderWeek(){
   if(isMe && (LOGX||NOASSUME)) W.tlJson=JSON.stringify({week:W.week, at:Date.now(), exact:!!(W.legLive && legFor(myRoster()?.roster_id)),
     legs: W.legLive? (W.legs||[]).map(pickLeg) : null, legsAt: W.legLive? W.legAt : null, past: W.legLive? (W.legsPast||null) : null,
     league: (()=>{ try{ return leagueOdds() }catch(e){ return null } })(),
+    // every team's title and playoff odds from the League tab, logged each cycle for the weekly recap's movers (user, 11-17)
+    title: LG.out? LG.out.teams.map(t=>[t.rid, +(t.ch||0).toFixed(4), +(t.po||0).toFixed(4)]) : null,
     // tonight's best free looks on waivers vs what the pickup model assumes for the week (user, 11-12: "most nights you can get a
     // free look at a guy or two ... just track it and see if it adds anything"): kept once a night by the Mac's sync
     pick: (()=>{ try{ const L=(W._claims?.list)||[]; return {date:todayStr(), assumed: W.vs? +(W.vs.me.pk||0).toFixed(2) : null,
