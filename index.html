@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BRU8n4z2286NVbStObjepLjt4U7sNR/fwmHwlBr1b10='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-djZ4ZR6AmZkkaArd7LY2NRaA0LZgYa21R43DUG7bfAs='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1134,14 +1134,19 @@ async function pastWeekData(w){
   const games={}; for(const r of W._pst[w]){ const st=r.stats||{}; if(!((st.min||0)>0||(st.sp||0)>0)) continue; (games[r.player_id] ||= []).push({gid:String(r.game_id), date:r.date, opp:r.opponent, fp:scoreStats(st)}) }
   for(const k in games) games[k].sort((a,b)=>a.date<b.date?-1:1);
   const counted=(L,pid)=>{ const g=games[pid]||[], gid=L.starters_games?.[pid]; const x= gid!=null? g.find(z=>z.gid===String(gid)) : g[g.length-1]; return x? {...x, locked: gid!=null} : null };
-  const tot=L=>L? (L.starters||[]).reduce((t,pid)=>t+(counted(L,pid)?.fp||0),0) : 0;
-  return {w, legs, counted, tot, med: pastMedians().find(x=>x.w===w)?.med ?? null} }
+  // the total: Sleeper's own (legs.json carries each team's exact finished-week points); the slot-by-slot rebuild only as a fallback.
+  // The rebuild takes an unlocked slot's last game, which is wrong when the lineup changed mid-week (user, 11-17: "i lost week 2",
+  // the card said 214.38 for a real 194.46)
+  const built=L=>L? (L.starters||[]).reduce((t,pid)=>t+(counted(L,pid)?.fp||0),0) : 0, tot=L=>L? (+L.points>0? +L.points : built(L)) : 0;
+  return {w, legs, counted, tot, built, med: pastMedians().find(x=>x.w===w)?.med ?? null} }
 function pastGrid(d,A,B){ const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   const cell=(L,pid)=>{ if(!L||!pid||pid==="0") return '<div class="pc"><span class="n">—</span></div>'; const c=d.counted(L,pid), nm=playerInfo(pid).name||pid;
     return '<div class="pc"><span class="n">'+esc(nm)+'</span><span class="s">'+(c? (c.locked? 'Locked · ' : 'Rode it · ')+dayLabel(c.date)+(c.opp? ' vs '+esc(c.opp) : '') : 'No game')+'</span><span class="v lk">'+(c? c.fp.toFixed(2) : '0.00')+'</span></div>' };
   let h='<div class="mhd"><span></span><span>'+esc(rosterName(A.roster_id))+'</span><span>'+esc(B? rosterName(B.roster_id) : '')+'</span></div>';
   SL.forEach((lab,i)=>{ h+='<div class="pastrow"><span class="sl">'+lab+'</span>'+cell(A,A.starters?.[i])+cell(B,B?.starters?.[i])+'</div>' });
-  return h+'<div class="mtot"><span class="sl">Total</span><div class="pc"><span class="v">'+d.tot(A).toFixed(2)+'</span></div><div class="pc"><span class="v">'+d.tot(B).toFixed(2)+'</span></div></div>' }
+  const off=L=>L && Math.abs(d.built(L)-d.tot(L))>0.05;
+  return h+'<div class="mtot"><span class="sl">Total</span><div class="pc"><span class="v">'+d.tot(A).toFixed(2)+'</span></div><div class="pc"><span class="v">'+d.tot(B).toFixed(2)+'</span></div></div>'+
+    (off(A)||off(B)? '<div class="plan-note">Totals are Sleeper\'s. The slot scores above are rebuilt from box scores and can miss mid-week lineup changes.</div>' : '') }
 async function renderPastWeek(w){
   const me=viewRoster()?.roster_id, box=$("wkMatch"), sc=$("wkScore"); if($("wkTodo")) $("wkTodo").innerHTML=""; if($("wkSum")) $("wkSum").innerHTML="";
   if(!W._pst?.[w]){ sc.innerHTML='<div class="empty">Loading week '+w+'…</div>' }
