@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JDeefDZ9MLKp6KuCYoLh7xuMN/p8OC+FewbsLUCWfOk='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-psvC74KPY0TVWmc9Tr37lquuzOcbAAWKS/ySbiBKftg='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -998,9 +998,11 @@ function viewingMe(){ const v=viewRoster(), m=myRoster(); return !!(v&&m&&v.rost
 async function loadWeek(force){
   // a tap on refresh during a background update isn't dropped: it runs again right after (user, 11-15: "clicking refresh on the page
   // doesn't update the scores, but refreshing through the browser did")
-  // a refresh that's been running over 2 minutes is stuck (a request that never answered): start over instead of skipping every refresh
+  // (10 minutes, not 2: a phone's full redraw can take over 2, and the 2-minute auto-refresh kept throwing it away and starting over,
+  // so the board sat on "Updating…" for good: user, 11-17. Requests have their own 20 s timeouts.)
+  // a refresh that's been running over 10 minutes is stuck (a request that never answered): start over instead of skipping every refresh
   // after it (11-17: "the refresh isn't coming": the board froze on a 5:00 copy, the Knicks clock on an old read)
-  if(!S.league) return; if(W.loading){ if(Date.now()-(W.loadT||0)<120000){ if(force) W.reloadWk=true; return } W.loading=false; if(W._wheel){ W._wheel=false; busyOff() } }
+  if(!S.league) return; if(W.loading){ if(Date.now()-(W.loadT||0)<600000){ if(force) W.reloadWk=true; return } W.loading=false; if(W._wheel){ W._wheel=false; busyOff() } }
   if(!["in_season","post_season","complete"].includes(S.league.status)){
     $("wkSum").textContent="The lock-in helper starts once the season does."; $("wkMatch").innerHTML=""; bootDone(); return;
   }
@@ -2044,6 +2046,8 @@ function resolveDraw(slots,s,risk,sharedPid,pre){
 // the board's own rules, slides and shared bench included (11-17: grading a call against the path not taken, the whole lineup replayed
 // on real scores, not one slot's chain). REAL_MISS is set when it reaches a game that hasn't been played yet.
 let REAL=null, REAL_MISS=false;
+// the grader pricing a past call with the live lock line (replanLine): {N: draws, noPk: no waiver adds (past weeks), keep: return both sides' draws}
+let REPLAN_X=null;
 function realOf(t){ if(!REAL.has(t.key)){ REAL_MISS=true; return null } return REAL.get(t.key) }
 function stepDraw(t,s,f=1){ if(REAL){ const y=realOf(t); if(y!=null) return y } const u=uAt(t.key,s), r=t.r||1; return t.cur!=null? t.cur+drawScore(Math.max(0,t.mu-t.cur),u,r,t.pid) : drawScore(t.mu*f,u,r,t.pid) }
 // V[i]: what the chain from step i is worth (his missed-game chance included); V.e[i]: the same if he plays.
@@ -3329,11 +3333,11 @@ function replanLine(A,P,x,date,claims){
   // header of 10% / 37%: with games live the quick planner ran 5.5 points under the full plan, which has the mid-game switches)
   // pickups need an open slot: each side gets its own (user, 11-13: "I also have the ability to add someone off waivers Saturday
   // and or Sunday"; the shared pickup line let a lock take a slot a Saturday add would have used, for free). Every waiver run left.
-  const rid= x.rid ?? viewRoster()?.roster_id, pkOf=R=>{ try{ return pickupFor(rid,{rows:R, from:0}) }catch(e){ return v.pkMe } };
+  const rid= x.rid ?? viewRoster()?.roster_id, pkOf=R=>{ if(REPLAN_X?.noPk) return null; try{ return pickupFor(rid,{rows:R, from:0}) }catch(e){ return v.pkMe } };
   // due now: the bigger run. A score that's in gets it only when the call is due within ~6 hours (his next tip), like the lock-slot
   // step; days out it's 3,000 until then (user, 11-17: "sure", to save ~6 s a redraw; those lines wobble ~0.1 until they're due)
   const nt= known && a.future.length? (tipAt(x.pid,a.future[0].date)||Date.parse(a.future[0].date+"T19:00:00")) : 0, soon= !nt || nt-(W.updated||Date.now())<6*3600e3;
-  const NN= (known && soon) || (a.live && a.live.date===date)? DUE_N : SIM_N, OPP=oppDN(NN);
+  const NN= REPLAN_X?.N || ((known && soon) || (a.live && a.live.date===date)? DUE_N : SIM_N), OPP=oppDN(NN);
   const QW=planWeek(AW,base), pkW=pkOf(AW), DW0=withPickups(teamDist(AW,QW,NN),pkW);
   // playing to win (POS_ON): both sides priced with the calls made on the score so far; the lock side's other slots play as if his
   // locked score were the plain line (the break-even score, which is what the line asks about)
@@ -3356,7 +3360,7 @@ function replanLine(A,P,x,date,claims){
     if(typeof LOGX!=="undefined" && (W._dbgLine===x.pid)) (W._dbgOut ||= []).push({slot:SLn[i], l, mL:DLi.m, mW:DW.m, fp, wL:titleObjD(DLi,OPP,v.tab,v.median,v.wt), wW:titleObjD(DW,OPP,v.tab,v.median,v.wt), pickL:[...QL.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), pickW:[...QW.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), partsL:[...DLi.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), partsW:[...DW.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), pkL:DLi.pk, pkW:DW.pk, baseL:DLi.base, baseW:DW.base}) }
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   return best==null? null : {l:best, slot:at, odds: known? (()=>{ const L=titleObjD(DLb,OPP,v.tab,v.median,v.wt), Wo=titleObjD(DW,OPP,v.tab,v.median,v.wt);
-    return {L, W:Wo, conf: callConf(DLb,DW,OPP,v.tab,v.median, L.obj>=Wo.obj)} })() : null} }
+    return {L, W:Wo, conf: callConf(DLb,DW,OPP,v.tab,v.median, L.obj>=Wo.obj), ...(REPLAN_X?.keep? {DL:DLb, DW, O:OPP} : {})} })() : null} }
 // Confidence in a lock call (11-17): across the simulated weeks, each weighted by how much the choice changed it (a matchup flip = 1,
 // plus the change in median chance), the share of the total difference that went the board's way. Same draws both ways. (Counting
 // weeks instead let tiny median-chance nudges count as much as a matchup flip: Clingan read 59%, weighted 53%.)
@@ -4164,7 +4168,8 @@ async function loadLeague(force){
 // (the score each starter counted, matched to his games). Per starter slot: locked before his last game, or rode it out;
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
-const GRADE_V=18;   // 18: confidence weighted by how much each simulated week changed   // 17: pc, the confidence of the board's side   // 15: rg, both sides of each call replayed on real scores, whole lineup   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
+const LIVE_GRADE=false;   // the live-line grader (v19): on once its full regrade is published with it
+const GRADE_V= LIVE_GRADE? 19 : 18;   // 19: each call priced by the live board's own lock line (replanLine), 3,000 weeks   // 18: confidence weighted by how much each simulated week changed   // 17: pc, the confidence of the board's side   // 15: rg, both sides of each call replayed on real scores, whole lineup   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
 // grade versions: 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
@@ -4393,6 +4398,22 @@ function onRosterAt(rid, pid, t){ let last=null, next=null;
   for(const x of (W.tx||[])){ if(x.status!=="complete") continue; const at=x.status_updated||x.created||0, add=x.adds&&x.adds[pid]===rid, drop=x.drops&&x.drops[pid]===rid; if(!add&&!drop) continue;
     if(at<=t){ if(!last||at>last.at) last={at, add} } else if(!next||at<next.at) next={at, add} }
   return last? last.add : next? !next.add : true }
+// One past call priced by the live lock line (replanLine): a stand-in W.vs for that team at that deadline (its opponent's week at 3,000
+// draws, everyone else's for the median, shifted to the median the board showed then), the player holding his score in his slot.
+// Swapped in and out around the one call; the stand-in is kept per team and deadline so its line cache serves later calls there.
+const LIVE_VS=new Map();
+function liveLineFor(r,T1,opp1,others1,me,sl,g,i,s,D,futP,wt,median,ds){ if(!LIVE_GRADE) return null;
+  const key=r.rid+"|"+D+"|"+(T1.A.length); let fv=LIVE_VS.get(key);
+  if(!fv){ const pkO= r.current? (()=>{ try{ return pickupFor(opp1.r.rid) }catch(e){ return null } })() : null, oP=planWeek(opp1.A,{});
+    const oD=withPickups(teamDist(opp1.A,oP,SIM_N),pkO), oth=others1.map(x=>({rid:x.r.rid, m:0, s:1, tot: ds? Float64Array.from(x.tot,y=>y+ds) : x.tot}));
+    fv={me:{tot:T1.tot}, opp:oD, oppRows:opp1.A, oppPlan:oP, pkOpp:pkO, tab: median? pTopTable(oth) : null, median, wt: wt||{perWin:1,perPt:0},
+      planBase:{force:{}}, force:{}, pkMe:null, rid:opp1.r.rid}; LIVE_VS.set(key,fv); if(LIVE_VS.size>400) LIVE_VS.delete(LIVE_VS.keys().next().value) }
+  const xr={...me, rid:r.rid, starter:true, idx:sl.si, slot:me.slot, a:{...me.a, live:null, lockedOn:null, latest:{id:g[i].id, date:g[i].date, fp:s, dnp:false, done:true, live:false},
+    future:futP}};
+  const A2=T1.A.map(z=> z.pid===me.pid? xr : z), sv=W.vs, su=W.updated;
+  W.vs=fv; W.updated=D; REPLAN_X={N:SIM_N, noPk:!r.current, keep:true};
+  try{ const fx=replanLine(A2, planWeek(A2,{}), xr, g[i].date, true); if(fx) fx.tab=fv.tab; return fx }
+  finally{ W.vs=sv; W.updated=su; REPLAN_X=null } }
 async function gradeWeek(w, rows, logs, SL, per){
   const N=400, median=medianOn(w);
   // waiting is played the way the board plays it: each call at the next tip, holding the slot's unlocked score (x0)
@@ -4522,14 +4543,23 @@ async function gradeWeek(w, rows, logs, SL, per){
             const QL=planWeek(AL,{light:true, pinLock:{pid:sl.pid, slot:k, from:sl.si}}); if(QL.pick.get(sl.pid)?.slot!==k) continue;
             const t=totOf(AL,QL,r), o=obj(ev(t)); if(o>bo){ bo=o; totL=t; rAL=AL; rQL=QL } } }
         if(!totL) continue;
-        const L=ev(totL), Wt=ev(totW);
+        let L=ev(totL), Wt=ev(totW);
         // the lock line this call was graded against: the score where locking and waiting come out even (shown in the managers' list)
         let line=null; { const tg=obj(Wt); let lo=0, hi=Math.max(90,s+40); if(obj(ev(totL,lo-s))>=tg) line=0; else if(obj(ev(totL,hi-s))>=tg){ for(let it=0;it<14;it++){ const mid=(lo+hi)/2; if(obj(ev(totL,mid-s))>=tg) hi=mid; else lo=mid } line=hi } }
-        const tol= wt? wt.perWin*0.01 : 0.01, bestL= obj(L)>=obj(Wt); let ok= locked? obj(L)>=obj(Wt)-tol : obj(Wt)>=obj(L)-tol;
+        const tol= wt? wt.perWin*0.01 : 0.01; let bestL= obj(L)>=obj(Wt), ok= locked? obj(L)>=obj(Wt)-tol : obj(Wt)>=obj(L)-tol;
         // too close to call: the gap is inside this replay's own margin (2 standard errors of the paired draws), so either call
         // was fine (user, 11-08: Trae, locked at 21.54 on the board's word, came out 1.70 vs 1.72 wins and got an x)
-        let dm=0, d2=0; for(let q=0;q<N;q++){ const d=L.w[q]-Wt.w[q]; dm+=d; d2+=d*d } dm/=N; const se=Math.sqrt(Math.max(0,d2/N-dm*dm)/N), close= Math.abs(dm)<2*se;
+        let dm=0, d2=0; for(let q=0;q<N;q++){ const d=L.w[q]-Wt.w[q]; dm+=d; d2+=d*d } dm/=N; let se=Math.sqrt(Math.max(0,d2/N-dm*dm)/N), close= Math.abs(dm)<2*se;
         if(close) ok=true;
+        // The live board's own lock line (user, 11-17: "why can they not just be the same, most accurate, representation"; Clingan was
+        // shown 26.35 and graded against 24.8): the board as it stood just before the deadline, priced by replanLine itself (full
+        // planner, claims by deadline order, the same opponent and median), 3,000 weeks. The replay above stays as the fallback.
+        let pcL=null; try{ const fx=liveLineFor(r,T1,opp1,others1,me,sl,g,i,s,D,futP.map((x,k)=>gm(sl.pid,x,k===0,D)),wt,median,medShift());
+          if(fx && fx.odds && fx.l!=null){ const o=fx.odds, M=Math.min(o.DL.tot.length,o.DW.tot.length,o.O.tot.length), tb=fx.tab;
+            line=+fx.l.toFixed(2); L={...L, h:o.L.h, md:o.L.md, m:o.DL.m}; Wt={...Wt, h:o.W.h, md:o.W.md, m:o.DW.m};
+            bestL= o.L.obj>=o.W.obj; ok= locked? o.L.obj>=o.W.obj-tol : o.W.obj>=o.L.obj-tol;
+            let a=0, b=0; for(let q=0;q<M;q++){ const wl=(o.DL.tot[q]>o.O.tot[q]?1:0)+(median&&tb? pTopAt(tb,o.DL.tot[q]) : 0), ww=(o.DW.tot[q]>o.O.tot[q]?1:0)+(median&&tb? pTopAt(tb,o.DW.tot[q]) : 0), d=wl-ww; a+=d; b+=d*d }
+            a/=M; se=Math.sqrt(Math.max(0,b/M-a*a)/M); close= Math.abs(a)<2*se; if(close) ok=true; pcL= o.conf!=null? +o.conf.toFixed(3) : null } }catch(e){ console.warn("live line", e) }
         // A call is judged against the line the board showed for it at the time, when the Mac's sync recorded one (user, 11-11:
         // "you told me to lock in luka but now you're saying it was a bad lock"): the replay's own line is only the stand-in.
         // (no override by the line the board showed then, user 11-16: "it was always about what info did the player have at the time,
@@ -4551,7 +4581,7 @@ async function gradeWeek(w, rows, logs, SL, per){
         let rLW=null; const rg=(()=>{ if(!rAL||!rQL) return null; const one=(A_,Q_)=>{ REAL=RM; REAL_MISS=false; try{ const d=teamDist(A_,Q_,1); return REAL_MISS? null : (d.tot? d.tot[0] : d.m) } catch(e){ return null } finally{ REAL=null } };
           const a=one(rAL,rQL), b=one(AW,QW); rLW=[a,b]; return a==null||b==null? null : +(a-b).toFixed(2) })();
         const st1={i, sc:s, line, locked, ok, best: locked===bestL, L:{h:L.h,md:L.md,m:L.m}, Wt:{h:Wt.h,md:Wt.md,m:Wt.m}, cost, bk:!!bk, moot, close, unv:unproven, wr, rg, rt: rLW? rLW.map(x=>x==null? null : +x.toFixed(2)) : null, pc:(()=>{   // confidence: of the simulated weeks where the two choices end differently, the share the board's side wins (11-17)
-          let n=0, k=0; for(let q=0;q<N;q++){ const d=L.w[q]-Wt.w[q]; if(d!==0){ n+=Math.abs(d); if((d>0)===bestL) k+=Math.abs(d) } } return n? +(k/n).toFixed(3) : 0.5 })()};
+          if(pcL!=null) return pcL; let n=0, k=0; for(let q=0;q<N;q++){ const d=L.w[q]-Wt.w[q]; if(d!==0){ n+=Math.abs(d); if((d>0)===bestL) k+=Math.abs(d) } } return n? +(k/n).toFixed(3) : 0.5 })(), lv: pcL!=null || undefined};
         tallyGrade(P,st1); waitChkFor(r,sl,g,i,s,st1); (sl.steps ||= []).push(st1); gradeSet(gk,st1);
       }
       // benched with a lockable score: his score locked in a slot he fits (whoever holds his old slot at the week's end goes to
