@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lWGKOBV92KEDwDsM/R7HAI/YLOOmqph+cDiSl2Ppqi8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-szM6wq4uKxWovnWxZJlmfhRqQ6Bp59hS8FkpXhETbzA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2080,7 +2080,7 @@ let REAL=null, REAL_MISS=false;
 let REPLAN_X=null, LINE_N=null, FA_ON=false;
 // the free-agent backup inside lock lines (faBackupFor) is OFF: tested 11-18, a full simulation showed the move it picked (Draymond Green for
 // Ryan Rollins) lowered title odds on both sides of Buzelis' call; the line it produced (22.0) was an artifact. Kept for a later, validated try.
-const FA_BACKUP=false;   // FA_ON: a close call's line priced with a free-agent backup (lineFor)   // LINE_N: a close call's line rerun on the big simulation (lineFor)
+const FA_BACKUP=true;   // 11-18 second try: bestMove, each side's own best move or none, on the full simulation   // FA_ON: a close call's line priced with a free-agent backup (lineFor)   // LINE_N: a close call's line rerun on the big simulation (lineFor)
 function realOf(t){ if(!REAL.has(t.key)){ REAL_MISS=true; return null } return REAL.get(t.key) }
 function stepDraw(t,s,f=1){ if(REAL){ const y=realOf(t); if(y!=null) return y } const u=uAt(t.key,s), r=t.r||1; return t.cur!=null? t.cur+drawScore(Math.max(0,t.mu-t.cur),u,r,t.pid) : drawScore(t.mu*f,u,r,t.pid) }
 // V[i]: what the chain from step i is worth (his missed-game chance included); V.e[i]: the same if he plays.
@@ -2692,7 +2692,7 @@ function lockOdds(A,P,x){ const v=W.vs, a=x.a; if(!v?.me?.tot||!a.latest) return
   // his last game of the week too: "play on" is giving his slot to whoever plays later (user, 11-13: Clingan's 24.12 in UTIL)
   // from his lock line's own two plans (user, 11-11: Robinson's line sat right at his 19.56 while these odds, still on the old
   // slot chain, said locking was worth 2 points of win chance and 4 of median); the chain below is only the fallback
-  if(x.idx!=null && lineFor(A,P,x,a.latest.date)!=null){ const o=v._lfo?.get(x.pid+"|"+a.latest.date+"|"+x.idx+"|1"); if(o) return {L:o.L, W:o.W, title:!!v.wt, conf:o.conf, fa:o.fa, faDrop:o.faDrop} }
+  if(x.idx!=null && lineFor(A,P,x,a.latest.date)!=null){ const o=v._lfo?.get(x.pid+"|"+a.latest.date+"|"+x.idx+"|1"); if(o) return {L:o.L, W:o.W, title:!!v.wt, conf:o.conf, fa:o.fa, faDrop:o.faDrop, faL:o.faL, faLDrop:o.faLDrop} }
   const hp=[...P.pick].find(([,q])=>q.slot===x.idx)?.[0]||x.pid, part=v.me.parts.get(hp)||v.me.parts.get(x.pid); if(!part) return null;
   const st0=chainSteps(A,P,hp,a.latest.date), k=st0.findIndex(t=>t.pid===hp||t.pid===x.pid); if(k<0) return null;
   const st=[{...st0[k],pm:0}].concat(st0.slice(k+1)), V=stepsValue(st), N=v.me.tot.length, f=calF(), C=new Float64Array(N), keep=new Float64Array(N), go=new Float64Array(N);
@@ -2986,7 +2986,7 @@ function todoItems(A,P){
         rems:[{id:"lock-"+x.pid, t, lead:15, title:"Last call: lock "+last(x.pid)+" "+a.latest.fp.toFixed(2)+at}]}) }
     else if(p){ const nd= a.kl!=null? a.kl : (vc&&vc.at!=null? Math.max(0,vc.at) : null);   // the same line as the grid and the after-game line
       const lo1=lockOdds(A,P,x);
-      out.push({t, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(2)+(nd!=null?" (needs "+nd.toFixed(2)+")":"")+(lo1?.conf!=null? " · "+confLabel(lo1.conf) : ""), sub:(lo1?.fa? "Counts on claiming "+lo1.fa+(lo1.faDrop? " (drop "+lo1.faDrop+")" : "")+" as a backup. " : "")+(oddsWhy(lo1)||callWhy(vc))}) }
+      out.push({t, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(2)+(nd!=null?" (needs "+nd.toFixed(2)+")":"")+(lo1?.conf!=null? " · "+confLabel(lo1.conf) : ""), sub:(lo1?.fa? "Best with claiming "+lo1.fa+(lo1.faDrop? " for "+lo1.faDrop : "")+". " : "")+(oddsWhy(lo1)||callWhy(vc))}) }
   }
   // lineup changes, game day by game day (later days assume nothing else changes first)
   const days=[P.night].concat(P.days||[]).filter(Boolean);
@@ -3336,8 +3336,7 @@ function replanLine(A,P,x,date,claims){
   // your own call: the free agent who'd best back up his slot joins your bench on both sides of the call (for a bench player with nothing
   // left this week, or an open roster spot), so waiting gets credit for the extra looks a pickup gives an open slot and locking gets him
   // wherever else he helps (user, 11-18: "I can always go pick up a PF"; Buzelis' line was 21.1 alone, 22.0 with Draymond Green's Thursday)
-  const fb= FA_ON && !REPLAN_X && xi!=null && x.rid!=null && x.rid===myRoster()?.roster_id? faBackupFor(A,P,x,SLn[xi]) : null;
-  if(fb){ B=A.filter(z=>z.pid!==fb.drop).concat([fb.row]) }
+  const own= FA_ON && !REPLAN_X && x.rid!=null && x.rid===myRoster()?.roster_id;   // your own close call: each side gets its best pickup (bestMove)
   // One claim per slot, best score first: any other finished score that's higher (pid breaks ties) and clears its own line
   // counts as locked, in the slot its own line found cheapest. Any slot type: with every open slot priced below, a forward
   // in UTIL and one in SF can both be after the same forward slot (11-11), not just two UTILs.
@@ -3374,10 +3373,13 @@ function replanLine(A,P,x,date,claims){
       // Friday 7:00 game still counted on the wait side of Mitchell's 7:30 line, which read 27.4 against a slot worth ~22)
       if(!keep.length && r.starter) return r;
       return {...r, a:{...r.a, future:keep, latest: r.a.latest? {...r.a.latest, fp:0, dnp:true} : r.a.latest}} }) }
-  const AL=B.map(r=> r.pid===x.pid? xL : r), AW=B.map(r=> r.pid===x.pid? xW : r);
+  let AL=B.map(r=> r.pid===x.pid? xL : r), AW=B.map(r=> r.pid===x.pid? xW : r);
   if(!AL.includes(xL)) AL.push(xL); if(!AW.includes(xW)) AW.push(xW);
   const b0=v.planBase||{force:v.force}, force={...(b0.force||{})}; delete force[x.pid];
   const ex= b0.exclude instanceof Set? new Set([...b0.exclude].filter(p=>p!==x.pid)) : b0.exclude, base={...b0, force, exclude:ex, pins:undefined};   // the line is priced without pins, as before
+  // each side with the waiver move that suits it best, or none (user, 11-18: "I can always go pick up a PF... it's a real thing"): waiting
+  // can open his slot for a pickup, locking closes it, and you'd make whichever move fits the choice you made
+  let mvW=null, mvL=null; if(own){ try{ mvW=bestMove(AW,x,base,"W"); mvL=bestMove(AL,x,base,"L") }catch(e){} if(mvW) AW=mvW.R; if(mvL) AL=mvL.R }
   // the full planner, the one behind the header's odds (user, 11-11: Robinson's "play on" odds read 6% win / 28% median under a
   // header of 10% / 37%: with games live the quick planner ran 5.5 points under the full plan, which has the mid-game switches)
   // pickups need an open slot: each side gets its own (user, 11-13: "I also have the ability to add someone off waivers Saturday
@@ -3410,7 +3412,7 @@ function replanLine(A,P,x,date,claims){
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
   if(best==null) why("nobest");
   return best==null? null : {l:best, slot:at, odds: known? (()=>{ const L=titleObjD(DLb,OPP,v.tab,v.median,v.wt), Wo=titleObjD(DW,OPP,v.tab,v.median,v.wt);
-    return {L, W:Wo, conf: callConf(DLb,DW,OPP,v.tab,v.median, L.obj>=Wo.obj), fa: fb? fb.name : null, faDrop: fb? fb.dropName : null, ...(REPLAN_X?.keep || v._keepD? {DL:DLb, DW, O:OPP} : {})} })() : null} }
+    return {L, W:Wo, conf: callConf(DLb,DW,OPP,v.tab,v.median, L.obj>=Wo.obj), fa: mvW? mvW.name : null, faDrop: mvW? mvW.dropName : null, faL: mvL? mvL.name : null, faLDrop: mvL? mvL.dropName : null, ...(REPLAN_X?.keep || v._keepD? {DL:DLb, DW, O:OPP} : {})} })() : null} }
 // Confidence in a lock call (11-17): across the simulated weeks, each weighted by how much the choice changed it (a matchup flip = 1,
 // plus the change in median chance), the share of the total difference that went the board's way. Same draws both ways. (Counting
 // weeks instead let tiny median-chance nudges count as much as a matchup flip: Clingan read 59%, weighted 53%.)
@@ -3464,6 +3466,30 @@ function faBackupFor(A,P,x,sn){ const v=W.vs; if(!W._fa||!sn||!v||!v.me?.tot||ty
       const gain=(Q.total-base0)*perPt + restOfSeason(x.rid, d? [d.pid] : [], o.c.pid);
       if(gain>0.0005 && (!best||gain>best.gain)) best={gain, row, name:o.c.info.name, drop:d? d.pid : null, dropName:d? d.a.info.name : null} }catch(e){} }
   return save(best) }
+// The best waiver move for one side of your own lock call, or null for none: a free agent (the Pickups list's best this-week options that
+// fit a slot) for a bench player, judged by title odds on the full simulation (each game at his chance to play, the whole lineup
+// re-planned), plus the later weeks (restOfSeason: who goes and who comes for the rest of the season), times your chance to land him
+// before teams ahead of you on waivers. Only moves worth at least +0.05% title odds. Cached per side, player and free-agent list.
+function bestMove(R,x,base,side){ const v=W.vs; if(!W._fa||!v||!v.me?.tot||!LG.strFor) return null; try{ faPool() }catch(e){ return null }
+  const key=side+"|"+x.pid+"|"+W._fa.k+"|"+(W.updated||0)+"|"+R.length+"|"+(x.idx??""); W._bm ||= new Map(); if(W._bm.has(key)) return W._bm.get(key);
+  const save=r=>{ W._bm.set(key,r); if(W._bm.size>100) W._bm.delete(W._bm.keys().next().value); return r };
+  const rid=x.rid, wt=v.wt||{perWin:1,perPt:0}, O=v.opp, tab=v.median? v.tab : null;
+  // each simulated week's title value (same weeks for every roster compared, so differences are paired)
+  const ows=RR=>{ const Q=planWeek(RR,base), D=teamDist(RR,Q,PK_N), n=Math.min(D.tot.length,O.tot.length), o=new Float64Array(n);
+    for(let s2=0;s2<n;s2++){ const t=D.tot[s2], y=O.tot[s2]; o[s2]=wt.perWin*((t>y?1:t===y?0.5:0)+(tab? pTopAt(tab,t) : 0))+wt.perPt*t } return o };
+  const r0=S.rosters[rid], room= r0 && (r0.players||[]).length-(r0.reserve||[]).length < (S.league.roster_positions||[]).filter(p=>p!=="IR").length;
+  const drops= room? [null] : R.filter(z=>z.pid!==x.pid && z.slot==="BN" && !z.a.lockedOn && !z.a.live && !z.fa);
+  const cands=(W._fa.list||[]).slice(0,4); if(!drops.length||!cands.length) return save(null);
+  const b=ows(R); let best=null;
+  for(const c of cands){ const s=claimFrom(c.pid), fut=(c.fut||[]).filter(g=>g.date>=s && g.mu>0); if(!fut.length) continue;
+    let land=1; try{ land=1-takenChance(c.pid) }catch(e){}
+    const row={pid:c.pid, slot:"BN", starter:false, idx:null, rid, fa:true, a:{info:{...c.info, pos:c.info.pos||[]}, live:null, latest:null, lockedOn:null, future:fut.map(f=>({...f}))}};
+    for(const d of drops){ const R2=R.filter(z=>!d||z.pid!==d.pid).concat([row]), o2=ows(R2), n=Math.min(o2.length,b.length); let m=0, q=0;
+      for(let s2=0;s2<n;s2++){ const dd=o2[s2]-b[s2]; m+=dd; q+=dd*dd } m/=n; const se=Math.sqrt(Math.max(0,q/n-m*m)/n), later=restOfSeason(rid, d? [d.pid] : [], c.pid);
+      // any gain, however small, as long as it's clearly more than the simulation's own uncertainty (user, 11-18: "even a .001% increase
+      // to odds is worth it no?"): a fixed bar threw away real gains; no bar would act on noise and churn the pick every refresh
+      const gain=land*(m+later); if(m+later>2*se && gain>0 && (!best||gain>best.gain)) best={gain, se, R:R2, name:c.info.name, dropName:d? d.a.info.name : null, land} } }
+  return save(best) }
 function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
   const v=W.vs, key=x.pid+"|"+date+"|"+x.idx+"|"+(noClaims?0:1); if(v){ v._lf ||= new Map(); if(v._lf.has(key)) return v._lf.get(key) }
@@ -3473,7 +3499,7 @@ function lineFor(A,P,x,date,noClaims){
   let b=null; try{ let r=replanLine(A,P,x,date,!noClaims); const sc= x.a.latest && !x.a.latest.dnp && x.a.latest.date===date && !x.a.live? x.a.latest.fp : null;
       // a call within 3 of its line: priced again with the free-agent backup (faBackupFor), and on 10,000 weeks when within 1.5; calls
       // further out can't flip, so they skip the pickup search (it's the slow part)
-      if(r && !REPLAN_X && sc!=null && Math.abs(sc-r.l)<(FA_BACKUP? 3 : 1)){ FA_ON=FA_BACKUP; if(Math.abs(sc-r.l)<(FA_BACKUP? 1.5 : 1) && SIM_N<DUE_N) LINE_N=DUE_N; try{ const r2=replanLine(A,P,x,date,!noClaims); if(r2) r=r2 }finally{ FA_ON=false; LINE_N=null } }
+      if(r && !REPLAN_X && sc!=null && Math.abs(sc-r.l)<(FA_BACKUP? 2 : 1)){ FA_ON=FA_BACKUP; if(Math.abs(sc-r.l)<1 && SIM_N<DUE_N) LINE_N=DUE_N; try{ const r2=replanLine(A,P,x,date,!noClaims); if(r2) r=r2 }finally{ FA_ON=false; LINE_N=null } }
       if(r){ b=r.l; if(v){ (v._lfs ||= new Map()).set(key,r.slot); (v._lfo ||= new Map()).set(key,r.odds) } } }catch(e){ b=null }
   if(b==null){ const own=slotLinesFor(A,P,x,date); b= own.size? (own.get(x.idx) ?? Math.min(...own.values())) : null }   // fallback: his slot's chain
   if(v) v._lf.set(key,b); return b }
@@ -5275,7 +5301,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
   WR.forEach(([n,g,set])=>{ const f=g(); set(function(...a){ if(depth[n]) return f.apply(this,a); depth[n]=1; const t=performance.now(); try{ return f.apply(this,a) } finally{ depth[n]=0; const o=(acc[n] ||= [0,0]); o[0]+=performance.now()-t; o[1]++ } }) }) }
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
-if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={faBackupFor,restOfSeason,pickupFor,oppBest,othersDist,pTopTable,replanLine,dnpP,liveTag,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD,ctxOf,medNormal,lockSlotFor,liveRest0,liveRest} }
+if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={bestMove,takenChance,restOfSeason,pickupFor,oppBest,othersDist,pTopTable,replanLine,dnpP,liveTag,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD,ctxOf,medNormal,lockSlotFor,liveRest0,liveRest} }
 if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
