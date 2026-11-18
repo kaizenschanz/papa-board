@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-djZ4ZR6AmZkkaArd7LY2NRaA0LZgYa21R43DUG7bfAs='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H6mjQRIa2TI5TLmhC1YvF39Orel7W2kreonBoy8F0mc='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1642,7 +1642,7 @@ const DUE_N = 10000;
 function oppDN(N){ const v=W.vs; if(!v || N<=SIM_N || !v.oppRows || !v.oppPlan) return v?.opp; const k=N+"|"+(v._oppOwn? 1 : 0)+"|"+(W.updated||0);
   if(v._oppN?.k===k) return v._oppN.D; let D=v.opp; try{ const pc= POS_ON && v.posC? {ctx:ctxOf(v.me), med:v.posC.medOpp, wt:v.posC.allIn? null : v.wtOpp, pkm:v.pkOpp?.m||0} : null;
     D=withPickups(teamDist(v.oppRows,v.oppPlan,N,0,false,pc),v.pkOpp) }catch(e){} v._oppN={k,D}; return D }
-const CALIB = {"pos":{"on":false,"team_weeks":48,"h2h":[0.6024,0.6053],"median":[0.5257,0.5292]},"replay":{"team_weeks":48,"team_days":312,"weeks":[1,2,3,4],"f":1.0324,"raw_f":1.0403,"open_bias":-0.0155,"openK":0.9923,"at":1794927781},"openK":0.9923,"med":{"n":2,"weeks":[4],"bias":1.3,"sd0":12.64,"raw_bias":5.2},"f":1.0324,"n":22,"prior_n":12,"weeks":[3,4],"raw_f":1.1625,"brier":0.1519,"games":23,"bins":[{"from":0.5,"n":2,"said":0.512,"won":1.0},{"from":0.6,"n":2,"said":0.674,"won":0.5},{"from":0.7,"n":5,"said":0.737,"won":0.8},{"from":0.8,"n":5,"said":0.832,"won":0.6},{"from":0.9,"n":9,"said":0.953,"won":1.0}],"asof":"2026-11-17","wait":{"single":{"bias":0.0,"n":0,"raw":null,"z_sd":null},"multi":{"bias":0.152,"n":3,"raw":0.657,"z_sd":0.312}},"calls":[{"call":"lock","promised":0.46,"got":0.0},{"call":"lock","promised":-0.1,"got":0.0},{"call":"lock","promised":-3.9,"got":0.0},{"call":"lock","promised":-5.89,"got":0.0},{"call":"lock","promised":-0.05,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.01,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.0,"got":0.9},{"call":"lock","promised":0.03,"got":0.0},{"call":"lock","promised":0.0,"got":0.0}]};
+const CALIB = {"str":{"blend":0.33,"shrink":0.62,"wk_sd":23.14,"lvl_sd":8.5,"fit":{"blend":0.35,"shrink":0.7,"wk_sd":19.89,"lvl_sd":7.5},"n":36,"weeks":[1,2,3,4],"rmse":15.66,"rmse_default":15.88},"pos":{"on":false,"team_weeks":48,"h2h":[0.6024,0.6053],"median":[0.5257,0.5292]},"replay":{"team_weeks":48,"team_days":312,"weeks":[1,2,3,4],"f":1.0324,"raw_f":1.0403,"open_bias":-0.0155,"openK":0.9923,"at":1794927781},"openK":0.9923,"med":{"n":2,"weeks":[4],"bias":1.3,"sd0":12.64,"raw_bias":5.2},"f":1.0324,"n":22,"prior_n":12,"weeks":[3,4],"raw_f":1.1625,"brier":0.1519,"games":23,"bins":[{"from":0.5,"n":2,"said":0.512,"won":1.0},{"from":0.6,"n":2,"said":0.674,"won":0.5},{"from":0.7,"n":5,"said":0.737,"won":0.8},{"from":0.8,"n":5,"said":0.832,"won":0.6},{"from":0.9,"n":9,"said":0.953,"won":1.0}],"asof":"2026-11-17","wait":{"single":{"bias":0.0,"n":0,"raw":null,"z_sd":null},"multi":{"bias":0.152,"n":3,"raw":0.657,"z_sd":0.312}},"calls":[{"call":"lock","promised":0.46,"got":0.0},{"call":"lock","promised":-0.1,"got":0.0},{"call":"lock","promised":-3.9,"got":0.0},{"call":"lock","promised":-5.89,"got":0.0},{"call":"lock","promised":-0.05,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.01,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.0,"got":0.9},{"call":"lock","promised":0.03,"got":0.0},{"call":"lock","promised":0.0,"got":0.0}]};
 function calF(){ const f=CALIB&&CALIB.f; return f>0.5&&f<2? f : 1 }
 // Learned correction to what an open slot is worth, from grading the board's own slot predictions against how weeks ended
 // (calibrate_odds.py): one bias for slots down to their last game, one for slots that can still wait for a better game.
@@ -3761,6 +3761,9 @@ function renderWeek(){
     league: (()=>{ try{ return leagueOdds() }catch(e){ return null } })(),
     // every team's title and playoff odds from the League tab, logged each cycle for the weekly recap's movers (user, 11-17)
     title: LG.out? LG.out.teams.map(t=>[t.rid, +(t.ch||0).toFixed(4), +(t.po||0).toFixed(4)]) : null,
+    // what title_backfill.py needs to replay the season simulation at past moments: roster strength, finished weeks, schedule
+    lgState: LG.out? {teams:LG.out.teams.map(t=>({rid:t.rid, strm:+t.str.m.toFixed(3)})), past:(LG.past||[]).map(m=>(m||[]).map(x=>[x.roster_id,x.matchup_id,+(+x.points||0).toFixed(2)])),
+      sched:Object.fromEntries(Object.entries(LG.sched||{}).map(([w,m])=>[w,(m||[]).map(x=>[x.roster_id,x.matchup_id])]))} : null,
     // finished weeks' exact totals from Sleeper (read with the login), for legs.json: without a login the board otherwise rebuilds
     // them from the lock records and can guess a slot wrong (11-17: the Luck table had you at 3 head-to-head wins, Sleeper says 4)
     pastPts: LG.pastGql && Array.isArray(LG.past)? Object.fromEntries(LG.past.map((m,i)=>[i+1, Object.fromEntries((m||[]).map(x=>[x.roster_id, +(+x.points||0).toFixed(2)]))])) : null,
@@ -4879,7 +4882,10 @@ async function computeLeague(){   // async: it pauses between its season runs so
   const withAct=teams.filter(t=>t.act!=null);
   const avgActual= withAct.length? withAct.reduce((a,t)=>a+t.act,0)/withAct.length : 210;
   const avgModel=teams.reduce((a,t)=>a+t.str.m,0)/teams.length;
-  for(const t of teams){ const m=t.str.m*(avgActual/avgModel), raw= t.act!=null? 0.7*m+0.3*t.act : m; t.mu=avgActual+0.5*(raw-avgActual); t.sd=28 }
+  // blend, pull toward the league's level, weekly swing and level wobble: fitted every morning (calibrate_odds.py fit_strength, leak-free
+  // on the finished weeks; user, 11-17: "I'd rather do something that's calibrated"), the old picks (0.3, 0.5, 28, 10) until there's a fit
+  const SC=CALIB?.str, BL= SC?.blend ?? 0.3, SH= SC?.shrink ?? 0.5, WSD= SC?.wk_sd ?? 28, LSD= SC?.lvl_sd ?? 10;
+  for(const t of teams){ const m=t.str.m*(avgActual/avgModel), raw= t.act!=null? (1-BL)*m+BL*t.act : m; t.mu=avgActual+SH*(raw-avgActual); t.sd=WSD }
   // simulate the rest of the regular season and the playoffs (seeded random numbers, so re-runs with a tweak are comparable)
   const N=8000, idx=Object.fromEntries(teams.map((t,i)=>[t.rid,i])), n=teams.length, cut=S.league.settings?.playoff_teams||8;
   const median=!!S.league.settings?.league_average_match;
@@ -4904,7 +4910,7 @@ async function computeLeague(){   // async: it pauses between its season runs so
     for(let s=0;s<N;s++){
       // each season run also draws how good every team really is (±10 a week: injuries, trades, pickups, projection misses), so
       // 17 weeks of weekly noise don't average out into false certainty
-      for(let i=0;i<n;i++){ W_[i]=teams[i].w+teams[i].t/2; PF[i]=teams[i].pf; off[i]=10*nrm() }
+      for(let i=0;i<n;i++){ W_[i]=teams[i].w+teams[i].t/2; PF[i]=teams[i].pf; off[i]=LSD*nrm() }
       if(ti>=0){ W_[ti]+=addW; PF[ti]+=addPF }
       for(const wk of weeks){
         // this week: the same score samples the matchup cards use (real score shapes, locks so far, backup chains); later weeks: team strength
@@ -4919,7 +4925,7 @@ async function computeLeague(){   // async: it pauses between its season runs so
       // playoffs: exact title odds for this seeding (1v8, 4v5 | 2v7, 3v6, one week per round). No random draws here, so the
       // +1 win / +points runs stay paired with the base run and the title weights come out steady instead of noisy.
       const seeds=order.slice(0,cut);
-      if(cut===8){ const pos=[0,7,3,4,1,6,2,5], st=pos.map(k=>teams[seeds[k]].mu+off[seeds[k]]+(seeds[k]===ti?addMu:0)), pw=(a,b)=>Phi((st[a]-st[b])/(28*Math.SQRT2));
+      if(cut===8){ const pos=[0,7,3,4,1,6,2,5], st=pos.map(k=>teams[seeds[k]].mu+off[seeds[k]]+(seeds[k]===ti?addMu:0)), pw=(a,b)=>Phi((st[a]-st[b])/(WSD*Math.SQRT2));
         let pr=new Array(8).fill(1);
         for(let size=2; size<=8; size*=2){ const half=size/2, nx=new Array(8).fill(0);
           for(let i=0;i<8;i++){ const blk=Math.floor(i/size)*size, o0= (i-blk)<half? blk+half : blk; let w=0; for(let j=o0;j<o0+half;j++) w+=pr[j]*pw(i,j); nx[i]=pr[i]*w }
