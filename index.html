@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1oo9ZxTSGv+wdNV1aTt6A9G3GIM/+WY0qAw/rqO6z2s='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D5z5ANRU8XONpYSCPkVLHjGVSpXIQqD3ST/tI361RMM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1033,7 +1033,10 @@ async function loadWeek(force){
     const week= base+((hasNext && (pick!=null? pick===1 : baseDone))? 1 : 0);
     W.baseWeek=base; W.hasNext=hasNext; W.baseDone=baseDone;
     if(W.week && W.week!==week){ LG.wt=null; LG.out=null; W._oth=null }   // another week: its own title weights and opponents
-    const slow = force || !W.loaded || W.week!==week || Date.now()-W.slowAt>15*60*1000;
+    // a tap on Refresh is about game state (scores, locks, clocks): the quick read, always redrawn; projections, lines, injuries and
+    // transactions still come every 15 minutes (user, 11-17: "refresh button isn't refreshing game state": a tap re-read all of
+    // that first, and the scores came in late)
+    const slow = W.slowNow || !W.loaded || W.week!==week || Date.now()-W.slowAt>15*60*1000; W.slowNow=false;
     // projections are big and change slowly, so they're re-read every 15 minutes; everything else on each refresh
     // Sleeper sometimes answers from an out-of-date copy, so the matchup is read three times and each starter's counted score is the majority
     const mread=()=>j("/league/"+lid+"/matchups/"+week);
@@ -1101,7 +1104,9 @@ async function loadWeek(force){
     if(W.profAcc){ W.tm.parts=Object.fromEntries(Object.entries(W.profAcc).map(([k,v])=>[k,Math.round(v[0])+"/"+v[1]])); for(const k in W.profAcc) delete W.profAcc[k] }   // how long each part took (status check)
     if(!LG.busy && W.view==="week" && (!LG.wt || Date.now()-LG.wt.at>15*60e3)) refreshTitleWeights();
   }catch(e){ bootDone(); W.err=e.message; $("wkMsg").textContent="Couldn't load this week from Sleeper: "+e.message; $("wkMsg").classList.add("err") }
-  finally{ if(W._wheel) busyOff(); W.loading=false; if(W.reloadWk){ W.reloadWk=false; setTimeout(()=>loadWeek(true),0) } }
+  finally{ if(W._wheel) busyOff(); W.loading=false; if(W.reloadWk){ W.reloadWk=false; setTimeout(()=>loadWeek(true),0) }
+    // after a Refresh tap's quick read is drawn: projections, lines and injuries re-read in the background, then redrawn quietly
+    else if(W.slowAfter){ W.slowAfter=false; if(Date.now()-(W.slowAt||0)>60e3){ W.slowNow=true; setTimeout(()=>loadWeek(false),0) } } }
 }
 // This page's week is over and the next one is a click away: what comes next (claims) belongs to that page.
 function weekOver(){ return W.games.length>0 && W.games.every(g=>g.status==="complete") && !!W.hasNext && W.week===W.baseWeek }
@@ -1343,7 +1348,7 @@ async function loadClocks(){
   const days=[...new Set(W.games.filter(g=>g.status!=="complete" && g.date<=todayStr()).map(g=>g.date))];
   await Promise.all(days.map(async day=>{
     try{
-      const sb=await fetch(ESPN_SITE+"/scoreboard?dates="+day.replace(/-/g,""),{signal: AbortSignal.timeout? AbortSignal.timeout(15000) : undefined}).then(r=>r.json());
+      const sb=await fetch(ESPN_SITE+"/scoreboard?dates="+day.replace(/-/g,"")+"&_="+Date.now(),{cache:"no-store", signal: AbortSignal.timeout? AbortSignal.timeout(15000) : undefined}).then(r=>r.json());
       for(const e of sb.events||[]){
         const s=e.status||{}, st=s.type?.state; if(st!=="in" && st!=="post") continue;
         const per=s.period||1, left=+s.clock||0;
@@ -5112,7 +5117,7 @@ function showView(v,persist){
   setLive(S.err?"err":"on"); renderClock();
 }
 $("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b) showView(b.dataset.view,true)});
-$("wkRefresh").addEventListener("click",()=>loadWeek(true));
+$("wkRefresh").addEventListener("click",()=>{ W.slowAfter=true; loadWeek(true) });   // game state first, shown; then projections (user, 11-17)
 $("teamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) return; if(!myRoster()){ setMe(v); return } W.viewRid=v; store.set(vrKey(), v); renderWeekBusy() });
 // the arrows step the week list one way or the other (Matchup and League tabs)
 document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest(".wkarr"); if(!b||b.disabled) return; const nav=b.closest(".wknav"), sel=nav&&nav.querySelector("select"); if(!sel) return;
