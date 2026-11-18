@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6S5IkU+4aO0EwN2h0viFyAoDxwH4vBo37RsfMHCTDCA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JDeefDZ9MLKp6KuCYoLh7xuMN/p8OC+FewbsLUCWfOk='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3173,6 +3173,9 @@ function renderLockStatus(me){ if(!me) return;
   $("wkSum").innerHTML=(fresh? '<span class="ok">● Starts '+dayLabel(W.games[0].date)+'</span>'
       : final? '<span class="ok">● Final</span>'
       : exact && W.legLive? '<span class="ok">● Exact locks · '+clock(W.updated||Date.now())+'</span>'
+      // a saved Sleeper login that stopped working falls back to the Mac's copy (a few minutes old): say so, with the fix (11-17: "every
+      // time I refresh it lags a few minutes": the login had quietly stopped working)
+      : exact && W.legErr? '<span class="warn">● Your Sleeper login stopped working · locks as of '+snapT+'</span>'+(LOGIN_UI? ' <button type="button" class="linkbtn" data-open="wkMore">Fix</button>' : ' <small>(open the board with ?login=1 to paste a new one)</small>')
       : exact && !legOld()? '<span class="ok">● Exact locks · '+snapT+'</span>'
       : exact? '<span class="warn">● Locks as of '+snapT+'</span>'
       : W.legErr && LOGIN_UI? '<span class="warn">● Sleeper login failed</span> <button type="button" class="linkbtn" data-open="wkMore">Fix</button>'
