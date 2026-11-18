@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wl1OJpRL8g5jkEj/B34mUMI632BkMwYmSYTKS2kMDto='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qlqV84O+8xIVaNP5qJ7oBlcNAiYvGGIrKcsgzh9FB08='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5284,18 +5284,17 @@ function makeWorkerEnv(INIT, post){
 // ---- the page side: draw what the worker says, send it the taps it asked for
 function pageBoot(){
   const qs=new URLSearchParams(location.search), ls=(()=>{ try{ return window.localStorage }catch(e){ return null } })();
-  // ?legsfeed=1 (the Mac's sync, once a minute during games): only this week's lock records, read with the login saved in this browser,
-  // into #legsFeed for the sync to publish. Nothing else loads. Only the lock fields leave the page, never the login (user, 11-17:
-  // "I don't wanna have to login every device or on other people's").
-  if(qs.get("legsfeed")==="1"){ (async()=>{ const out=document.createElement("script"); out.type="application/json"; out.id="legsFeed"; const put=o=>{ out.textContent=JSON.stringify(o); document.body.appendChild(out) };
-    try{ const g=k=>{ try{ return JSON.parse(ls.getItem("prb:"+k)) }catch(e){ return null } }, tok=String(g("slpToken")||"").replace(/^\s*bearer\s+/i,""), lid=g("league");
-      if(!tok||!lid){ put({err:"no login or league saved"}); return }
+  // This week's lock records, read with the login saved in this browser (the Mac's sync, once a minute during games: through ?legsfeed=1,
+  // or called on the page its full read already has open). Only the lock fields come back, never the login (user, 11-17: "I don't wanna
+  // have to login every device or on other people's").
+  window.__legsFeed=async()=>{ try{ const g=k=>{ try{ return JSON.parse(ls.getItem("prb:"+k)) }catch(e){ return null } }, tok=String(g("slpToken")||"").replace(/^\s*bearer\s+/i,""), lid=g("league");
+      if(!tok||!lid) return {err:"no login or league saved"};
       const st=await fetch("https://api.sleeper.app/v1/state/nba?_="+Date.now(),{cache:"no-store"}).then(r=>r.json()), week=+(st.display_week||st.week);
       const r=await fetch("https://sleeper.com/graphql",{method:"POST", signal:AbortSignal.timeout? AbortSignal.timeout(20000) : undefined, headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
         body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+week+') { roster_id matchup_id starters starters_games players points } }'})});
-      const d=await r.json(); if(d.errors&&d.errors.length){ put({err:String(d.errors[0].message||"error").slice(0,120), status:r.status}); return }
-      const legs=(d.data?.matchup_legs||[]).map(l=>({roster_id:l.roster_id, matchup_id:l.matchup_id, starters:l.starters||[], starters_games:l.starters_games||{}, players:l.players||[], points:+l.points||0}));
-      put({week, at:Date.now(), legs}) }catch(e){ put({err:String(e&&e.message||e).slice(0,120)}) } })(); return }
+      const d=await r.json(); if(d.errors&&d.errors.length) return {err:String(d.errors[0].message||"error").slice(0,120), status:r.status};
+      return {week, at:Date.now(), legs:(d.data?.matchup_legs||[]).map(l=>({roster_id:l.roster_id, matchup_id:l.matchup_id, starters:l.starters||[], starters_games:l.starters_games||{}, players:l.players||[], points:+l.points||0}))} }catch(e){ return {err:String(e&&e.message||e).slice(0,120)} } };
+  if(qs.get("legsfeed")==="1"){ window.__legsFeed().then(o=>{ const out=document.createElement("script"); out.type="application/json"; out.id="legsFeed"; out.textContent=JSON.stringify(o); document.body.appendChild(out) }); return }
   const classic=()=>APP({document, window, localStorage:ls, location, IN_WORKER:false, fetch:window.fetch.bind(window),
     requestAnimationFrame:window.requestAnimationFrame.bind(window), cancelAnimationFrame:window.cancelAnimationFrame.bind(window),
     onReady:a=>{ window.__board=q=>Promise.resolve({mode:"page", ...(q==="prof"? a.prof() : /^team:/.test(q||"")? a.team(+q.slice(5)) : a.status())}) }});
