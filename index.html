@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u42MiBB6Q/dxbwQE8oAae7tUGbRPUb2JkLj9s+w8BZw='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ef5pxwkQ4WPUKErA62JWqVYkcAMaC4qnALOXVci4HAY='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -226,6 +226,20 @@ details.lgm .lgg{padding:4px 0 12px}
 .thc svg{width:100%;height:auto;display:block}.thc .ths{display:block}.thc .thw{display:none}@media (min-width:640px){.thc .ths{display:none}.thc .thw{display:block}}
 .thc .g{stroke:var(--line);stroke-width:1}.thc .d{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4}.thc .ax{font-weight:600;font-family:var(--body);fill:var(--muted)}
 .thc path{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.thc path.me{stroke-width:2.75}.thc circle{stroke:var(--panel);stroke-width:2}.thc .lv{font-weight:700;font-family:var(--body);font-variant-numeric:tabular-nums}
+.lrm{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(12px,env(safe-area-inset-top,0px)) max(10px,env(safe-area-inset-right,0px)) 24px max(10px,env(safe-area-inset-left,0px))}
+.lrb{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:min(760px,100%);padding:16px;margin-top:8px}
+.lrh{display:flex;align-items:center;gap:10px;margin-bottom:10px}.lrh b{font:700 22px/1.1 var(--display)}.lrc{margin-left:auto;background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer}
+.lrs{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}.lrs h3{font:700 13px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.lrv{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px}.lrcall{font:700 48px/0.95 var(--display);color:var(--accent)}.lrcall.w{color:var(--ser1)}.lrcall small{display:block;font:600 15px/1.3 var(--body);color:var(--ink);margin-top:6px}
+.lrchip{display:inline-flex;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font:700 13px/1.3 var(--body)}
+.lrkv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.lrkv b{display:block;font:700 22px/1.1 var(--display);font-variant-numeric:tabular-nums}.lrkv span{color:var(--muted);font-size:12px}
+.lrsvg .lr-s{display:block}.lrsvg .lr-w{display:none}@media (min-width:640px){.lrsvg .lr-s{display:none}.lrsvg .lr-w{display:block}}.lrsvg svg{width:100%;height:auto;display:block}
+.lrsvg .ax{font:600 11px var(--body);fill:var(--muted)}.lrsvg .lb{font:700 12px var(--body);fill:var(--ink)}.lrsvg .gr{stroke:var(--line);stroke-width:1}
+.lrt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:8px}.lrt td{padding:6px 4px;border-bottom:1px solid var(--line)}.lrt td+td{text-align:right}
+.lrch{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.lrg{border:1px solid var(--line);border-radius:10px;padding:10px}.lrg .d{font:700 16px/1 var(--display)}.lrg .m{font:700 26px/1.1 var(--display);margin-top:4px}.lrg .s{color:var(--muted);font-size:12px}.lrg .k{font-size:13px;margin-top:6px}
+.lrf{list-style:none;margin:0;padding:0;display:grid;gap:8px}.lrf li{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px;padding-top:8px;border-top:1px solid var(--line);font-size:14px}.lrf li:first-child{border-top:0;padding-top:0}.lrf b{font:700 15px/1.3 var(--display)}
+@media (max-width:620px){.lrf li{grid-template-columns:1fr;gap:2px}.lrcall{font-size:40px}.lrkv b{font-size:19px}}
+.lrbtn{background:none;border:0;padding:0;margin-left:6px;color:var(--accent);font:600 12px var(--body);text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
 .thq{margin-top:10px;font:500 12px var(--body);color:var(--muted)}.thk{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:6px}
 .thb{display:flex;align-items:center;gap:8px;background:none;border:0;border-radius:6px;padding:6px 4px;color:var(--muted);font:500 13px var(--body);text-align:left;cursor:pointer;min-height:34px}.thb:hover{background:var(--accent-soft)}
 .thb.on{color:var(--ink)}.thb.me .n{font-weight:700}.thb i{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--line);flex:none;display:inline-flex;align-items:center;justify-content:center;font:800 11px/1 var(--body);color:var(--panel);font-style:normal}
@@ -532,6 +546,8 @@ details.fold #poolSeg{margin-bottom:6px}
   </div>
   </div>
 </main>
+<!-- the in-page lock report (user, 11-18): opened by a To-do item's Details link, worked out on click -->
+<div id="lrModal" class="lrm" hidden data-lrx="1"><div class="lrb" role="dialog" aria-modal="true" aria-labelledby="lrTitle"><div class="lrh"><b id="lrTitle">Lock report</b><button type="button" class="lrc" data-lrx="1" aria-label="Close">✕</button></div><div id="lrBody"></div></div></div>
 
 <script>
 // ============================================================================================================================
@@ -1003,6 +1019,8 @@ function viewRoster(){ if(W.viewRid==null && !W._vrLd && S.league && !(typeof LO
 // the first pick is remembered in their browser as theirs, and later picks just show other teams. "Not your team?" resets it.
 function renderWho(){ const el=$("whoBox"); if(el){ el.hidden=true; el.innerHTML="" } }
 function setMe(rid){ store.set(meKey(), +rid); W.viewRid=null; store.del(vrKey()); W._oth=null; LG.wt=null; LG.out=null; renderWeek(); refreshTitleWeights() }
+document.addEventListener("click",e=>{ const lr=e.target.closest&&e.target.closest("[data-lr]"); if(lr){ openLockReport(lr.dataset.lr); return }
+  const lx=e.target.closest&&e.target.closest("[data-lrx]"); if(lx && (lx.id!=="lrModal" || e.target.id==="lrModal")){ $("lrModal").hidden=true; return } });
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-me]"); if(b){ setMe(b.dataset.me); return }
   if(e.target.closest("#whoReset")){ store.del(meKey()); W.viewRid=null; W._oth=null; LG.wt=null; LG.out=null; renderWeek(); $("wkBoardCard").scrollIntoView({behavior:"smooth",block:"start"}) } });
 function viewingMe(){ const v=viewRoster(), m=myRoster(); return !!(v&&m&&v.roster_id===m.roster_id) }
@@ -2996,11 +3014,11 @@ function todoItems(A,P){
     const vc=v?.calls?.[x.pid], p=P.pick.get(x.pid);
     if(a.call?.c==="lock"){ const kb=knownBy(t), ls=lockSlotFor(A,x.pid), at=ls&&ls.slot!==x.idx? " at "+ls.name : "", mv= ls? (ls.how? " "+ls.how : "") : (p&&p.slot!==x.idx? " Move him to "+P.SL[p.slot]+" first.":"");
       const lo0=lockOdds(A,P,x);
-      out.push({t, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(2)+at+(lo0?.conf!=null? " · "+confLabel(lo0.conf) : ""), note:mv.trim(), sub:(oddsWhy(lo0)||callWhy(vc))+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
+      out.push({t, pid:x.pid, kind:"lock", title:"Lock "+a.info.name+"'s "+a.latest.fp.toFixed(2)+at+(lo0?.conf!=null? " · "+confLabel(lo0.conf) : ""), note:mv.trim(), sub:(oddsWhy(lo0)||callWhy(vc))+mv+(kb.length?" No rush: "+kb.join(", ")+" finish"+(kb.length>1?"":"es")+" first.":""),
         rems:[{id:"lock-"+x.pid, t, lead:15, title:"Last call: lock "+last(x.pid)+" "+a.latest.fp.toFixed(2)+at}]}) }
     else if(p){ const nd= a.kl!=null? a.kl : (vc&&vc.at!=null? Math.max(0,vc.at) : null);   // the same line as the grid and the after-game line
       const lo1=lockOdds(A,P,x);
-      out.push({t, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(2)+(nd!=null?" (needs "+nd.toFixed(2)+")":"")+(lo1?.conf!=null? " · "+confLabel(lo1.conf) : ""), sub:(lo1?.fa? "Best with claiming "+lo1.fa+(lo1.faDrop? " for "+lo1.faDrop : "")+". " : "")+(oddsWhy(lo1)||callWhy(vc))}) }
+      out.push({t, pid:x.pid, kind:"wait", title:"Play "+a.info.name+", don't lock his "+a.latest.fp.toFixed(2)+(nd!=null?" (needs "+nd.toFixed(2)+")":"")+(lo1?.conf!=null? " · "+confLabel(lo1.conf) : ""), sub:(lo1?.fa? "Best with claiming "+lo1.fa+(lo1.faDrop? " for "+lo1.faDrop : "")+". " : "")+(oddsWhy(lo1)||callWhy(vc))}) }
   }
   // lineup changes, game day by game day (later days assume nothing else changes first)
   const days=[P.night].concat(P.days||[]).filter(Boolean);
@@ -3205,11 +3223,85 @@ function todoItems(A,P){
 }
 // One column per day in a sideways strip (swipe for later days; the next one peeks in), "Now" items above it. The strip keeps
 // its place through refreshes.
+// The lock report for one of your pending calls, worked out when its Details link is clicked (user, 11-18: "a button they can click on
+// for in depth analysis... it calculates there instead of calculating before they click"): the same numbers as the lock-report skill.
+async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!M||!body) return;
+  const v=W.vs, A=v?.rows, x=A&&A.find(r=>r.pid===pid); M.hidden=false;
+  if(!x||!v.plan){ $("lrTitle").textContent="Lock report"; body.innerHTML='<p class="empty">This call isn\'t on the board right now.</p>'; return }
+  const a=x.a, nmP=a.info.name; $("lrTitle").textContent=nmP;
+  if(!a.latest||a.latest.dnp||a.lockedOn){ body.innerHTML='<p class="empty">'+esc(nmP)+(a.lockedOn? ' is locked already.' : ' has no score to lock right now.')+'</p>'; return }
+  body.innerHTML='<p class="empty">Working it out… (a few seconds)</p>'; await tick();
+  const P=v.plan, SL=P.SL, d=a.latest.date, fp=a.latest.fp, nm=q=>(A.find(z=>z.pid===q)||{a:{info:{name:q}}}).a.info.name;
+  let line=null, o=null; try{ line=lineFor(A,P,x,d); o=v._lfo?.get(x.pid+"|"+d+"|"+x.idx+"|1") }catch(e){}
+  let lineNoMed=null, opp=null, season=[], hist=[], phase=0;
+  const hold={...(v.planBase||{force:v.force}), force:{...((v.planBase||{}).force||{}), [x.pid]:"hold"}}; let st=[], V=null, res=[];
+  try{ const PW=planWeek(A,hold); st=slotSteps(A,PW,x.pid); V=stepsValue(st); const N=v.me.tot.length; for(let s2=0;s2<N;s2++) res.push(playSteps(st,V,s2,0,0)); res.sort((p2,q2)=>p2-q2) }catch(e){}
+  await tick();
+  const N=res.length||1, qq=p2=>res.length? res[Math.min(N-1,Math.floor(p2*(N-1)))] : 0, bins=new Array(25).fill(0); for(const y of res) bins[Math.max(0,Math.min(24,Math.floor(y/2)))]++;
+  const wmean= res.length? res.reduce((t2,y)=>t2+y,0)/N : null, beat=res.filter(y=>y>fp).length/N, u15=res.filter(y=>y<15).length/N;
+  const slow=async()=>{ await tick(); LINE_N=SIM_N;   // context, not the call itself: the 3,000-week run
+  // the median's effect: both lines on the same 3,000-week run, so the gap is the median and not the run size
+  { let r1=null; try{ r1=replanLine(A,P,x,d,true) }catch(e){} const m0=v.median; v.median=false; try{ const r0=replanLine(A,P,x,d,true); if(r0&&r1) lineNoMed=[r0.l, r1.l] }catch(e){} finally{ v.median=m0 } }
+  await tick();
+  try{ v._keepD=true; const r=replanLine(A,P,x,d,true); v._keepD=false;
+    if(r&&r.odds&&r.odds.DL){ const B=v.oppRows, me=x.rid, othFor=D=>(v.oth||othersDist(me)).filter(q2=>q2.rid!==v.rid).concat([{rid:me, m:D.m, s:Math.sqrt((D.v||400)+36), tot:D.tot||null}]);
+      const ctx=D=>({oth:othFor(D), median:v.median, wt:v.wtOpp||{perWin:1,perPt:0}, pk:v.pkOpp}), rL=oppBest(B,r.odds.DL,ctx(r.odds.DL)), rW=oppBest(B,r.odds.DW,ctx(r.odds.DW)), f=(D,Op)=>titleObjD(D,Op,v.tab,v.median,v.wt);
+      const a1=f(r.odds.DL,r.odds.O), a2=f(r.odds.DW,r.odds.O), b1=f(r.odds.DL,rL.D), b2=f(r.odds.DW,rW.D);
+      opp={same:JSON.stringify(rL.force)===JSON.stringify(rW.force), fW:(a1.h-a2.h)*100, fM:(a1.md-a2.md)*100, rW:(b1.h-b2.h)*100, rM:(b1.md-b2.md)*100} } }catch(e){} finally{ v._keepD=false; LINE_N=null } };
+  // his season (box scores, the league's scoring) and his line through the week (the Mac's logs)
+  const loadSeason=async()=>{ try{ for(let w=1; w<=W.week; w++){ let rows;
+      if(w===W.week) rows=Object.values(W.stats?.[pid]||{}); else { W._pst ||= {}; if(!W._pst[w]) W._pst[w]=await jx(RAW+"/stats/nba/"+W.season+"/"+w+"?season_type=regular").catch(()=>[]); rows=(W._pst[w]||[]).filter(r2=>String(r2.player_id)===String(pid)) }
+      for(const r2 of rows){ const s3=r2.stats||{}; if((s3.min||(s3.sp||0)/60)>0) season.push([r2.date, scoreStats(s3)]) } } }catch(e){}
+  season.sort((p2,q2)=>p2[0]<q2[0]?-1:1);
+  try{ const lh=await fetch("line_hist.json?t="+Date.now(),{cache:"no-store"}).then(r2=>r2.ok? r2.json() : null); if(lh&&+lh.week===+W.week) hist=(lh.calls?.[pid]||[]).filter(e=>Math.abs((e[3]||0)-fp)<0.01) }catch(e){}
+  if(line!=null) hist=hist.concat([[Date.now(), line, o?.conf]]) };
+  // ---- the page
+  const f2=t2=>(+t2).toFixed(2), f1=t2=>(+t2).toFixed(1), sg=t2=>(t2>=0?"+":"")+t2.toFixed(1)+"%", pc1=t2=>(t2*100).toFixed(1)+"%", conf=o?.conf;
+  const lockIt= line!=null && fp>=line, close= conf!=null && conf<0.55, eW=o? (o.L.h-o.W.h)*100 : 0, eM=o? (o.L.md-o.W.md)*100 : 0;
+  const callTxt= close? "Coin flip" : lockIt? "Lock" : "Play on", mg= line!=null? fp-line : 0;
+  const sub= line==null? "No line right now" : close? "His "+f2(fp)+" vs a "+f2(line)+" line: the board leans "+(lockIt? "lock" : "play on")+" by "+Math.abs(mg).toFixed(2) : lockIt? "His "+f2(fp)+" clears the "+f2(line)+" line by "+mg.toFixed(2) : "His "+f2(fp)+" is "+(-mg).toFixed(2)+" under the "+f2(line)+" line";
+  const twoSizes=g=>'<div class="lrsvg"><div class="lr-s">'+g(340)+'</div><div class="lr-w">'+g(690)+'</div></div>';
+  const oddsSvg=Wd=>{ const H=130, L=54, R=96, X=t2=>L+(t2/100)*(Wd-L-R); let g='<svg viewBox="0 0 '+Wd+' '+H+'" role="img" aria-label="Win and median chance, lock vs play on">';
+    for(const t2 of [0,50,100]) g+='<line class="gr" x1="'+X(t2)+'" x2="'+X(t2)+'" y1="4" y2="'+(H-20)+'"/><text class="ax" x="'+X(t2)+'" y="'+(H-6)+'" text-anchor="middle">'+t2+'%</text>';
+    [["Win",o.L.h,o.W.h],["Median",o.L.md,o.W.md]].forEach(([n2,l2,w2],i2)=>{ const y=8+i2*54; g+='<text class="lb" x="0" y="'+(y+24)+'">'+n2+'</text><rect x="'+L+'" y="'+y+'" width="'+Math.max(1,X(l2*100)-L)+'" height="18" rx="4" fill="var(--accent)"/><text class="lb" x="'+(X(l2*100)+5)+'" y="'+(y+14)+'">'+pc1(l2)+' lock</text><rect x="'+L+'" y="'+(y+22)+'" width="'+Math.max(1,X(w2*100)-L)+'" height="18" rx="4" fill="var(--ser1)"/><text class="lb" x="'+(X(w2*100)+5)+'" y="'+(y+36)+'">'+pc1(w2)+' play on</text>' });
+    return g+'</svg>' };
+  const histSvg=Wd=>{ const H=Wd<500? 170 : 210, L=32, R=8, T=16, B=24, top=Math.max(5,Math.ceil(Math.max(...bins)/N*100/5)*5), X=t2=>L+(t2/50)*(Wd-L-R), Y=p2=>T+(1-p2/top)*(H-T-B), bw=(Wd-L-R)/25;
+    let g='<svg viewBox="0 0 '+Wd+' '+H+'" role="img" aria-label="Where the slot ends if he plays on">'; for(let p2=0;p2<=top;p2+=5) g+='<line class="gr" x1="'+L+'" x2="'+(Wd-R)+'" y1="'+Y(p2)+'" y2="'+Y(p2)+'"/><text class="ax" x="'+(L-5)+'" y="'+(Y(p2)+4)+'" text-anchor="end">'+p2+'%</text>';
+    bins.forEach((c,i2)=>{ const p2=c/N*100, up=i2*2>=fp; g+='<rect x="'+(L+i2*bw+1)+'" y="'+Y(p2)+'" width="'+(bw-2)+'" height="'+Math.max(0,Y(0)-Y(p2))+'" rx="2" fill="'+(up? "var(--ser1)" : "none")+'" stroke="var(--ser1)" stroke-width="'+(up? 0 : 1)+'"/>' });
+    for(const t2 of [0,10,20,30,40,50]) g+='<text class="ax" x="'+X(t2)+'" y="'+(H-6)+'" text-anchor="middle">'+t2+'</text>';
+    return g+'<line x1="'+X(fp)+'" x2="'+X(fp)+'" y1="'+(T-6)+'" y2="'+Y(0)+'" stroke="var(--accent)" stroke-width="2.5"/><text class="lb" x="'+(X(fp)+5)+'" y="'+(T+4)+'" fill="var(--accent)">Lock: '+f2(fp)+'</text></svg>' };
+  const lineSvg=Wd=>{ const pts=hist, vals=pts.map(e=>e[1]).concat([fp]), lo=Math.floor((Math.min(...vals)-0.2)*5)/5, hi=Math.ceil((Math.max(...vals)+0.2)*5)/5, H=Wd<500? 170 : 200, L=40, R=12, T=14, B=30;
+    const X=i2=>L+i2*(Wd-L-R)/Math.max(1,pts.length-1), Y=t2=>T+(1-(t2-lo)/((hi-lo)||1))*(H-T-B), stp=(hi-lo)>2? 0.5 : 0.2, every=Math.max(1,Math.ceil(pts.length/Math.max(2,Math.floor((Wd-L)/110))));
+    let g='<svg viewBox="0 0 '+Wd+' '+H+'" role="img" aria-label="His lock line through the week">'; for(let t2=lo; t2<=hi+1e-9; t2+=stp) g+='<line class="gr" x1="'+L+'" x2="'+(Wd-R)+'" y1="'+Y(t2)+'" y2="'+Y(t2)+'"/><text class="ax" x="'+(L-5)+'" y="'+(Y(t2)+4)+'" text-anchor="end">'+t2.toFixed(1)+'</text>';
+    g+='<line x1="'+L+'" x2="'+(Wd-R)+'" y1="'+Y(fp)+'" y2="'+Y(fp)+'" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"/><text class="lb" x="'+(Wd-R)+'" y="'+(Y(fp)-5)+'" text-anchor="end" fill="var(--accent)">His score '+f2(fp)+'</text>';
+    g+='<path d="'+pts.map((e,i2)=>(i2?"L":"M")+X(i2)+" "+Y(e[1])).join(" ")+'" fill="none" stroke="var(--ink)" stroke-width="2"/>';
+    pts.forEach((e,i2)=>{ g+='<circle cx="'+X(i2)+'" cy="'+Y(e[1])+'" r="4" fill="'+(e[1]>fp? "var(--ser1)" : "var(--accent)")+'" stroke="var(--panel)" stroke-width="2"/>'; if(i2%every===0||i2===pts.length-1) g+='<text class="ax" x="'+X(i2)+'" y="'+(H-10)+'" text-anchor="middle">'+new Date(e[0]).toLocaleString("en-US",{weekday:"short",hour:"numeric"})+'</text>' });
+    return g+'</svg>' };
+  const paint=()=>{ if(M.hidden || $("lrTitle").textContent!==nmP) return;
+  const sv=season.map(e=>e[1]), above=sv.filter(t2=>t2>fp).length, rank=[...sv].sort((p2,q2)=>q2-p2).findIndex(t2=>Math.abs(t2-fp)<0.01)+1, ord=n2=>n2+(n2%10===1&&n2!==11?"st":n2%10===2&&n2!==12?"nd":n2%10===3&&n2!==13?"rd":"th");
+  const facts=[]; const add=(k,t2)=>facts.push('<li><b>'+k+'</b><span>'+t2+'</span></li>');
+  if(lineNoMed){ const dm=lineNoMed[1]-lineNoMed[0]; add("League median", Math.abs(dm)<0.05? "Barely moves the line." : (dm>0? "Raises" : "Lowers")+" the line by "+Math.abs(dm).toFixed(2)+" (a "+f2(lineNoMed[0])+" line without it, "+f2(lineNoMed[1])+" with it, same simulated weeks).") }
+  if(sv.length) add("His season", f2(fp)+" is "+(rank>0? "his "+ord(rank)+"-best game" : "one of his games")+" of "+sv.length+"; "+above+" game"+(above===1?"":"s")+" beat it. Average "+f1(sv.reduce((t2,y)=>t2+y,0)/sv.length)+", last 4 "+f1(sv.slice(-4).reduce((t2,y)=>t2+y,0)/Math.min(4,sv.length))+".");
+  const g0=a.future[0]; if(g0&&g0.parts){ const Pp=g0.parts, src=[["DraftKings",Pp.dk],["Sleeper",Pp.slp],["DARKO",Pp.darko],["Recent form",Pp.form],["Season",Pp.season]].filter(e=>e[1]!=null).map(e=>e[0]+" "+f1(e[1])).join(", "); add("Next projection", f1(g0.mu)+" ("+src+").") }
+  if(opp) add("Your opponent", esc(v.name)+"'s best plan "+(opp.same? "is the same either way" : "changes with your choice")+". With them responding, locking's edge is "+sg(opp.rW)+" win, "+sg(opp.rM)+" median (vs "+sg(opp.fW)+" / "+sg(opp.fM)+" with their plan fixed).");
+  add("Waiver moves", o&&(o.fa||o.faL)? "Best if you wait: "+esc(o.fa? o.fa+(o.faDrop? " for "+o.faDrop : "") : "none")+". Best if you lock: "+esc(o.faL? o.faL+(o.faLDrop? " for "+o.faLDrop : "") : "none")+"." : "No claim helps either side by more than the simulation's noise.");
+  const alts=A.filter(z=>z.pid!==pid && (z.a.info.pos||[]).some(q2=>(a.info.pos||[]).includes(q2))).map(z=>esc(z.a.info.name)+" ("+(z.slot==="IR"? "IR" : z.starter? SL[z.idx] : "BN")+(z.a.info.inj? ", "+esc(z.a.info.inj) : "")+")").join(", "); if(alts) add("Others who fit", alts+".");
+  add("Your week", pc1(v.win)+" to win, "+pc1(v.med||0)+" to beat the median"+(v.title!=null? ", "+(v.title*100).toFixed(1)+"% title" : "")+". "+(v.win>0.6? "As the favorite, a sure score is worth more than a gamble with the same average." : v.win<0.4? "As the underdog, upside counts for more than a sure score." : ""));
+  const chain=st.map((t2,k)=>{ let pm=t2.pm||0; const row=A.find(z=>z.pid===t2.pid), g=row&&row.a.future.find(f3=>f3.date===t2.date); try{ if(g) pm=dnpP(g,row.a.future.indexOf(g),t2.pid) }catch(e){}
+    return '<div class="lrg"><div class="d">'+dayLabel(t2.date)+(t2.pid!==pid? ' · '+esc(nm(t2.pid)) : '')+'</div><div class="m">'+f1(t2.mu)+'</div><div class="s">projected · '+Math.round(pm*100)+'% chance he sits</div><div class="k">'+(k<st.length-1&&V? "Keep it if it's "+f1(V[k+1])+"+" : "Last chance: the slot keeps it")+'</div></div>' }).join("");
+  body.innerHTML='<div class="lrs"><div class="lrv"><div class="lrcall'+(!close&&!lockIt? " w" : "")+'">'+callTxt+'<small>'+esc(sub)+'</small></div>'+(conf!=null? '<span class="lrchip">'+confLabel(conf)+'</span>' : '')+'</div>'+
+    '<div class="lrkv"><div><b>'+sg(eW)+'</b><span>win chance for locking</span></div><div><b>'+sg(eM)+'</b><span>median chance for locking</span></div><div><b>'+(wmean!=null? f2(wmean) : "–")+'</b><span>average if you wait</span></div></div></div>'+
+    (o? '<div class="lrs"><h3>Odds both ways</h3>'+twoSizes(oddsSvg)+'</div>' : '')+
+    (res.length? '<div class="lrs"><h3>If you wait: where the slot ends up</h3>'+twoSizes(histSvg)+'<table class="lrt"><tr><td>Disaster (1 in 10)</td><td>'+f1(qq(.1))+' or less</td></tr><tr><td>Bad (1 in 4)</td><td>'+f1(qq(.25))+' or less</td></tr><tr><td>Typical</td><td>'+f1(qq(.5))+'</td></tr><tr><td>Good (1 in 4)</td><td>'+f1(qq(.75))+' or more</td></tr><tr><td>Great (1 in 10)</td><td>'+f1(qq(.9))+' or more</td></tr></table><p class="note">'+Math.round(beat*100)+'% chance to beat '+f2(fp)+', '+Math.round(u15*100)+'% to end under 15, over '+N+' simulated weeks.</p></div>' : '')+
+    (chain? '<div class="lrs"><h3>The chain if you don\'t lock</h3><div class="lrch">'+chain+'</div></div>' : '')+
+    (hist.length>1? '<div class="lrs"><h3>His line through the week</h3>'+twoSizes(lineSvg)+'<p class="note">Above his score means play on, below means lock.</p></div>' : '')+
+    '<div class="lrs"><h3>What\'s in the number</h3><ul class="lrf">'+facts.join("")+(phase<2? '<li><b>…</b><span>'+(phase<1? "Loading his season and line history…" : "Working out the median and your opponent\'s response…")+'</span></li>' : '')+'</ul></div><p class="note">Worked out just now on the live board, '+clock(Date.now())+'.</p>' };
+  paint(); await loadSeason(); phase=1; paint(); await slow(); phase=2; paint() }
 function renderTodo(items){
   const el=$("wkTodo");
   if(!items.length){ el.innerHTML='<div class="empty">Nothing left to decide this week.</div>'; return }
   const row=i=>'<div class="td '+i.kind+'"><div class="td-t">'+(i.t? '<b>'+(i.approx?'~':'')+clock(i.t)+'</b>' : '<b>Now</b>')+
-    '</div><div class="td-b"><div class="tt">'+esc(i.title)+'</div>'+(i.note?'<div class="ts">'+esc(i.note)+'</div>':'')+'</div></div>';
+    '</div><div class="td-b"><div class="tt">'+esc(i.title)+((i.kind==="lock"||i.kind==="wait")&&i.pid&&viewingMe()? ' <button type="button" class="lrbtn" data-lr="'+esc(i.pid)+'">Details ›</button>' : '')+'</div>'+(i.note?'<div class="ts">'+esc(i.note)+'</div>':'')+'</div></div>';
   const now=items.filter(i=>!i.t), days=[]; for(const i of items){ if(!i.t) continue; const k=ymd(i.t), g=days[days.length-1]; if(g&&g.k===k) g.items.push(i); else days.push({k, items:[i]}) }
   todoHTML(el, now.map(row).join("")+(days.length? '<div class="tdx'+(days.length<2?' one':'')+'">'+days.map(g=>'<section class="tdc"><div class="tdch">'+dayLabel(g.k)+'<span>'+g.items.length+'</span></div>'+g.items.map(row).join("")+'</section>').join("")+'</div>' : ''));
 }
