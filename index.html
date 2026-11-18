@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-f1SO/ZzRvKCowG48MsdfyzUunug9RaY1FUwCAT0y7eM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jjWy3GDOoJltDHfWNpFJG4rEUvxsEgLbzV0tIXbjnGQ='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3408,7 +3408,9 @@ function callConf(DL,DW,O,tab,median,lockBetter){ if(!DL?.tot||!DW?.tot||!O?.tot
   for(let s=0;s<N;s++){ const hl=DL.tot[s]>O.tot[s]?1:0, hw=DW.tot[s]>O.tot[s]?1:0, ml=median&&tab? pTopAt(tab,DL.tot[s]) : 0, mw=median&&tab? pTopAt(tab,DW.tot[s]) : 0, a=hl+ml, b=hw+mw, d=a-b;
     if(Math.abs(d)>1e-6){ n+=Math.abs(d); if((d>0)===lockBetter) k+=Math.abs(d); if(hl!==hw){ if(hl>hw) dbg.hL++; else dbg.hW++ } else if(ml>mw){ dbg.mdL++; dbg.mdLsum+=ml-mw } else { dbg.mdW++; dbg.mdWsum+=mw-ml } } else dbg.same++ }
   if(typeof window!=="undefined") window.__confDbg=dbg;
-  return n? k/n : 0.5 }
+  // a week the choice barely touches (under 1% of simulated weeks' worth of difference) has no confidence to speak of: the few weeks that
+  // differ make it 0% or 100% at random (user, 11-17, outliers: Bane 25.14 read 0% with both sides at 0%/0%)
+  return n<0.01*N? null : k/n }
 const confLabel=c=> c==null? "" : (c<0.55? "Toss-up" : c<0.65? "Lean" : c<0.8? "Likely" : "Clear")+" ("+Math.round(c*100)+"%)";
 function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
