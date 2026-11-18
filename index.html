@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-i3Cd/0GHMjJn68A2QkqN/amDEyhgJCDd8WrClb2h1Mc='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6S5IkU+4aO0EwN2h0viFyAoDxwH4vBo37RsfMHCTDCA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3414,7 +3414,10 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     const oppLock= !mine && x.starter && !a.lockedOn && !a.live && a.latest && (lnO!=null? a.latest.fp>=lnO : (L? (L.locks||[]).includes(x.pid) : W.vs && R===W.vs.oppRows && Q?.pick?.get(x.pid)?.k==="lock"));   // any team's plan (League tab: from its own view)
     const badge= oppLock? '<span class="badge lock">Lock</span> ' : mine&&x.starter&&!a.lockedOn&&a.call&&/^(lock|wait)$/.test(a.call.c)? '<span class="badge '+a.call.c+'">'+(a.call.c==="lock"?"Lock":"Wait")+'</span> '
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
-    if(a.lockedOn){ const gl=lockGrade(x.rid,x.pid); s='Locked · '+dayLabel(a.lockedOn.date)+(gl? ' · line '+gl.line.toFixed(1)+(gl.ok? ' ✓' : ' ✗') : ''); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
+    // the line the board showed before the lock (the Mac logs it: legs.json dec), not the regrade's (11-17: Clingan read "line 24.8"
+    // after he was locked over the 26.35 the board showed); the regrade's line only where nothing was logged
+    if(a.lockedOn){ const dl=W.decSnap?.[W.week+"|"+x.rid+"|"+x.pid+"|"+a.lockedOn.date], shown= dl && dl[1]!=null? dl[1] : null, gl= shown==null? lockGrade(x.rid,x.pid) : null;
+      s='Locked · '+dayLabel(a.lockedOn.date)+(shown!=null? ' · line '+shown.toFixed(1)+(a.lockedOn.fp>=shown? ' ✓' : ' ✗') : gl? ' · line '+gl.line.toFixed(1)+(gl.ok? ' ✓' : ' ✗') : ''); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
     else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp;
       // his slot value belongs on the row of the slot the plan has him in: if that's another slot and nobody is planned here,
       // this row says where he's headed and shows no value (so one value never shows on two rows)
