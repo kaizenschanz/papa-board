@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YLqPkBwLQwMmj1BqrtY99iPuFy+Hab65SP1y2Ih4NcI='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2baQm5NyNA6fpI6lD2uDjqq7s69G7+wuED1vUagXFTs='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5326,7 +5326,9 @@ function pageBoot(){
     onReady:a=>{ window.__board=q=>Promise.resolve({mode:"page", ...(q==="prof"? a.prof() : /^team:/.test(q||"")? a.team(+q.slice(5)) : a.status())}) }});
   const want= typeof Worker!=="undefined" && typeof Blob!=="undefined" && ls && qs.get("log")!=="1" && qs.get("noassume")!=="1" && qs.get("worker")!=="0" && qs.get("view")!=="draft" && qs.get("login")!=="1";
   const lsGet=(k,d)=>{ try{ const v=ls.getItem("prb:"+k); if(v!=null) return JSON.parse(v) }catch(e){} return d };
-  if(!want || (lsGet("noworker",0)>Date.now() && qs.get("worker")!=="1")){ classic(); return }   // noworker: the worker let this device down in the last day (see the watchdog)
+  // (noworker2: the old one-day "noworker" flags, set by a refresh bug and a speed rule since dropped, are ignored; user, 11-18: "make
+  // the UI smoother" after half-drawn screens on the phone, which come from the simulation running on the page and freezing scrolling)
+  if(!want || (lsGet("noworker2",0)>Date.now() && qs.get("worker")!=="1")){ classic(); return }   // noworker: the worker let this device down in the last day (see the watchdog)
   let w, started=false, dead=false, gotBoard=false;
   try{ w=new Worker(URL.createObjectURL(new Blob([document.currentScript.textContent],{type:"text/javascript"}))) }catch(e){ classic(); return }
   const fallback=why=>{ if(dead) return; dead=true; try{ w.terminate() }catch(e){} console.warn("board worker unavailable ("+why+"); running on the page");
@@ -5358,11 +5360,12 @@ function pageBoot(){
   // is given up on: back to the page, for a day. Slow is fine (a League-first load on a phone can take a while); stalled isn't.
   const born=Date.now(); let lastOps=Date.now();
   const dog=setInterval(()=>{ if(dead || gotBoard){ clearInterval(dog); return } if(document.hidden){ lastOps=Date.now(); return }
-    if(Date.now()-lastOps>45000 || Date.now()-born>150000){ clearInterval(dog); try{ ls.setItem("prb:noworker", JSON.stringify(Date.now()+24*3600e3)) }catch(e){} fallback("no board from the worker") } }, 5000);
+    // stalled for real (no sign of life for 90 s, or no board after 5 minutes in view): back to the page for this visit only
+    if(Date.now()-lastOps>90000 || Date.now()-born>300000){ clearInterval(dog); fallback("no board from the worker") } }, 5000);
   w.onmessage=e=>{ const m=e.data;
     if(m.t==="hello"){ clearTimeout(hello); BENCH.worker=m.bench;
       // a worker in the slow lane would make every update take longer than the freezes it removes (not judged when the page is in the background: everything is slow then)
-      if(!document.hidden && m.bench>3*BENCH.page+5){ BENCH.used="page"; try{ ls.setItem("prb:noworker", JSON.stringify(Date.now()+24*3600e3)) }catch(e){} fallback("worker is "+(m.bench/BENCH.page).toFixed(1)+"x slower than the page here"); return }
+      // no fallback for a slower worker any more: slower updates beat a page that freezes while you scroll (11-18)
       started=true; BENCH.used="worker"; w.postMessage({...INIT, t:"go"}) } else if(m.t==="ops") applyOps(m.ops); else if(m.t==="fatal") fallback(m.msg);
     else if(m.t==="warn") console.warn("board:", m.msg); else if(m.t==="status"){ window.__last=m.st; const r=asks.get(m.id); if(r){ asks.delete(m.id); r({mode:"worker", bench:BENCH, ...(m.st||{})}) } } };
   // at once, before the worker has anything: the last board drawn on this device (dimmed), the wheel, and instant tab switches
