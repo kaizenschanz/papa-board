@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D5z5ANRU8XONpYSCPkVLHjGVSpXIQqD3ST/tI361RMM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BRU8n4z2286NVbStObjepLjt4U7sNR/fwmHwlBr1b10='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -416,7 +416,7 @@ details.fold #poolSeg{margin-bottom:6px}
   <section class="wk" id="callsView" hidden><iframe id="callsFrame" title="Board vs teams" loading="lazy" style="width:100%;height:calc(100vh - 150px);min-height:520px;border:0;border-radius:12px;background:transparent"></iframe></section>
   <section class="wk" id="leagueView" hidden>
     <div class="card">
-      <div class="wk-top"><h2 id="lgTitle">League</h2><button class="btn ghost" type="button" id="lgRefresh">Refresh now</button></div>
+      <div class="wk-top"><h2 id="lgTitle">League</h2><select id="lgTeamSel" aria-label="Team to show" style="margin-left:auto"></select><button class="btn ghost" type="button" id="lgRefresh">Refresh now</button></div>
       <div class="wk-sum num" id="lgSum">Loading the league…</div>
       <div class="acc num" id="lgAcc" hidden></div>
     </div>
@@ -5022,7 +5022,7 @@ function renderLuck(){ const el=$("lgLuck"); if(!el) return; const P=(LG.past||[
 function weekOfDate(ms){ const ds=(W.sched||[]).filter(g=>+g.week===1).map(g=>g.date).sort(); if(!ds.length) return null; const m=new Date(ds[0]+"T00:00:00"); m.setDate(m.getDate()-((m.getDay()+6)%7)); const w=Math.floor((ms-m.getTime())/(7*86400e3))+1; return w>=1? w : null }
 function renderTitleOdds(){ const card=$("lgOddsCard"), el=$("lgOdds"), H=LG.th; if(!card||!el) return;
   if(!H || !Array.isArray(H.pts) || !H.pts.length || !Array.isArray(H.rids)){ card.hidden=true; return }
-  const K=LG.thK||"ch", ki= K==="po"? 2 : 1, T=LG.out?.teams||[], myR=myRoster()?.roster_id, now=Date.now();
+  const K=LG.thK||"ch", ki= K==="po"? 2 : 1, T=LG.out?.teams||[], myR=viewRoster()?.roster_id, now=Date.now();   // "you" here: the team picked (League or Matchup tab)
   $("lgOddsH").textContent=(K==="po"? "Playoff" : "Title")+" odds";
   const all=H.rids.map((rid,j)=>{ const P=H.pts.map(e=>[e[0], e[ki]?.[j]]).filter(x=>x[1]!=null); const t=T.find(x=>x.rid===rid), cur= t? (K==="po"? t.po : t.ch)*100 : null;
     if(cur!=null && isFinite(cur) && P.length && now>P[P.length-1][0]) P.push([now, cur]); return {rid, P, name: rosterName(rid)||("Team "+rid)} }).filter(x=>x.P.length>1);
@@ -5036,7 +5036,8 @@ function renderTitleOdds(){ const card=$("lgOddsCard"), el=$("lgOdds"), H=LG.th;
   all.forEach(x=>{ x.S=[x.P[0], ...marks.map(m=>[m, valAt(x.P,m)]), x.P[x.P.length-1]]; x.cur=x.P[x.P.length-1][1]; x.d=x.cur-x.P[0][1] });
   // which teams are drawn: a checkbox per team in the list (user, 11-17); to start, the top four contenders and you. Each team keeps
   // one color whatever else is on (by roster order), so ticking a team never repaints the others.
-  const me=all.find(x=>x.rid===myR); if(!(LG.thSel instanceof Set)) LG.thSel=new Set(all.filter(x=>x.rid!==myR).sort((a,b)=>b.cur-a.cur).slice(0, me? 4 : 5).map(x=>x.rid).concat(me? [myR] : []));
+  const me=all.find(x=>x.rid===myR); if(LG.thSel instanceof Set && LG.thFocus!==myR){ if(LG.thFocus!=null) LG.thSel.delete(LG.thFocus); LG.thSel.add(myR) } LG.thFocus=myR;
+  if(!(LG.thSel instanceof Set)) LG.thSel=new Set(all.filter(x=>x.rid!==myR).sort((a,b)=>b.cur-a.cur).slice(0, me? 4 : 5).map(x=>x.rid).concat(me? [myR] : []));
   all.filter(x=>x!==me).sort((a,b)=>a.rid-b.rid).forEach((x,k)=>x.col="var(--tc"+(k%11)+")"); if(me) me.col="var(--accent)";
   const show=all.filter(x=>LG.thSel.has(x.rid));
   const top=Math.max(1, ...show.flatMap(x=>x.S.map(p=>p[1]))), yMax= K==="po"? 100 : Math.min(100, Math.max(10, Math.ceil(top/5)*5)), step= yMax<=25? 5 : yMax<=50? 10 : 25;
@@ -5049,21 +5050,23 @@ function renderTitleOdds(){ const card=$("lgOddsCard"), el=$("lgOdds"), H=LG.th;
     const lab=show.map(x=>({x, y:Y(x.cur)})).sort((a,b)=>a.y-b.y); for(let k=1;k<lab.length;k++) if(lab[k].y-lab[k-1].y<fs*1.25) lab[k].y=lab[k-1].y+fs*1.25;
     const labs=lab.map(l=>'<text class="lv" style="font-size:'+fs+'px;fill:'+l.x.col+'" x="'+f(X(t1)+8)+'" y="'+f(l.y+fs*0.35)+'">'+l.x.cur.toFixed(1)+'%</text>').join("");
     return '<svg viewBox="0 0 '+Wd+' '+Hh+'" role="img" aria-label="'+(K==="po"?"Playoff":"Title")+' odds over the season: the top contenders and you">'+g+lines+labs+'</svg>' };
-  const key=all.slice().sort((a,b)=>b.cur-a.cur).map(x=>{ const on=LG.thSel.has(x.rid); return '<button type="button" class="thb'+(on?' on':'')+(x===me?' me':'')+'" data-thr="'+x.rid+'" role="checkbox" aria-checked="'+on+'"><i style="'+(on? 'background:'+x.col+';border-color:'+x.col : '')+'">'+(on?'✓':'')+'</i><span class="n">'+esc(x.name)+'</span><b>'+x.cur.toFixed(1)+'%</b><small>'+(x.d>=0.05? '▲' : x.d<=-0.05? '▼' : '')+(Math.abs(x.d)>=0.05? Math.abs(x.d).toFixed(1) : '')+'</small></button>' }).join("");
+  const key=all.slice().sort((a,b)=>b.cur-a.cur).map(x=>{ const on=LG.thSel.has(x.rid); return '<button type="button" class="thb'+(on?' on':'')+(x===me?' me':'')+'" data-thr="'+x.rid+'" role="checkbox" aria-checked="'+on+'"><i style="'+(on? 'background:'+x.col+';border-color:'+x.col : '')+'">'+(on?'✓':'')+'</i><span class="n">'+esc(x.name)+'</span><b>'+x.cur.toFixed(1)+'%</b></button>' }).join("");   // no change column: the chart shows it (user, 11-17)
   el.innerHTML='<div class="thc"><div class="ths">'+draw(360,230,11)+'</div><div class="thw">'+draw(720,320,12)+'</div></div><div class="thq"><button type="button" class="linkbtn" data-thall="1">All</button> · <button type="button" class="linkbtn" data-thall="5">Top 5</button> · <button type="button" class="linkbtn" data-thall="0">Just me</button></div><div class="thk">'+key+'</div>'+
-    '<div class="thn">▲▼ since '+new Date(t0).toLocaleDateString("en-US",{month:"short", day:"numeric"})+' · before and after each day\'s games'+(H.rebuilt>0 && H.pts[H.rebuilt]? ' · before '+new Date(H.pts[H.rebuilt][0]).toLocaleDateString("en-US",{month:"short", day:"numeric"})+': rebuilt with the board\'s season simulation' : '')+'</div>';
+    '<div class="thn">Since '+new Date(t0).toLocaleDateString("en-US",{month:"short", day:"numeric"})+' · before and after each day\'s games'+(H.rebuilt>0 && H.pts[H.rebuilt]? ' · before '+new Date(H.pts[H.rebuilt][0]).toLocaleDateString("en-US",{month:"short", day:"numeric"})+': rebuilt with the board\'s season simulation' : '')+'</div>';
   if(!el.dataset.tw){ el.dataset.tw=1; el.addEventListener("click",e=>{ const b=e.target.closest&&(e.target.closest("[data-thall]")||e.target.closest("[data-thr]")); if(!b) return;
-    if(b.dataset.thall!=null){ const n=+b.dataset.thall, A=LG._thAll||[]; LG.thSel= n===1? new Set(A.map(x=>x.rid)) : n===0? new Set([myRoster()?.roster_id]) : new Set(A.filter(x=>x.rid!==myRoster()?.roster_id).sort((a,b)=>b.cur-a.cur).slice(0,4).map(x=>x.rid).concat([myRoster()?.roster_id])) }
+    if(b.dataset.thall!=null){ const n=+b.dataset.thall, A=LG._thAll||[]; LG.thSel= n===1? new Set(A.map(x=>x.rid)) : n===0? new Set([viewRoster()?.roster_id]) : new Set(A.filter(x=>x.rid!==viewRoster()?.roster_id).sort((a,b)=>b.cur-a.cur).slice(0,4).map(x=>x.rid).concat([viewRoster()?.roster_id])) }
     else { const r=+b.dataset.thr; if(LG.thSel.has(r)) LG.thSel.delete(r); else LG.thSel.add(r) }
     renderTitleOdds() }) }
   LG._thAll=all.map(x=>({rid:x.rid, cur:x.cur})) }
 function renderLeague(){
   const O=LG.out; if(!O) return; const T=O.teams; try{ renderLuck() }catch(e){} try{ renderTitleOdds() }catch(e){ console.warn("title odds chart", e) }
   $("lgTitle").textContent=(S.league.name||"League")+" · Week "+W.week;
-  const me=T.find(t=>t.me);
-  $("lgSum").innerHTML= me? '<span>You: <b>'+me.w+'-'+me.l+'</b>, playoff odds <b>'+(me.po*100).toFixed(1)+'%</b>, title odds <b>'+(me.ch*100).toFixed(1)+'%</b>, projected finish <b>'+me.xw.toFixed(1)+'-'+me.xl.toFixed(1)+'</b></span>' : "";
+  // whose League tab this is: the team picked here or on the Matchup tab (one choice for both; user, 11-17), you by default
+  const focus=viewRoster()?.roster_id, isMe= focus===myRoster()?.roster_id, me=T.find(t=>t.rid===focus);
+  { const sel=$("lgTeamSel"), mr=myRoster()?.roster_id; if(sel){ const html=Object.values(S.rosters).sort((a,b)=>a.roster_id===mr? -1 : b.roster_id===mr? 1 : rosterName(a.roster_id).localeCompare(rosterName(b.roster_id))).map(r=>'<option value="'+r.roster_id+'"'+(r.roster_id===focus?' selected':'')+'>'+esc(rosterName(r.roster_id))+(r.roster_id===mr?' (you)':'')+'</option>').join(""); if(sel.dataset.h!==html){ sel.innerHTML=html; sel.dataset.h=html } } }
+  $("lgSum").innerHTML= me? '<span>'+(isMe? 'You' : esc(me.name))+': <b>'+me.w+'-'+me.l+'</b>, playoff odds <b>'+(me.po*100).toFixed(1)+'%</b>, title odds <b>'+(me.ch*100).toFixed(1)+'%</b>, projected finish <b>'+me.xw.toFixed(1)+'-'+me.xl.toFixed(1)+'</b></span>' : "";
   // playoff path: your most likely seed and first-round opponent (same season simulation)
-  if(me && LG.path && me.po>=0.02){ const P=LG.path, k=P.seed.indexOf(Math.max(...P.seed)), o=P.opp[0], ord=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
+  if(me && isMe && LG.path && me.po>=0.02){ const P=LG.path, k=P.seed.indexOf(Math.max(...P.seed)), o=P.opp[0], ord=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Likely seed <b>'+ord(k+1)+'</b> ('+(P.seed[k]/P.N*100).toFixed(1)+'%)'+'</span>') }
   if(O.median && !isPlayoffWeek(W.week)){ const pm=pastMedians(), mp=(W.vs? weekMedian() : null) ?? expMedian(T.map(t=> t.tot&&t.tot.length? {tot:t.tot} : {m:t.proj, s:Math.sqrt(t.pv||400)})) ?? medianOf(T.map(t=>t.proj));   // where it should land, not the middle projection
     $("lgSum").insertAdjacentHTML("beforeend",'<span>Median <b>~'+(mp!=null?mp.toFixed(1):'?')+'</b> this week'+(pm.length?' · '+pm.map(x=>'W'+x.w+' <b>'+x.med.toFixed(1)+'</b>').join(", "):'')+'</span>') }
@@ -5083,7 +5086,7 @@ function renderLeague(){
     const oa=own(a), ob=own(b), hA=h2h(a), pA= hA!=null? hA : oa? oa.win : p0, pB= hA!=null? 1-hA : ob? ob.win : 1-p0;
     const medOf=rid=>{ if(isPlayoffWeek(W.week)) return null; const o=rid===a? oa : ob; return o&&o.med!=null? o.med : mine&&rid===myRid&&W.vs.med!=null? W.vs.med : m? (rid===a? m.meda : m.medb) : null };
     const side=(X,r)=>{ const o=X.rid===a? oa : ob;
-      return '<div class="side'+(r?' r':'')+'"><span class="tn'+(X.me?' me':'')+'">'+esc(X.name)+' <small class="stg">'+standTag(X.rid)+'</small></span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(o&&o.m!=null? o.m : mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+'</span></div>' };
+      return '<div class="side'+(r?' r':'')+'"><span class="tn'+(X.rid===focus?' me':'')+'">'+esc(X.name)+' <small class="stg">'+standTag(X.rid)+'</small></span><span class="sc">Locked <b>'+X.now.toFixed(2)+'</b> · Proj <b>'+(o&&o.m!=null? o.m : mine? (X.rid===myRid? W.vs.me.m : W.vs.opp.m) : X.proj).toFixed(2)+'</b></span><span class="sc">'+(X.exact?'':'at least ')+X.locked+' of 9 locked'+(medOf(X.rid)!=null?' · median <b class="md">'+(medOf(X.rid)*100).toFixed(1)+'%</b>':'')+'</span></div>' };
     return '<details class="lgm" data-k="m'+a+'-'+b+'" data-a="'+a+'" data-b="'+b+'"'+(LG.openM.has(a+'-'+b)?' open':'')+'><summary><div class="mu">'+side(A,false)+'<span class="vs">'+(pA*100).toFixed(1)+'% – '+(Math.abs(pA+pB-1)<1e-9? (100-+(pA*100).toFixed(1)).toFixed(1) : (pB*100).toFixed(1))+'%</span>'+side(B,true)+'<div class="wpbar"><i style="width:'+(100*pA/((pA+pB)||1)).toFixed(2)+'%"></i></div></div></summary><div class="lgg">'+(LG.openM.has(a+'-'+b)? gridOf(a,b) : '')+'</div></details>';
   }).join(""));
   // tap a matchup for both lineups (same rows as the Lock-in tab); it and its open rows stay open through refreshes (keepOpen).
@@ -5102,7 +5105,7 @@ function renderLeague(){
   const order=[...T].sort((x,y)=>y.xw-x.xw||y.xpf-x.xpf);
   const cut=S.league.settings?.playoff_teams||8;
   $("lgTable").innerHTML='<thead><tr><th>Proj #</th><th>Team</th><th>W-L</th><th class="c-x">PF</th><th class="c-x">PA</th><th class="c-x">Proj W-L</th><th>Playoffs</th><th>#1 seed</th><th>Title</th></tr></thead><tbody>'+
-    order.map((t,k)=>'<tr class="'+(t.me?'me ':'')+(k===cut-1?'cut':'')+'"><td>'+(k+1)+'</td><td>'+esc(t.name)+'</td><td>'+t.w+'-'+t.l+(t.t?'-'+t.t:'')+'</td><td class="c-x">'+t.pf.toFixed(0)+'</td><td class="c-x">'+t.pa.toFixed(0)+'</td><td class="c-x">'+t.xw.toFixed(1)+'-'+t.xl.toFixed(1)+'</td><td class="odds">'+(t.po>0.995?'>99':t.po<0.005?'<1':(t.po*100).toFixed(1))+'%</td><td>'+(t.top<0.005?'<1':(t.top*100).toFixed(1))+'%</td><td class="odds">'+(t.ch<0.005?'<1':(t.ch*100).toFixed(1))+'%</td></tr>').join("")+'</tbody>';
+    order.map((t,k)=>'<tr class="'+(t.rid===focus?'me ':'')+(k===cut-1?'cut':'')+'"><td>'+(k+1)+'</td><td>'+esc(t.name)+'</td><td>'+t.w+'-'+t.l+(t.t?'-'+t.t:'')+'</td><td class="c-x">'+t.pf.toFixed(0)+'</td><td class="c-x">'+t.pa.toFixed(0)+'</td><td class="c-x">'+t.xw.toFixed(1)+'-'+t.xl.toFixed(1)+'</td><td class="odds">'+(t.po>0.995?'>99':t.po<0.005?'<1':(t.po*100).toFixed(1))+'%</td><td>'+(t.top<0.005?'<1':(t.top*100).toFixed(1))+'%</td><td class="odds">'+(t.ch<0.005?'<1':(t.ch*100).toFixed(1))+'%</td></tr>').join("")+'</tbody>';
   try{ renderLuck() }catch(e){}
   setLive("on");
 }
@@ -5118,6 +5121,7 @@ function showView(v,persist){
 }
 $("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b) showView(b.dataset.view,true)});
 $("wkRefresh").addEventListener("click",()=>{ W.slowAfter=true; loadWeek(true) });   // game state first, shown; then projections (user, 11-17)
+$("lgTeamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) return; W.viewRid=v; store.set(vrKey(), v); try{ renderLeague() }catch(err){} renderWeekBusy() });
 $("teamSel").addEventListener("change",e=>{ const v=+e.target.value; if(!v) return; if(!myRoster()){ setMe(v); return } W.viewRid=v; store.set(vrKey(), v); renderWeekBusy() });
 // the arrows step the week list one way or the other (Matchup and League tabs)
 document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest(".wkarr"); if(!b||b.disabled) return; const nav=b.closest(".wknav"), sel=nav&&nav.querySelector("select"); if(!sel) return;
