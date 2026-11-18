@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8BseSV4cxlV92uSTMPRdk1gytXjuJpFdGurU/RznvLg='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u42MiBB6Q/dxbwQE8oAae7tUGbRPUb2JkLj9s+w8BZw='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1809,7 +1809,7 @@ function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
     if(!e) return j===0? SIT.c1 : SIT.cL;
     // a game from an earlier week (the managers' replay): his usual rate after a game he played, not today's state
     if(W.games?.length && g.date && g.date<W.games[0].date) return e[bb? 5 : 4];
-    const mk=pid+"|"+g.date+"|"+(W.updated||0)+"|"+(W.injAt||0)+(W._noEspnRet?"|n":"")+"|"+(W.sitOvSig||""); if(DNPM.has(mk)) return DNPM.get(mk); if(DNPM.size>4000) DNPM.clear();
+    const mk=pid+"|"+g.date+"|"+(W.updated||0)+"|"+(W.injAt||0)+(W._noEspnRet?"|n":"")+(W._noLive?"|L":"")+"|"+(W.sitOvSig||""); if(DNPM.has(mk)) return DNPM.get(mk); if(DNPM.size>4000) DNPM.clear();
     // where this game falls among the ones he has left (a live one counts as played): his next one, or one after another
     const F=playerWeek(pid).games.filter(x=>!x.done && x.mu>0), k=F.findIndex(x=>x.date===g.date), prev= k>0? F[k-1] : null;
     let p;
@@ -1848,7 +1848,7 @@ function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
     const TM=SIT.timing; if(TM && !prev){ const tip=tipAt(pid,g.date), lt= tip? liveTag(pid,g) : null; if(tip){ const mn=(tip-(W.updated||Date.now()))/60e3, wi=TM.win.findIndex(([lo,hi])=>mn>=lo && mn<hi);
       if(wi>=0){ const q=Math.min(Math.max(p,1e-4),1-1e-4); p=1/(1+Math.exp(-(TM.a+TM.b*Math.log(q/(1-q))+(lt==="Questionable"? (TM.q[wi]||0) : 0)))) } } }
     // near tip: whether DraftKings has his props up, once the board's own log has taught it what that's worth (sit_fit "live")
-    const LV=SIT.live; if(LV && !prev){ const tip=tipAt(pid,g.date); if(tip && tip-(W.updated||Date.now())<3*3600e3){ const q=Math.min(Math.max(p,1e-4),1-1e-4); const lt=liveTag(pid,g); p=1/(1+Math.exp(-(LV.a+LV.b*Math.log(q/(1-q))+(g.src==="dk"? LV.dk : 0)+(lt==="Questionable"? (LV.q||0) : lt==="none"? (LV.none||0) : 0)))) } }
+    const LV=SIT.live; if(LV && !prev && !W._noLive){ const tip=tipAt(pid,g.date); if(tip && tip-(W.updated||Date.now())<3*3600e3){ const q=Math.min(Math.max(p,1e-4),1-1e-4); const lt=liveTag(pid,g); p=1/(1+Math.exp(-(LV.a+LV.b*Math.log(q/(1-q))+(g.src==="dk"? LV.dk : 0)+(lt==="Questionable"? (LV.q||0) : lt==="none"? (LV.none||0) : 0)))) } }
     // the last hour before tip and still on nobody's report (user, 11-16: Powell announced as a starter and still ~50%): the report is
     // updated right up to tip, so an unlisted player then almost always plays. The board's own last looks agree so far (unlisted at
     // its last look before tip: 44 games, 0 sat, it had said 2.6%). Capped at 2% until the tag-timing learner has enough to replace it.
@@ -1856,7 +1856,7 @@ function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
     // Sleeper's injury status floor (sitFloor): only for the game it describes, his very next one on the schedule, and not when ESPN has
     // him back by then (Rollins, out sick Wednesday, back Thursday)
     { const nx=playerWeek(pid).games.find(x=>!x.done && !x.live), E=W.injESPN?.[pid];
-      if(nx && nx.date===g.date && !(E && E.ret && E.ret<=g.date)){ const fl=sitFloor(String(playerInfo(pid).inj||"")); if(fl!=null && p<fl) p=fl } }
+      if(!W._noLive && nx && nx.date===g.date && !(E && E.ret && E.ret<=g.date)){ const fl=sitFloor(String(playerInfo(pid).inj||"")); if(fl!=null && p<fl) p=fl } }
     p=Math.min(0.995,p); DNPM.set(mk,p); return p }
   const d=(SHAPE&&SHAPE.dnp)||[0.05,0.08]; return j===0? d[0] : d[1] }
 // A chain step knows when it tips (t) and roughly when it ends, so a later game that tips while it's still on can be handled as
@@ -4896,7 +4896,7 @@ const safeLog=f=>{ try{ return f() }catch(e){ return {err:String(e).slice(0,160)
 function logProj(){ const out=[], now=Date.now(), seen=new Set();
   for(const r of Object.values(S.rosters||{})) for(const pid of (r.players||[])){ if(seen.has(pid)) continue; seen.add(pid); let j=0;
     for(const g of playerWeek(pid).games){ if(g.done||g.live) continue; const tp=tipAt(pid,g.date); if(tp && tp<=now){ j++; continue }
-      if(g.mu>0) out.push([pid, g.date, +g.mu.toFixed(2), g.src==="dk"? "dk" : g.model? "model" : "fb", dnpP(g,j,pid), g.slp>0? +(+g.slp).toFixed(2) : null, String(playerInfo(pid).inj||""), (j===0? liveTag(pid,g) : null), (()=>{ const e=W.injESPN?.[pid]; return e? [e.status||"", e.ret||null] : null })(), (()=>{ W._noEspnRet=true; try{ return +dnpP(g,j,pid).toFixed(4) } finally{ W._noEspnRet=false } })(), tp||null]); j++ } }   // [10]: his tip (ms), for tag timing   // [9]: the sit chance without ESPN's return date   // [8]: ESPN's status and expected return date (user, 11-12: track it)
+      if(g.mu>0) out.push([pid, g.date, +g.mu.toFixed(2), g.src==="dk"? "dk" : g.model? "model" : "fb", dnpP(g,j,pid), g.slp>0? +(+g.slp).toFixed(2) : null, String(playerInfo(pid).inj||""), (j===0? liveTag(pid,g) : null), (()=>{ const e=W.injESPN?.[pid]; return e? [e.status||"", e.ret||null] : null })(), (()=>{ W._noEspnRet=true; try{ return +dnpP(g,j,pid).toFixed(4) } finally{ W._noEspnRet=false } })(), tp||null, (()=>{ W._noLive=true; try{ return +dnpP(g,j,pid).toFixed(4) } finally{ W._noLive=false } })()]); j++ } }   // [11]: the sit chance before the near-tip prop learner and the status floor (what that learner trains on, so it never corrects its own correction)   // [10]: his tip (ms), for tag timing   // [9]: the sit chance without ESPN's return date   // [8]: ESPN's status and expected return date (user, 11-12: track it)
   return out }
 // the score at which keeping it equals playing step k (at the projection as it stands): the plan's keep threshold there
 function keepAt(V,k){ const u=uAtF(V.U[k],1); if(gAt(V.G[k+1],0)>=u) return 0; let lo=0, hi=160; for(let i=0;i<24;i++){ const m=(lo+hi)/2; if(gAt(V.G[k+1],m)>=u) hi=m; else lo=m } return hi }
