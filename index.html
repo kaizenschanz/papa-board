@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zexyyVCNU/euFofOkhIGZLplLc8lQ5jRvicwqRcpUBE='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-L9AvHsTW3KM4ainAldM95qOtRF96+o3KTXqsr2qibMM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -239,6 +239,7 @@ details.lgm .lgg{padding:4px 0 12px}
 .lrch{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.lrg{border:1px solid var(--line);border-radius:10px;padding:10px}.lrg .d{font:700 16px/1 var(--display)}.lrg .m{font:700 26px/1.1 var(--display);margin-top:4px}.lrg .s{color:var(--muted);font-size:12px}.lrg .k{font-size:13px;margin-top:6px}
 .lrf{list-style:none;margin:0;padding:0;display:grid;gap:8px}.lrf li{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px;padding-top:8px;border-top:1px solid var(--line);font-size:14px}.lrf li:first-child{border-top:0;padding-top:0}.lrf b{font:700 15px/1.3 var(--display)}
 @media (max-width:620px){.lrf li{grid-template-columns:1fr;gap:2px}.lrcall{font-size:40px}.lrkv b{font-size:19px}}
+.lrload{display:flex;align-items:center;gap:10px;padding:18px 4px;color:var(--muted);font:600 15px var(--body)}.lrload .spin{display:inline-block}
 .lrbtn{background:none;border:0;padding:0;margin-left:6px;color:var(--accent);font:600 12px var(--body);text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
 .thq{margin-top:10px;font:500 12px var(--body);color:var(--muted)}.thk{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:6px}
 .thb{display:flex;align-items:center;gap:8px;background:none;border:0;border-radius:6px;padding:6px 4px;color:var(--muted);font:500 13px var(--body);text-align:left;cursor:pointer;min-height:34px}.thb:hover{background:var(--accent-soft)}
@@ -3230,7 +3231,7 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   if(!x||!v.plan){ $("lrTitle").textContent="Lock report"; body.innerHTML='<p class="empty">This call isn\'t on the board right now.</p>'; return }
   const a=x.a, nmP=a.info.name; $("lrTitle").textContent=nmP;
   if(!a.latest||a.latest.dnp||a.lockedOn){ body.innerHTML='<p class="empty">'+esc(nmP)+(a.lockedOn? ' is locked already.' : ' has no score to lock right now.')+'</p>'; return }
-  body.innerHTML='<p class="empty">Working it out… (a few seconds)</p>'; await tick();
+  body.innerHTML='<div class="lrload"><span class="spin"></span>Working out the report…</div>'; await tick();
   const P=v.plan, SL=P.SL, d=a.latest.date, fp=a.latest.fp, nm=q=>(A.find(z=>z.pid===q)||{a:{info:{name:q}}}).a.info.name;
   let line=null, o=null; try{ line=lineFor(A,P,x,d); o=v._lfo?.get(x.pid+"|"+d+"|"+x.idx+"|1") }catch(e){}
   let lineNoMed=null, opp=null, season=[], hist=[], phase=0;
@@ -3288,8 +3289,9 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   const alts=A.filter(z=>z.pid!==pid && (z.a.info.pos||[]).some(q2=>(a.info.pos||[]).includes(q2))).map(z=>esc(z.a.info.name)+" ("+(z.slot==="IR"? "IR" : z.starter? SL[z.idx] : "BN")+(z.a.info.inj? ", "+esc(z.a.info.inj) : "")+")").join(", "); if(alts) add("Others who fit", alts+".");
   add("Your week", pc1(v.win)+" to win, "+pc1(v.med||0)+" to beat the median"+(v.title!=null? ", "+(v.title*100).toFixed(1)+"% title" : "")+". "+(v.win>0.6? "As the favorite, a sure score is worth more than a gamble with the same average." : v.win<0.4? "As the underdog, upside counts for more than a sure score." : ""));
   const chain=st.map((t2,k)=>{ let pm=t2.pm||0; const row=A.find(z=>z.pid===t2.pid), g=row&&row.a.future.find(f3=>f3.date===t2.date); try{ if(g) pm=dnpP(g,row.a.future.indexOf(g),t2.pid) }catch(e){}
-    const tp=tipAt(t2.pid,t2.date);   // the game's tip time (user, 11-18: "put time of game in the chain")
-    return '<div class="lrg"><div class="d">'+dayLabel(t2.date)+(tp? ' '+clock(tp) : '')+(t2.pid!==pid? ' · '+esc(nm(t2.pid)) : '')+'</div><div class="m">'+f1(t2.mu)+'</div><div class="s">projected · '+Math.round(pm*100)+'% chance he sits</div><div class="k">'+(k<st.length-1&&V? "Keep it if it's "+f1(V[k+1])+"+" : "Last chance: the slot keeps it")+'</div></div>' }).join("");
+    const tp=tipAt(t2.pid,t2.date), tm=playerInfo(t2.pid).team, G=W.games.find(y=>y.date===t2.date && (y.home?.team===tm || y.away?.team===tm)), home=G&&G.home?.team===tm, ov= G? (home? 'vs '+(G.away?.team||'') : '@ '+(G.home?.team||'')) : '';
+    // who plays, when, and against whom (user, 11-18: "put their name when it's them playing... put who they're playing too")
+    return '<div class="lrg"><div class="d">'+esc(nm(t2.pid))+'</div><div class="s" style="margin-top:2px">'+dayLabel(t2.date)+(tp? ' '+clock(tp) : '')+(ov? ' '+esc(ov) : '')+'</div><div class="m">'+f1(t2.mu)+'</div><div class="s">projected · '+Math.round(pm*100)+'% chance he sits</div><div class="k">'+(k<st.length-1&&V? "Keep it if it's "+f1(V[k+1])+"+" : "Last chance: the slot keeps it")+'</div></div>' }).join("");
   body.innerHTML='<div class="lrs"><div class="lrv"><div class="lrcall'+(!close&&!lockIt? " w" : "")+'">'+callTxt+'<small>'+esc(sub)+'</small></div>'+(conf!=null? '<span class="lrchip">'+confLabel(conf)+'</span>' : '')+'</div>'+
     '<div class="lrkv"><div><b>'+sg(eW)+'</b><span>win chance for locking</span></div><div><b>'+sg(eM)+'</b><span>median chance for locking</span></div><div><b>'+(wmean!=null? f2(wmean) : "–")+'</b><span>average if you wait</span></div></div></div>'+
     (o? '<div class="lrs"><h3>Odds both ways</h3>'+twoSizes(oddsSvg)+'</div>' : '')+
@@ -5578,6 +5580,10 @@ function pageBoot(){
       for(const id in c.h){ const e=$(id); if(e && c.h[id]!=null) e.innerHTML=c.h[id] } ["wkTodoCard","wkMatchCard"].forEach(id=>{ const e=$(id); if(e) e.hidden=false });
       $("weekView").classList.add("stale"); $("wkMsg").textContent="Updating…" } }catch(e){}
   $("viewSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b && b.dataset.view) show(b.dataset.view) });   // the switch itself never waits on the worker
+  // a lock report's panel and spinner show the moment Details is tapped, before the worker (maybe busy with the league) gets to it (11-18)
+  document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest("[data-lr]"); if(!b) return; const M=$("lrModal"); if(!M) return;
+    M.hidden=false; const n=b.closest(".pc")?.querySelector(".n"); $("lrTitle").textContent= n? n.textContent.replace(/\s*🏀.*/,"").trim() : "Lock report";
+    $("lrBody").innerHTML='<div class="lrload"><span class="spin"></span>Working out the report…</div>' }, true);
   window.addEventListener("resize",DOMH.syncBarHeight); DOMH.syncBarHeight();
   const snap={}; try{ for(let i=0;i<ls.length;i++){ const k=ls.key(i); if(k && k.startsWith("prb:")) snap[k]=ls.getItem(k) } }catch(e){}
   const INIT={ls:snap, search:location.search, href:location.href, base:location.href.replace(/[?#].*$/,"").replace(/[^/]*$/,""), vals:vals(), hidden:document.hidden};
