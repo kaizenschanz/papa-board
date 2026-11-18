@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-kFWuewtI6gWxWDdkJSbErDgZneGcWagbeODNPCjbUOs='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YLqPkBwLQwMmj1BqrtY99iPuFy+Hab65SP1y2Ih4NcI='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2281,12 +2281,15 @@ function planWeek(A,opt={}){
   const SL=(S.league.roster_positions||[]).filter(s=>s!=="BN"&&s!=="IR");
   const lockedIdx=new Set(A.filter(x=>x.starter&&x.a.lockedOn).map(x=>x.idx));
   const slots=SL.map((_,i)=>i).filter(i=>!lockedIdx.has(i));
-  const pool=A.filter(x=>x.slot!=="IR" && !x.a.lockedOn && !(opt.exclude&&opt.exclude.has(x.pid)));
+  const irUse=irSwapsFor(A), pool=A.filter(x=>(x.slot!=="IR" || irUse.has(x.pid)) && !x.a.lockedOn && !(opt.exclude&&opt.exclude.has(x.pid)));
   const C=[];
   for(const x of pool){ const a=x.a; const ch=[];
     let hold=null;
     if(x.starter && a.live) hold=emax(waitValue(a.future)??-1e9, a.live.mu, a.live.sd);
     else if(a.future.length) hold=waitValue(a.future);
+    // a player coming back from IR: his games count at his chance to play them (Paolo's possible Sunday return is ~12%; at full value the
+    // plan had him starting at PF over Buzelis). Everyone else's small sit chances are handled later, in the simulation, as before.
+    if(x.slot==="IR" && a.future.length){ const g2=a.future.map((g,j)=>{ let p=0; try{ p=dnpP(g,j,x.pid) }catch(e){} return {...g, mu:(g.mu||0)*(1-p)} }); hold=waitValue(g2) }
     if(hold!=null && hold>0) ch.push({k:"hold",v:hold});
     // asStarted: a what-if row for a game still to come (replanLine), where he'll be in the lineup by then
     if(x.starter && a.latest && !a.live && !a.latest.dnp && (x.asStarted || startedWholeGame(x.rid, x.pid, a.latest.date))) ch.push({k:"lock",v:a.latest.fp});
@@ -3830,6 +3833,13 @@ function wtsMoved(){ const a=W.wtUsed, b=wtSnap(); if(!a||!a.me||!b.me) return t
   if(!!a.opp!==!!b.opp) return true; if(a.opp&&b.opp&&rel(a.opp.perWin,b.opp.perWin)>0.05) return true;
   return false }
 
+// IR players the plan may use (user, 11-18: "you can switch players around in IR, you just can't pick up new players"): one back
+// to the active roster for each active player who could take his IR spot (an injury status the league allows there, nobody locked),
+// the IR players worth the most this week first. Paolo Banchero comes back for Duncan Robinson (Out) that way.
+function irSwapsFor(A){ if(A._irs) return A._irs; const out=new Set(), ir=A.filter(x=>x.slot==="IR"); if(!ir.length || !S.league) return (A._irs=out);
+  const can=A.filter(x=>x.slot!=="IR" && !x.a.lockedOn && irOk(x.a.info.inj)).length;
+  if(can>0){ const val=x=>(x.a.future||[]).reduce((t,f)=>t+(f.mu||0),0); ir.filter(x=>val(x)>0).sort((p,q)=>val(q)-val(p)).slice(0,can).forEach(x=>out.add(x.pid)) }
+  try{ Object.defineProperty(A,"_irs",{value:out, enumerable:false}) }catch(e){} return out }
 // Is this injury status allowed in an IR slot under the league's settings?
 function irOk(inj){
   const s=S.league.settings||{}; inj=String(inj||"").toUpperCase();
