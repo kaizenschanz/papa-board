@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+gz6GlL6P0neCsvihwESyzKGYfm59Ff90YNWMibpV9k='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1oo9ZxTSGv+wdNV1aTt6A9G3GIM/+WY0qAw/rqO6z2s='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
 /* Layout: draft-room console. Sticky status bar, controls, best-available list on the left, my roster + pick feed on the right; stacks to one column on phones. */
 :root{
   --bg:#f3f4f1; --panel:#ffffff; --ink:#1b2230; --muted:#5f6878; --line:#dcdfe3;
-  --accent:#b85c12; --accent-ink:#ffffff; --accent-soft:#f6e6d6; --ser1:#2a78d6; --ser2:#1baf7a; --ser3:#e87ba4; --ser4:#6250d6; --ser5:#eda100;
+  --accent:#b85c12; --accent-ink:#ffffff; --accent-soft:#f6e6d6; --tc0:#2a78d6; --tc1:#1baf7a; --tc2:#e87ba4; --tc3:#6250d6; --tc4:#5f6878; --tc5:#008300; --tc6:#d03b3b; --tc7:#0e9fb5; --tc8:#c2185b; --tc9:#a3a300; --tc10:#7a8494; --ser1:#2a78d6; --ser2:#1baf7a; --ser3:#e87ba4; --ser4:#6250d6; --ser5:#eda100;
   --good:#1f7a4a; --good-soft:#dcf0e3; --bad:#b4322a; --bad-soft:#f7dedb; --warn:#8a6100; --warn-soft:#f6ebc9;
   --taken:#9aa1ab;
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
@@ -21,12 +21,12 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#12161d; --panel:#1a2029; --ink:#e7eaee; --muted:#9aa3b0; --line:#2b3340;
-  --accent:#ec9a52; --accent-ink:#1a1206; --accent-soft:#3a2816; --ser1:#3987e5; --ser2:#199e70; --ser3:#d55181; --ser4:#9085e9; --ser5:#c98500;
+  --accent:#ec9a52; --accent-ink:#1a1206; --accent-soft:#3a2816; --tc0:#3987e5; --tc1:#199e70; --tc2:#d55181; --tc3:#9085e9; --tc4:#d0d4da; --tc5:#0ca30c; --tc6:#e5534b; --tc7:#22b5c9; --tc8:#ff7ab8; --tc9:#bdbd2e; --tc10:#8b94a3; --ser1:#3987e5; --ser2:#199e70; --ser3:#d55181; --ser4:#9085e9; --ser5:#c98500;
   --good:#5fcf8f; --good-soft:#173826; --bad:#f08178; --bad-soft:#3d1c1a; --warn:#e5c062; --warn-soft:#3a3016;
   --taken:#5e6672; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12161d; --panel:#1a2029; --ink:#e7eaee; --muted:#9aa3b0; --line:#2b3340;
-  --accent:#ec9a52; --accent-ink:#1a1206; --accent-soft:#3a2816; --ser1:#3987e5; --ser2:#199e70; --ser3:#d55181; --ser4:#9085e9; --ser5:#c98500;
+  --accent:#ec9a52; --accent-ink:#1a1206; --accent-soft:#3a2816; --tc0:#3987e5; --tc1:#199e70; --tc2:#d55181; --tc3:#9085e9; --tc4:#d0d4da; --tc5:#0ca30c; --tc6:#e5534b; --tc7:#22b5c9; --tc8:#ff7ab8; --tc9:#bdbd2e; --tc10:#8b94a3; --ser1:#3987e5; --ser2:#199e70; --ser3:#d55181; --ser4:#9085e9; --ser5:#c98500;
   --good:#5fcf8f; --good-soft:#173826; --bad:#f08178; --bad-soft:#3d1c1a; --warn:#e5c062; --warn-soft:#3a3016;
   --taken:#5e6672; color-scheme:dark}
 *{box-sizing:border-box}
@@ -226,8 +226,10 @@ details.lgm .lgg{padding:4px 0 12px}
 .thc svg{width:100%;height:auto;display:block}.thc .ths{display:block}.thc .thw{display:none}@media (min-width:640px){.thc .ths{display:none}.thc .thw{display:block}}
 .thc .g{stroke:var(--line);stroke-width:1}.thc .d{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4}.thc .ax{font-weight:600;font-family:var(--body);fill:var(--muted)}
 .thc path{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.thc path.me{stroke-width:2.75}.thc circle{stroke:var(--panel);stroke-width:2}.thc .lv{font-weight:700;font-family:var(--body);font-variant-numeric:tabular-nums}
-.thk{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font:500 13px var(--body);color:var(--muted)}.thk span{display:inline-flex;align-items:center;gap:6px}.thk span.me{color:var(--ink);font-weight:700}
-.thk i{width:14px;height:3px;border-radius:2px;flex:none}.thk small{font-size:11px;font-variant-numeric:tabular-nums}.thn{margin-top:8px;font:500 11px var(--body);color:var(--muted)}
+.thq{margin-top:10px;font:500 12px var(--body);color:var(--muted)}.thk{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:6px}
+.thb{display:flex;align-items:center;gap:8px;background:none;border:0;border-radius:6px;padding:6px 4px;color:var(--muted);font:500 13px var(--body);text-align:left;cursor:pointer;min-height:34px}.thb:hover{background:var(--accent-soft)}
+.thb.on{color:var(--ink)}.thb.me .n{font-weight:700}.thb i{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--line);flex:none;display:inline-flex;align-items:center;justify-content:center;font:800 11px/1 var(--body);color:var(--panel);font-style:normal}
+.thb .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.thb b{font-variant-numeric:tabular-nums}.thb small{min-width:34px;text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}.thn{margin-top:8px;font:500 11px var(--body);color:var(--muted)}
 .spark-key{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:-4px 0 8px;font:600 11px var(--body);color:var(--muted)}.spark-key span{display:inline-flex;align-items:center;gap:4px}
 .spark-key .k{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--accent);background:var(--bg)}.spark-key .k.a{background:var(--accent)}
 .acc{display:grid;grid-template-columns:max-content 1fr;gap:3px 14px;margin-top:10px;font:500 13px var(--body);color:var(--muted)}.acc .acc-h{grid-column:1/-1;font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase}
@@ -330,6 +332,7 @@ details.fold>summary{padding:10px 0}
 .tdc .td{grid-template-columns:58px minmax(0,1fr)}
 .tdc .td:nth-child(2){border-top:0}
 .mhd,details.mr>summary,.mtot{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center}
+.mhd .mh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}.mhd .mh>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mhd .mh small{font:600 10px/1 var(--body);letter-spacing:.04em;flex:none}
 .mhd{font:700 12px/1 var(--display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:2px 0 8px;border-bottom:1px solid var(--line)}
 details.mr{border-bottom:1px solid var(--line)}
 .pastrow{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
@@ -417,13 +420,13 @@ details.fold #poolSeg{margin-bottom:6px}
       <div class="wk-sum num" id="lgSum">Loading the league…</div>
       <div class="acc num" id="lgAcc" hidden></div>
     </div>
-    <div class="card" id="lgOddsCard" hidden>
-      <div class="lghd"><h2 id="lgOddsH">Title odds over time</h2><select id="lgOddsK" aria-label="Which odds" style="margin-left:auto"><option value="ch">Title</option><option value="po">Playoffs</option></select></div>
-      <div id="lgOdds"></div>
-    </div>
     <div class="card">
       <div class="lghd"><h2 id="lgWeekH">This week</h2><a href="recap/" style="font-size:13px;margin-left:auto;margin-right:10px;white-space:nowrap">Week recap &rsaquo;</a><span class="wknav" id="lgNav" hidden><button type="button" class="wkarr" data-step="-1" aria-label="Previous week">&lsaquo;</button><select id="lgWkSel" aria-label="Week"></select><button type="button" class="wkarr" data-step="1" aria-label="Next week">&rsaquo;</button></span></div>
       <div id="lgWeek" class="num"></div>
+    </div>
+    <div class="card" id="lgOddsCard" hidden>
+      <div class="lghd"><h2 id="lgOddsH">Title odds over time</h2><select id="lgOddsK" aria-label="Which odds" style="margin-left:auto"><option value="ch">Title</option><option value="po">Playoffs</option></select></div>
+      <div id="lgOdds"></div>
     </div>
     <div class="card">
       <h2>Standings</h2>
@@ -1642,9 +1645,10 @@ function shapeQ(mu){ if(!SHAPE) return null; const k=Math.max(SHAPE.lo,Math.min(
 // r: the player's own boom/bust width vs everyone at his level (shape_fit.py learns it daily; 1 = typical)
 function volOf(pid){ const v=SHAPE&&SHAPE.vol&&SHAPE.vol[pid]; return v>0? v : (SPREAD&&SPREAD.ratio&&SPREAD.ratio[pid]) || 1 }
 // his own width r stretches the shape as v^r / mean(v^r): same mean, wider or narrower, and no artificial floor
-function qMean(q,r){ if(r===1) return 1; const m=(q._m ||= {}), k=r.toFixed(2); if(m[k]!=null) return m[k]; let t=0; for(let i=0;i<101;i++) t+=Math.pow(q[i],r); return m[k]=(t/101)||1 }
-function drawScore(mu,u,r=1,pid=null){ if(!(mu>0)) return 0; const q=shapeFor(mu,pid); if(!q) return mu; const x=u*100, i=Math.floor(x), v=(i>=100? q[100] : q[i]+(q[i+1]-q[i])*(x-i)); return r===1? mu*v : mu*Math.pow(v,r)/qMean(q,r) }
-function emaxE(mu,c,r=1){ const q=shapeQ(mu); if(!q||!(mu>0)) return Math.max(mu||0,c); const M=qMean(q,r); let t=0; for(let i=0;i<101;i++) t+=Math.max(r===1? mu*q[i] : mu*Math.pow(q[i],r)/M,c); return t/101 }
+function qMean(q,r){ if(r===1) return 1; const m=(q._m ||= {}), k=r.toFixed(2); if(m[k]!=null) return m[k]; let t=0; for(let i=0;i<101;i++) t+=spow(q[i],r); return m[k]=(t/101)||1 }
+function drawScore(mu,u,r=1,pid=null){ if(!(mu>0)) return 0; const q=shapeFor(mu,pid); if(!q) return mu; const x=u*100, i=Math.floor(x), v=(i>=100? q[100] : q[i]+(q[i+1]-q[i])*(x-i)); return r===1? mu*v : mu*spow(v,r)/qMean(q,r) }   // spow: a shape's bottom quantile can be under 0 (a negative game is possible), and a negative to the 0.9 is NaN (11-17: Poeltl's live game, one draw in 3,000, turned the whole team total NaN)
+function spow(v,r){ return v<0? -Math.pow(-v,r) : Math.pow(v,r) }   // the power on the size, the sign kept
+function emaxE(mu,c,r=1){ const q=shapeQ(mu); if(!q||!(mu>0)) return Math.max(mu||0,c); const M=qMean(q,r); let t=0; for(let i=0;i<101;i++) t+=Math.max(r===1? mu*q[i] : mu*spow(q[i],r)/M,c); return t/101 }
 function hashKey(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619) } return h|0 }
 function uAt(key,s){ let h=(key^Math.imul(s+1,0x9E3779B1))|0; h^=h>>>16; h=Math.imul(h,0x7feb352d); h^=h>>>15; h=Math.imul(h,0x846ca68b); h^=h>>>16; return (h>>>0)/4294967296 }
 // Chance a scheduled game doesn't happen for him (sits, late scratch, rest, injury): sit_fit.py's model, refit every morning
@@ -1900,7 +1904,7 @@ function ovValue(t,o,st,V){
     if(!(psi>1e-6) || !(F>p)){ const cont=path(m+1,p,nph,F), kv=kvAt(o.kv[m],p); return (1-pm)*(Vj>kv? Vj : cont)+pm*cont }
     let tot=0; for(const [z,w] of GH){ const p2=bridgeStep(p,F,psi,z), cont=path(m+1,p2,nph,F), kv=kvAt(o.kv[m],p2); tot+=w*((1-pm)*(Vj>kv? Vj : cont)+pm*cont) }
     return tot };
-  let tot=0; for(let a=0;a<101;a++){ const R= !(mu>0)? 0 : !q? mu : r===1? mu*q[a] : mu*Math.pow(q[a],r)/M; tot+=path(0,base,f0,base+R) }
+  let tot=0; for(let a=0;a<101;a++){ const R= !(mu>0)? 0 : !q? mu : r===1? mu*q[a] : mu*spow(q[a],r)/M; tot+=path(0,base,f0,base+R) }
   return tot/101 }
 // ---- Lock calls wait for the next tip (user, 11-09: "wait until you absolutely have to... right before his next game then you
 // find out he's out"). The score a slot holds is kept or given up right before the next game in its chain tips, by then knowing
@@ -1915,9 +1919,9 @@ function projF(t,s){ if(REAL) return 1; const g=t.ps; if(!(g>0)) return 1; const
 // playing step t at projection factor f, then holding his final against table T (the steps after his game)
 function stepU(t,f,T){ const r=t.r||1, live=t.cur!=null, base= live? t.cur : 0, mu= live? Math.max(0,t.mu-t.cur) : t.mu*f;
   if(!(mu>0)) return gAt(T,base); const q=shapeFor(mu,t.pid); if(!q) return gAt(T,base+mu);
-  const M= r!==1? qMean(q,r) : 1; let tot=0; for(let a=0;a<101;a++) tot+=gAt(T, base+(r===1? mu*q[a] : mu*Math.pow(q[a],r)/M)); return tot/101 }
+  const M= r!==1? qMean(q,r) : 1; let tot=0; for(let a=0;a<101;a++) tot+=gAt(T, base+(r===1? mu*q[a] : mu*spow(q[a],r)/M)); return tot/101 }
 function endVal(p,rm,r,T,pid=null){ if(!T) return p+rm; if(!(rm>0)) return gAt(T,p); const q=shapeFor(rm,pid); if(!q) return gAt(T,p+rm);
-  const M= r!==1? qMean(q,r) : 1; let s=0; for(let a=0;a<101;a++) s+=gAt(T, p+(r===1? rm*q[a] : rm*Math.pow(q[a],r)/M)); return s/101 }
+  const M= r!==1? qMean(q,r) : 1; let s=0; for(let a=0;a<101;a++) s+=gAt(T, p+(r===1? rm*q[a] : rm*spow(q[a],r)/M)); return s/101 }
 // Does he sit this game in draw s? His first game left: one draw against his chance. A later game of his in the same chain depends
 // on the one before it in that draw (sat it: pS, played it: pP), so two sits go together as often as the model says, no more
 // (review, 11-12: one shared draw per player made a second sit near-certain after a first: Powell 96% where the model says ~74%).
@@ -2673,17 +2677,24 @@ function lockOdds(A,P,x){ const v=W.vs, a=x.a; if(!v?.me?.tot||!a.latest) return
   for(let s=0;s<N;s++){ const R=v.me.tot[s]-(part.s? part.s[s] : part.m); rm+=R; keep[s]=R+a.latest.fp; go[s]=R+cm+f*(C[s]-cm) } rm/=N;
   const o=(tot,m)=>titleObjD({tot,m},v.opp,v.tab,v.median,v.wt);
   return {L:o(keep,rm+a.latest.fp), W:o(go,rm+cm), title:!!v.wt} }
-// How far the odds could be off if the model's measured biases sit at the edges of their margins (11-17): the team spread factor
-// (season replay, ~±10% with ~50 team-weeks) and the open part of each team's week (±3%: real totals vs simulated), both teams and the
-// median moved the way that hurts, then the way that helps. Simulation noise alone (±1%) is too small to show.
+// An 80% range for each number (user, 11-17: "make this like an 80 or 95% confident range"): the board's two calibrated corrections
+// aren't known exactly, so 200 versions of the week are drawn with them set from how sure the season replay is about each, and the
+// middle 80% of the resulting odds is shown. Bootstrapped over the replay's 48 team-weeks (11-17): the spread factor is sure to
+// about ±7.5% (one sd), the league-wide projection bias to ±0.7% of open points (moving both teams and the median together, so it
+// mostly cancels). A bias for one team's roster was tested and isn't real: a team's miss in its other weeks doesn't predict the
+// week left out (correlation +0.02), so it's left out (the old worst-case range, both corrections maxed against each other, assumed it).
+const RNG_SPREAD_SD=0.075, RNG_BIAS_SD=0.007, RNG_M=200;
 function oddsRange(v){ if(!v?.me?.tot||!v.opp?.tot) return null; const k=W.updated+"|"+v.me.m+"|"+v.opp.m; if(v._rng&&v._rng.k===k) return v._rng.r;
-  const A=v.me.tot, B=v.opp.tot, N=Math.min(A.length,B.length), mA=v.me.m, mB=v.opp.m, oA=Math.max(0,mA-(v.me.base||0)), oB=Math.max(0,mB-(v.opp.base||0)), tab=v.tab;
-  const one=(g,sA,sB,sM)=>{ let h=0, md=0; for(let s=0;s<N;s++){ const a=mA+g*(A[s]-mA)+sA, b=mB+g*(B[s]-mB)+sB; if(a>b) h++; else if(a===b) h+=0.5; if(v.median&&tab) md+=pTopAt(tab,a-sM) } return {h:h/N, md:md/N} };
-  const out=[]; for(const g of [0.9,1.1]) for(const sg of [-1,1]) out.push(one(g, sg*0.03*oA, -sg*0.03*oB, -sg*0.03*oB));
-  const r={win:[Math.min(...out.map(o=>o.h)), Math.max(...out.map(o=>o.h))]};
-  if(v.median&&tab) r.med=[Math.min(...out.map(o=>o.md)), Math.max(...out.map(o=>o.md))];
-  if(v.title!=null && v.wt?.perWin){ const w0=(v.win||0)+(v.med||0), lo=r.win[0]+(r.med? r.med[0] : 0), hi=r.win[1]+(r.med? r.med[1] : 0);
-    r.title=[Math.max(0,v.title+v.wt.perWin*(lo-w0)), Math.min(1,v.title+v.wt.perWin*(hi-w0))] }
+  const A=v.me.tot, B=v.opp.tot, N=Math.min(A.length,B.length), mA=v.me.m, mB=v.opp.m, oA=Math.max(0,mA-(v.me.base||0)), oB=Math.max(0,mB-(v.opp.base||0)), tab=v.median? v.tab : null;
+  const st=Math.max(1,Math.floor(N/2000));   // every few simulated weeks: same weeks in every version, so only the corrections differ
+  const one=(g,c)=>{ let h=0, md=0, n=0; const sA=c*oA, sB=c*oB, sM=c*(oA+oB)/2; for(let s=0;s<N;s+=st){ const a=mA+g*(A[s]-mA)+sA, b=mB+g*(B[s]-mB)+sB; h+= a>b? 1 : a===b? 0.5 : 0; if(tab) md+=pTopAt(tab,a-sM); n++ } return {h:h/n, md:md/n} };
+  let sd=1234567; const rnd=()=>{ sd|=0; sd=sd+0x6D2B79F5|0; let x=Math.imul(sd^sd>>>15,1|sd); x=x+Math.imul(x^x>>>7,61|x)^x; return ((x^x>>>14)>>>0)/4294967296 },
+    nrm=()=>{ let u=0,w=0; while(!u) u=rnd(); while(!w) w=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*w) };
+  const base=one(1,0), H=[], M=[], T=[], w0=(v.win||0)+(v.med||0), pw=v.wt?.perWin;
+  for(let k=0;k<RNG_M;k++){ const o=one(Math.max(0.6,1+RNG_SPREAD_SD*nrm()), RNG_BIAS_SD*nrm()), dh=o.h-base.h, dm=o.md-base.md;
+    H.push((v.win||0)+dh); M.push((v.med||0)+dm); if(v.title!=null && pw) T.push(v.title+pw*(dh+dm)) }
+  const q=(X,p)=>{ const a=X.slice().sort((x,y)=>x-y); return a[Math.round(p*(a.length-1))] }, cl=x=>Math.max(0,Math.min(1,x)), band=X=>[cl(q(X,0.1)), cl(q(X,0.9))];
+  const r={win:band(H)}; if(tab) r.med=band(M); if(T.length) r.title=band(T);
   v._rng={k, r}; return r }
 // The lock-or-play-on odds as a small table (11-17: "make it into a table"): win, median, title, and the confidence.
 function oddsTable(o, pre, post){ if(!o) return ""; const d=o.L.obj-o.W.obj, lb=d>=0, td=(v,b)=>'<td'+(b?' class="bst"':'')+'>'+v+'</td>';
@@ -3167,11 +3178,11 @@ function renderBoard(A,P){
   const side=(name,proj,lk,op,r,rid)=>'<div class="tm'+(r?' r':'')+'"><div class="tn">'+esc(name)+(rid!=null? ' <small class="stg">'+standTag(rid)+'</small>' : '')+'</div><div class="big">'+proj.toFixed(2)+'</div><div class="sm">'+lk.toFixed(2)+' locked · '+op+' open</div></div>';
   let h='<div class="sb">'+side(rosterName(me.roster_id), v? v.me.m : lockedSum(A)+P.total, lockedSum(A), open(A), false, me.roster_id)+
     (v? side(v.name, v.opp.m, lockedSum(v.oppRows), open(v.oppRows), true, v.rid) : '')+'</div><div class="sb-cap">projected final</div>';
-  const pills=[], rg=v? oddsRange(v) : null, rgs=r=> r? ' <small class="rng">('+Math.round(r[0]*100)+'–'+Math.round(r[1]*100)+'%)</small>' : '';
+  const pills=[], rg=v? oddsRange(v) : null, rgs=r=> r? ' <small class="rng" title="80% range: the middle 80% of where the true chance sits, given how sure the model\'s calibration is">('+Math.round(r[0]*100)+'–'+Math.round(r[1]*100)+'%)</small>' : '';
   if(v){ pills.push('<span class="pill '+(v.win>=.5?'good':'bad')+'">Win <b>'+pct(v.win)+'</b>'+rgs(rg?.win)+'</span>');
     if(v.med!=null){ const mx=weekMedian(); pills.push('<span class="pill">Median <b>'+pct(v.med)+'</b>'+rgs(rg?.med)+(mx!=null? ' · ~'+mx.toFixed(1) : '')+'</span>') }
     // title odds on one page at a time: this week while it's on, next week once this one is final (they can't disagree)
-    if(v.title!=null && !weekOver() && !(W.week>W.baseWeek && !W.baseDone)) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b>'+(rg?.title? ' <small class="rng">('+(rg.title[0]*100).toFixed(1)+'–'+(rg.title[1]*100).toFixed(1)+'%)</small>' : '')+'</span>') }
+    if(v.title!=null && !weekOver() && !(W.week>W.baseWeek && !W.baseDone)) pills.push('<span class="pill">Title <b>'+(v.title*100).toFixed(2)+'%</b>'+(rg?.title? ' <small class="rng" title="80% range">('+(rg.title[0]*100).toFixed(1)+'–'+(rg.title[1]*100).toFixed(1)+'%)</small>' : '')+'</span>') }
   h+= pills.length? '<div class="pills">'+pills.join("")+'</div>' : '';
   if(v) h+=oddsSpark(me.roster_id, v.rid, A, v.oppRows);   // the win-chance timeline here too (user, 11-09)
   if(v) h+='<label class="oppmode">Opponent <select id="oppMode"><option value="smart"'+(W.oppAllIn?'':' selected')+'>Optimal</option><option value="allin"'+(W.oppAllIn?' selected':'')+'>Matchup Focused</option></select></label>';
@@ -3434,7 +3445,9 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       : (mine&&!x.starter&&a.call&&a.call.t.startsWith("Start")? '<span class="badge start">Start</span> ' : '');
     // the line the board showed before the lock (the Mac logs it: legs.json dec), not the regrade's (11-17: Clingan read "line 24.8"
     // after he was locked over the 26.35 the board showed); the regrade's line only where nothing was logged
-    if(a.lockedOn){ const dl=W.decSnap?.[W.week+"|"+x.rid+"|"+x.pid+"|"+a.lockedOn.date], shown= dl && dl[1]!=null? dl[1] : null, gl= shown==null? lockGrade(x.rid,x.pid) : null;
+    // The grade's line first, now that it's the live board's own lock line priced at the deadline (grade 19); the logged line only
+    // where there's no grade yet (user, 11-17: "clingan still showing 26.4": that look had SwindlerZ inflated by the live-model bug)
+    if(a.lockedOn){ const dl=W.decSnap?.[W.week+"|"+x.rid+"|"+x.pid+"|"+a.lockedOn.date], gl=lockGrade(x.rid,x.pid)||lockGradeKept(W.week,x.rid,x.pid), shown= !gl && dl && dl[1]!=null? dl[1] : null;
       s='Locked · '+dayLabel(a.lockedOn.date)+(shown!=null? ' · line '+shown.toFixed(1)+(a.lockedOn.fp>=shown? ' ✓' : ' ✗') : gl? ' · line '+gl.line.toFixed(1)+(gl.ok? ' ✓' : ' ✗') : ''); val=a.lockedOn.fp.toFixed(2); vc=' lk' }
     else { const bits=[], g=a.future[0], now= x.starter&&a.latest&&!a.latest.dnp;
       // his slot value belongs on the row of the slot the plan has him in: if that's another slot and nobody is planned here,
@@ -3456,7 +3469,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
     return '<div class="pc"><span class="n">'+esc(a.info.name)+(a.live?.on?' <span title="on the floor">🏀</span>':'')+(x.slot==="IR"?' <span class="chip inj">IR</span>' : a.info.inj&&!a.lockedOn&&!back? ' <span class="chip inj">'+esc(a.info.inj)+'</span>' : '')+'</span><span class="s">'+badge+s+'</span>'+(val?'<span class="v'+vc+'">'+val+'</span>':'')+'</div>' };
   const row=(lab,a,b)=>'<details class="mr" data-k="'+(lab||'bn')+':'+(a?a.pid:'')+':'+(b?b.pid:'')+'"><summary><span class="sl">'+lab+'</span>'+cell(a,DA,QA,A,mineA,LA)+cell(b,DB,QB,B,false,LB)+'</summary><div class="det">'+(a?playerDetail(a,mineA? true : null,LA):'<div></div>')+(b?playerDetail(b,mineA? false : null,LB):'<div></div>')+'</div></details>';
   const at=(R,i)=>R.find(x=>x.starter&&x.idx===i);
-  let h='<div class="mhd"><span></span><span>'+esc(nameA)+'</span><span>'+esc(nameB)+'</span></div>';
+  let h='<div class="mhd"><span></span><span class="mh"><span>'+esc(nameA)+'</span><small>Slot value</small></span><span class="mh"><span>'+esc(nameB)+'</span><small>Slot value</small></span></div>';   // (user, 11-17: "label the slot value columns")
   SL.forEach((s,i)=>{ h+=row(s,at(A,i),at(B,i)) });
   const tot=(R,D)=>'<div class="pc"><span class="n">'+lockedSum(R).toFixed(2)+' locked</span><span class="s">± '+Math.sqrt(D.v).toFixed(0)+'</span><span class="v">'+D.m.toFixed(2)+'</span></div>';
   h+='<div class="mtot"><span class="sl">Total</span>'+tot(A,DA)+tot(B,DB)+'</div>';
@@ -4273,6 +4286,8 @@ async function managerTendencies0(){
 // again, locally or on the website"): this device's grades plus the site's grades.json, which the Mac's board publishes.
 const GRADES={};
 function gradeKey0(){ return "grades:"+(S.league?.league_id||"")+":"+GRADE_V }
+// a lock's kept grade (grades.json / this browser), for the locked row when the managers' list hasn't been worked out on this page
+function lockGradeKept(w,rid,pid){ gradeGet(""); const pre=w+"|"+rid+"|"+pid+"|"; for(const k in GRADES.m||{}){ if(k.startsWith(pre) && k.endsWith("|L")){ const c=GRADES.m[k]; if(c && c.line!=null) return {line:c.line, ok:c.ok} } } return null }
 function gradeGet(k){ if(!GRADES._ld){ GRADES._ld=1; GRADES.m={...(GRADES.site||{}), ...(store.get(gradeKey0(),{})||{})} } return GRADES.m[k]||null }
 function gradeSet(k,c){ gradeGet(k); GRADES.m[k]=c; clearTimeout(GRADES._t); GRADES._t=setTimeout(()=>{ store.set(gradeKey0(), GRADES.m); gradesOut() },500) }
 function gradesOut(){ if(!GRADES.m) return; let el=document.getElementById("gradesJson"); if(!el){ el=document.createElement("script"); el.type="application/json"; el.id="gradesJson"; document.body.appendChild(el) }
@@ -5014,21 +5029,29 @@ function renderTitleOdds(){ const card=$("lgOddsCard"), el=$("lgOdds"), H=LG.th;
     for(const m of (tp || [d.getTime()+15.5*3600e3, d.getTime()+26*3600e3])) if(m>t0 && m<t1) marks.push(m) } }
   const valAt=(P,t)=>{ let k=0; while(k<P.length-1 && P[k+1][0]<=t) k++; const a=P[k], b=P[k+1]; if(!b || t-a[0]<6*3600e3) return a[1]; return a[1]+(b[1]-a[1])*(t-a[0])/((b[0]-a[0])||1) };   // the last reading before it (rebuilt weeks: between week starts)
   all.forEach(x=>{ x.S=[x.P[0], ...marks.map(m=>[m, valAt(x.P,m)]), x.P[x.P.length-1]]; x.cur=x.P[x.P.length-1][1]; x.d=x.cur-x.P[0][1] });
-  // the top four contenders and you, colors kept to the team (by roster order among the five shown)
-  const me=all.find(x=>x.rid===myR), show=all.filter(x=>x.rid!==myR).sort((a,b)=>b.cur-a.cur).slice(0, me? 4 : 5).concat(me? [me] : []);
-  const pal=["var(--ser1)","var(--ser2)","var(--ser3)","var(--ser4)","var(--ser5)"], others=show.filter(x=>x!==me).sort((a,b)=>a.rid-b.rid); others.forEach((x,k)=>x.col=pal[k]); if(me) me.col="var(--accent)";
-  const top=Math.max(...show.flatMap(x=>x.S.map(p=>p[1]))), yMax= K==="po"? 100 : Math.min(100, Math.max(10, Math.ceil(top/5)*5)), step= yMax<=25? 5 : yMax<=50? 10 : 25;
+  // which teams are drawn: a checkbox per team in the list (user, 11-17); to start, the top four contenders and you. Each team keeps
+  // one color whatever else is on (by roster order), so ticking a team never repaints the others.
+  const me=all.find(x=>x.rid===myR); if(!(LG.thSel instanceof Set)) LG.thSel=new Set(all.filter(x=>x.rid!==myR).sort((a,b)=>b.cur-a.cur).slice(0, me? 4 : 5).map(x=>x.rid).concat(me? [myR] : []));
+  all.filter(x=>x!==me).sort((a,b)=>a.rid-b.rid).forEach((x,k)=>x.col="var(--tc"+(k%11)+")"); if(me) me.col="var(--accent)";
+  const show=all.filter(x=>LG.thSel.has(x.rid));
+  const top=Math.max(1, ...show.flatMap(x=>x.S.map(p=>p[1]))), yMax= K==="po"? 100 : Math.min(100, Math.max(10, Math.ceil(top/5)*5)), step= yMax<=25? 5 : yMax<=50? 10 : 25;
   const draw=(Wd,Hh,fs)=>{ const L=fs*2.6, R=fs*4.6, Tp=10, B=fs*2.2, X=t=>L+(t-t0)/((t1-t0)||1)*(Wd-L-R), Y=v=>Tp+(1-v/yMax)*(Hh-Tp-B), f=v=>v.toFixed(1);
     let g=""; for(let v=0; v<=yMax+1e-9; v+=step) g+='<line class="g" x1="'+f(L)+'" x2="'+f(Wd-R)+'" y1="'+f(Y(v))+'" y2="'+f(Y(v))+'"/><text class="ax" style="font-size:'+fs+'px" x="'+f(L-5)+'" y="'+f(Y(v)+fs*0.35)+'" text-anchor="end">'+v+'%</text>';
-    const d=new Date(t0); d.setHours(0,0,0,0); for(; d.getTime()<=t1; d.setDate(d.getDate()+1)){ const t=d.getTime(); if(t<=t0 || d.getDay()!==1) continue; const wk=weekOfDate(t);
+    { const w0=weekOfDate(t0); if(w0) g+='<text class="ax" style="font-size:'+fs+'px" x="'+f(L)+'" y="'+f(Hh-B+fs*1.5)+'" text-anchor="start">W'+w0+'</text>' }   // the week the chart starts in (user: "add W1")
+    const d=new Date(t0); d.setHours(0,0,0,0); for(; d.getTime()<=t1; d.setDate(d.getDate()+1)){ const t=d.getTime(); if(t<=t0+86400e3 || d.getDay()!==1) continue; const wk=weekOfDate(t);
       g+='<line class="d" x1="'+f(X(t))+'" x2="'+f(X(t))+'" y1="'+Tp+'" y2="'+f(Hh-B)+'"/><text class="ax" style="font-size:'+fs+'px" x="'+f(X(t))+'" y="'+f(Hh-B+fs*1.5)+'" text-anchor="middle">'+(wk? 'W'+wk : (d.getMonth()+1)+'/'+d.getDate())+'</text>' }
     const lines=show.slice().sort((a,b)=>(a===me)-(b===me)).map(x=>'<path d="'+x.S.map((p,k)=>(k?'L':'M')+f(X(p[0]))+' '+f(Y(p[1]))).join(' ')+'" style="stroke:'+x.col+'" class="'+(x===me?'me':'')+'"><title>'+esc(x.name)+'</title></path><circle cx="'+f(X(t1))+'" cy="'+f(Y(x.cur))+'" r="4" style="fill:'+x.col+'"/>').join("");
     const lab=show.map(x=>({x, y:Y(x.cur)})).sort((a,b)=>a.y-b.y); for(let k=1;k<lab.length;k++) if(lab[k].y-lab[k-1].y<fs*1.25) lab[k].y=lab[k-1].y+fs*1.25;
     const labs=lab.map(l=>'<text class="lv" style="font-size:'+fs+'px;fill:'+l.x.col+'" x="'+f(X(t1)+8)+'" y="'+f(l.y+fs*0.35)+'">'+l.x.cur.toFixed(1)+'%</text>').join("");
     return '<svg viewBox="0 0 '+Wd+' '+Hh+'" role="img" aria-label="'+(K==="po"?"Playoff":"Title")+' odds over the season: the top contenders and you">'+g+lines+labs+'</svg>' };
-  const key=show.slice().sort((a,b)=>b.cur-a.cur).map(x=>'<span class="'+(x===me?'me':'')+'"><i style="background:'+x.col+'"></i>'+esc(x.name)+'<small>'+(x.d>=0.05? '▲' : x.d<=-0.05? '▼' : '')+(Math.abs(x.d)>=0.05? Math.abs(x.d).toFixed(1) : '')+'</small></span>').join("");
-  el.innerHTML='<div class="thc"><div class="ths">'+draw(360,230,11)+'</div><div class="thw">'+draw(720,320,12)+'</div></div><div class="thk">'+key+'</div>'+
-    '<div class="thn">▲▼ since '+new Date(t0).toLocaleDateString("en-US",{month:"short", day:"numeric"})+' · before and after each day\'s games'+(H.rebuilt>0 && H.pts[H.rebuilt]? ' · before '+new Date(H.pts[H.rebuilt][0]).toLocaleDateString("en-US",{month:"short", day:"numeric"})+': rebuilt with the board\'s season simulation' : '')+'</div>' }
+  const key=all.slice().sort((a,b)=>b.cur-a.cur).map(x=>{ const on=LG.thSel.has(x.rid); return '<button type="button" class="thb'+(on?' on':'')+(x===me?' me':'')+'" data-thr="'+x.rid+'" role="checkbox" aria-checked="'+on+'"><i style="'+(on? 'background:'+x.col+';border-color:'+x.col : '')+'">'+(on?'✓':'')+'</i><span class="n">'+esc(x.name)+'</span><b>'+x.cur.toFixed(1)+'%</b><small>'+(x.d>=0.05? '▲' : x.d<=-0.05? '▼' : '')+(Math.abs(x.d)>=0.05? Math.abs(x.d).toFixed(1) : '')+'</small></button>' }).join("");
+  el.innerHTML='<div class="thc"><div class="ths">'+draw(360,230,11)+'</div><div class="thw">'+draw(720,320,12)+'</div></div><div class="thq"><button type="button" class="linkbtn" data-thall="1">All</button> · <button type="button" class="linkbtn" data-thall="5">Top 5</button> · <button type="button" class="linkbtn" data-thall="0">Just me</button></div><div class="thk">'+key+'</div>'+
+    '<div class="thn">▲▼ since '+new Date(t0).toLocaleDateString("en-US",{month:"short", day:"numeric"})+' · before and after each day\'s games'+(H.rebuilt>0 && H.pts[H.rebuilt]? ' · before '+new Date(H.pts[H.rebuilt][0]).toLocaleDateString("en-US",{month:"short", day:"numeric"})+': rebuilt with the board\'s season simulation' : '')+'</div>';
+  if(!el.dataset.tw){ el.dataset.tw=1; el.addEventListener("click",e=>{ const b=e.target.closest&&(e.target.closest("[data-thall]")||e.target.closest("[data-thr]")); if(!b) return;
+    if(b.dataset.thall!=null){ const n=+b.dataset.thall, A=LG._thAll||[]; LG.thSel= n===1? new Set(A.map(x=>x.rid)) : n===0? new Set([myRoster()?.roster_id]) : new Set(A.filter(x=>x.rid!==myRoster()?.roster_id).sort((a,b)=>b.cur-a.cur).slice(0,4).map(x=>x.rid).concat([myRoster()?.roster_id])) }
+    else { const r=+b.dataset.thr; if(LG.thSel.has(r)) LG.thSel.delete(r); else LG.thSel.add(r) }
+    renderTitleOdds() }) }
+  LG._thAll=all.map(x=>({rid:x.rid, cur:x.cur})) }
 function renderLeague(){
   const O=LG.out; if(!O) return; const T=O.teams; try{ renderLuck() }catch(e){} try{ renderTitleOdds() }catch(e){ console.warn("title odds chart", e) }
   $("lgTitle").textContent=(S.league.name||"League")+" · Week "+W.week;
