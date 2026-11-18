@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Ar2421QyTv7vCc9ITqa1s/iOf++WFTAUNy3ROu2X54s='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YetO3autmzqIFozdupuolJLGWFF7N8/deb7irbel4DU='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1796,6 +1796,13 @@ function sitCond(pid,g){ const e=SIT?.p?.[pid]; if(!e || g.live || g.cur!=null |
 const DNPM=new Map();
 // his average minutes in games he played this season (the sit model's "usual minutes"); Sleeper's season number as a fallback
 function avgMinOf(pid){ const L=W.logs?.[pid]; if(L && L.size){ let s=0,n=0; for(const v of L.values()) if(v.min>0){ s+=v.min; n++ } if(n) return s/n } return byId?.[pid]?.min||0 }
+// A floor under his chance to sit his next game from Sleeper's own injury status, set by how often players with that status at the last look
+// before tip really sat (score_board, data/score.json), blended with a starting value worth 10 games (user, 11-18: "if they're tagged
+// out they're gonna be out"; the model read the game's report tag, not Sleeper's status, and listed-Out players averaged 77% while 31 of
+// 31 sat). Out ~97% on today's numbers; GTD and DTD firm up as cases come in. Never lowers the model's own number.
+const SIT_PRIOR={Out:0.95, IR:0.98, Doubtful:0.8, Suspension:0.95, GTD:0.6, Questionable:0.5, DTD:0.45, "Day-To-Day":0.45};
+function sitFloor(st){ const pr=SIT_PRIOR[st]; if(pr==null) return null; const g=(typeof SCORE!=="undefined" && SCORE?.proj?.sit?.tag?.[st]) || null, k=10;
+  return g&&g.n? (g.real*g.n+pr*k)/(g.n+k) : pr }
 function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
   if(pid!=null && g.date){ const ov=sitOvOf(pid,g.date); if(ov!=null) return ov }   // your call: sits (1) or plays (0)
   if(SIT && SIT.c1>0){ const e=pid!=null && SIT.p?.[pid], bb= pid!=null && g.date && b2bOf(pid,g.date);
@@ -1846,6 +1853,10 @@ function dnpP(g,j,pid){ if(g.live || g.cur!=null || g.sure) return 0;
     // updated right up to tip, so an unlisted player then almost always plays. The board's own last looks agree so far (unlisted at
     // its last look before tip: 44 games, 0 sat, it had said 2.6%). Capped at 2% until the tag-timing learner has enough to replace it.
     if(!prev){ const tip=tipAt(pid,g.date), mn= tip? (tip-(W.updated||Date.now()))/60e3 : null; if(mn!=null && mn<=60 && mn>-10 && liveTag(pid,g)==="none") p=Math.min(p,0.02) }
+    // Sleeper's injury status floor (sitFloor): only for the game it describes, his very next one on the schedule, and not when ESPN has
+    // him back by then (Rollins, out sick Wednesday, back Thursday)
+    { const nx=playerWeek(pid).games.find(x=>!x.done && !x.live), E=W.injESPN?.[pid];
+      if(nx && nx.date===g.date && !(E && E.ret && E.ret<=g.date)){ const fl=sitFloor(String(playerInfo(pid).inj||"")); if(fl!=null && p<fl) p=fl } }
     p=Math.min(0.995,p); DNPM.set(mk,p); return p }
   const d=(SHAPE&&SHAPE.dnp)||[0.05,0.08]; return j===0? d[0] : d[1] }
 // A chain step knows when it tips (t) and roughly when it ends, so a later game that tips while it's still on can be handled as
