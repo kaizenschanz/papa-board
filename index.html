@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jjWy3GDOoJltDHfWNpFJG4rEUvxsEgLbzV0tIXbjnGQ='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wYH7hCZZM7wdtoVTpbqjzKNgkxyG9Ugqirg8tsusXOA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2077,7 +2077,7 @@ function resolveDraw(slots,s,risk,sharedPid,pre){
 // on real scores, not one slot's chain). REAL_MISS is set when it reaches a game that hasn't been played yet.
 let REAL=null, REAL_MISS=false;
 // the grader pricing a past call with the live lock line (replanLine): {N: draws, noPk: no waiver adds (past weeks), keep: return both sides' draws}
-let REPLAN_X=null;
+let REPLAN_X=null, LINE_N=null;   // LINE_N: a close call's line rerun on the big simulation (lineFor)
 function realOf(t){ if(!REAL.has(t.key)){ REAL_MISS=true; return null } return REAL.get(t.key) }
 function stepDraw(t,s,f=1){ if(REAL){ const y=realOf(t); if(y!=null) return y } const u=uAt(t.key,s), r=t.r||1; return t.cur!=null? t.cur+drawScore(Math.max(0,t.mu-t.cur),u,r,t.pid) : drawScore(t.mu*f,u,r,t.pid) }
 // V[i]: what the chain from step i is worth (his missed-game chance included); V.e[i]: the same if he plays.
@@ -3375,7 +3375,7 @@ function replanLine(A,P,x,date,claims){
   // due now: the bigger run. A score that's in gets it only when the call is due within ~6 hours (his next tip), like the lock-slot
   // step; days out it's 3,000 until then (user, 11-17: "sure", to save ~6 s a redraw; those lines wobble ~0.1 until they're due)
   const nt= known && a.future.length? (tipAt(x.pid,a.future[0].date)||Date.parse(a.future[0].date+"T19:00:00")) : 0, soon= !nt || nt-(W.updated||Date.now())<6*3600e3;
-  const NN= REPLAN_X?.N || ((known && soon) || (a.live && a.live.date===date)? DUE_N : SIM_N), OPP=oppDN(NN);
+  const NN= REPLAN_X?.N || LINE_N || ((known && soon) || (a.live && a.live.date===date)? DUE_N : SIM_N), OPP=oppDN(NN);
   const QW=planWeek(AW,base), pkW=pkOf(AW), DW0=withPickups(teamDist(AW,QW,NN),pkW);
   // playing to win (POS_ON): both sides priced with the calls made on the score so far; the lock side's other slots play as if his
   // locked score were the plain line (the break-even score, which is what the line asks about)
@@ -3415,7 +3415,12 @@ const confLabel=c=> c==null? "" : (c<0.55? "Toss-up" : c<0.65? "Lean" : c<0.8? "
 function lineFor(A,P,x,date,noClaims){
   if(!P?.pick || x.idx==null || !A.length) return null;
   const v=W.vs, key=x.pid+"|"+date+"|"+x.idx+"|"+(noClaims?0:1); if(v){ v._lf ||= new Map(); if(v._lf.has(key)) return v._lf.get(key) }
-  let b=null; try{ const r=replanLine(A,P,x,date,!noClaims); if(r){ b=r.l; if(v){ (v._lfs ||= new Map()).set(key,r.slot); (v._lfo ||= new Map()).set(key,r.odds) } } }catch(e){ b=null }
+  // a score within a point of its line: rerun on 10,000 weeks, so a close call stops flipping with the simulation's wobble (user, 11-17:
+  // "I like you having to pick a side... part of the reason this is useful is to help with the real close ones"; Buzelis 20.76 read
+  // lock at 20.39 and don't at 20.94 an hour apart)
+  let b=null; try{ let r=replanLine(A,P,x,date,!noClaims); const sc= x.a.latest && !x.a.latest.dnp && x.a.latest.date===date && !x.a.live? x.a.latest.fp : null;
+      if(r && !REPLAN_X && sc!=null && Math.abs(sc-r.l)<1 && SIM_N<DUE_N){ LINE_N=DUE_N; try{ const r2=replanLine(A,P,x,date,!noClaims); if(r2) r=r2 }finally{ LINE_N=null } }
+      if(r){ b=r.l; if(v){ (v._lfs ||= new Map()).set(key,r.slot); (v._lfo ||= new Map()).set(key,r.odds) } } }catch(e){ b=null }
   if(b==null){ const own=slotLinesFor(A,P,x,date); b= own.size? (own.get(x.idx) ?? Math.min(...own.values())) : null }   // fallback: his slot's chain
   if(v) v._lf.set(key,b); return b }
 function slotLine(R,Q,x,date){ return lineFor(R,Q,x,date) }
