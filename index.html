@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Y3dLk1cVIfVXOhlaNQTYGlpNcqH2dBEy/etG8r8o32I='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-whWW5N6iiVvPIAMae74TyPpdKDYTb9cDmtzz4VlGIWI='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3238,7 +3238,7 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   const hold={...(v.planBase||{force:v.force}), force:{...((v.planBase||{}).force||{}), [x.pid]:"hold"}}; let st=[], V=null, res=[];
   try{ const PW=planWeek(A,hold); st=slotSteps(A,PW,x.pid); V=stepsValue(st); const N=v.me.tot.length; for(let s2=0;s2<N;s2++) res.push(playSteps(st,V,s2,0,0)); res.sort((p2,q2)=>p2-q2) }catch(e){}
   await tick();
-  const N=res.length||1, qq=p2=>res.length? res[Math.min(N-1,Math.floor(p2*(N-1)))] : 0, bins=new Array(25).fill(0); for(const y of res) bins[Math.max(0,Math.min(24,Math.floor(y/2)))]++;
+  const N=res.length||1, qq=p2=>res.length? res[Math.min(N-1,Math.floor(p2*(N-1)))] : 0, XM=Math.max(50, Math.ceil((res.length? res[Math.min(res.length-1,Math.floor(0.99*(res.length-1)))] : 50)/10)*10), NB=XM/2, bins=new Array(NB).fill(0); for(const y of res) bins[Math.max(0,Math.min(NB-1,Math.floor(y/2)))]++;   // the axis runs to his 99th percentile, the last bar holds the rest (user, 11-18: Luka's chart piled every 48+ week into one 26% bar at 50)
   const wmean= res.length? res.reduce((t2,y)=>t2+y,0)/N : null, beat=res.filter(y=>y>fp).length/N, u15=res.filter(y=>y<15).length/N;
   const slow=async()=>{ await tick(); LINE_N=SIM_N;   // context, not the call itself: the 3,000-week run
   // the median's effect: both lines on the same 3,000-week run, so the gap is the median and not the run size
@@ -3266,10 +3266,10 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
     for(const t2 of [0,50,100]) g+='<line class="gr" x1="'+X(t2)+'" x2="'+X(t2)+'" y1="4" y2="'+(H-20)+'"/><text class="ax" x="'+X(t2)+'" y="'+(H-6)+'" text-anchor="middle">'+t2+'%</text>';
     [["Win",o.L.h,o.W.h],["Median",o.L.md,o.W.md]].forEach(([n2,l2,w2],i2)=>{ const y=8+i2*54; g+='<text class="lb" x="0" y="'+(y+24)+'">'+n2+'</text><rect x="'+L+'" y="'+y+'" width="'+Math.max(1,X(l2*100)-L)+'" height="18" rx="4" fill="var(--accent)"/><text class="lb" x="'+(X(l2*100)+5)+'" y="'+(y+14)+'">'+pc1(l2)+' lock</text><rect x="'+L+'" y="'+(y+22)+'" width="'+Math.max(1,X(w2*100)-L)+'" height="18" rx="4" fill="var(--ser1)"/><text class="lb" x="'+(X(w2*100)+5)+'" y="'+(y+36)+'">'+pc1(w2)+' play on</text>' });
     return g+'</svg>' };
-  const histSvg=Wd=>{ const H=Wd<500? 170 : 210, L=32, R=8, T=16, B=24, top=Math.max(5,Math.ceil(Math.max(...bins)/N*100/5)*5), X=t2=>L+(t2/50)*(Wd-L-R), Y=p2=>T+(1-p2/top)*(H-T-B), bw=(Wd-L-R)/25;
+  const histSvg=Wd=>{ const H=Wd<500? 170 : 210, L=32, R=8, T=16, B=24, top=Math.max(5,Math.ceil(Math.max(...bins)/N*100/5)*5), X=t2=>L+(t2/XM)*(Wd-L-R), Y=p2=>T+(1-p2/top)*(H-T-B), bw=(Wd-L-R)/NB;
     let g='<svg viewBox="0 0 '+Wd+' '+H+'" role="img" aria-label="Where the slot ends if he plays on">'; for(let p2=0;p2<=top;p2+=5) g+='<line class="gr" x1="'+L+'" x2="'+(Wd-R)+'" y1="'+Y(p2)+'" y2="'+Y(p2)+'"/><text class="ax" x="'+(L-5)+'" y="'+(Y(p2)+4)+'" text-anchor="end">'+p2+'%</text>';
     bins.forEach((c,i2)=>{ const p2=c/N*100, up=i2*2>=fp; g+='<rect x="'+(L+i2*bw+1)+'" y="'+Y(p2)+'" width="'+(bw-2)+'" height="'+Math.max(0,Y(0)-Y(p2))+'" rx="2" fill="'+(up? "var(--ser1)" : "none")+'" stroke="var(--ser1)" stroke-width="'+(up? 0 : 1)+'"/>' });
-    for(const t2 of [0,10,20,30,40,50]) g+='<text class="ax" x="'+X(t2)+'" y="'+(H-6)+'" text-anchor="middle">'+t2+'</text>';
+    const tk= Wd<500 && XM>60? 20 : 10; for(let t2=0;t2<XM-tk/2;t2+=tk) g+='<text class="ax" x="'+X(t2)+'" y="'+(H-6)+'" text-anchor="middle">'+t2+'</text>'; g+='<text class="ax" x="'+X(XM)+'" y="'+(H-6)+'" text-anchor="end">'+(XM-2)+'+</text>';
     return g+'<line x1="'+X(fp)+'" x2="'+X(fp)+'" y1="'+(T-6)+'" y2="'+Y(0)+'" stroke="var(--accent)" stroke-width="2.5"/><text class="lb" x="'+(X(fp)+5)+'" y="'+(T+4)+'" fill="var(--accent)">Lock: '+f2(fp)+'</text></svg>' };
   // his line on a time axis from the end of the game that scored it to now (user, 11-18: "it should be from the time game ended to current time")
   const tip0=tipAt(pid,d), t0=Math.min(tip0? tip0+2.5*3600e3 : (hist[0]?.[0]||Date.now()), hist[0]?.[0]||Infinity), t1=Date.now();
@@ -5450,7 +5450,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
   WR.forEach(([n,g,set])=>{ const f=g(); set(function(...a){ if(depth[n]) return f.apply(this,a); depth[n]=1; const t=performance.now(); try{ return f.apply(this,a) } finally{ depth[n]=0; const o=(acc[n] ||= [0,0]); o[0]+=performance.now()-t; o[1]++ } }) }) }
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
-if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={bestMove,landChance,takenChance,restOfSeason,pickupFor,oppBest,othersDist,pTopTable,replanLine,dnpP,liveTag,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD,ctxOf,medNormal,lockSlotFor,liveRest0,liveRest} }
+if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={bestMove,landChance,takenChance,restOfSeason,pickupFor,oppBest,othersDist,pTopTable,replanLine,dnpP,liveTag,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD,ctxOf,medNormal,lockSlotFor,liveRest0,liveRest,drawScore,stepDraw,projF,psKept:()=>PS_KEPT,scoreStats,jx,shapeFor} }
 if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
