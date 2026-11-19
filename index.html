@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wVBY/DoYzANIKAWyBxIgK6b8zIW2Wpplq9dUGKsikm8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jq6h4rAxhr9DYBRlZibB3qkCAiYygbE22qv6fMnYJt0='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2434,7 +2434,7 @@ function planWeek(A,opt={}){
   for(const [pid,q] of [...best.pick].filter(([,q])=>q.k==="hold")){
     const c=C.find(c=>c.pid===pid), gs=holdGames(c); if(!gs.length) continue;
     const base=waitValueT(gs,term[pid],rhoT[pid]), first=gs[0].date, ft= gs[0].live? null : tipAt(pid,first); let bp=null;
-    for(const o of C){ if(best.pick.has(o.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;   // shared across slots (resolveDraw)
+    for(const o of C){ if(best.pick.has(o.pid)||o.x.a.live||!fitsVia(o.pos,q.slot,pid,o.x.a.future.find(g=>g.mu>0)?.date)) continue;   // shared across slots (resolveDraw); a slide counts (user, 11-19: Powell, SF/SG, ahead of McCain in Luka's PG with Mitchell sliding to PG)
       const g=o.x.a.future.filter(g=>g.mu>0); if(!g.length) continue;
       const lg=g[g.length-1], same=lg.date===first, lt= same? tipAt(o.pid,lg.date) : null;
       if(lg.date>first || (same && !(ft && lt && lt<ft-LOOK_GAP))) continue;
@@ -2448,7 +2448,7 @@ function planWeek(A,opt={}){
   const preMid=[];
   for(const [pid,bp] of Object.entries(pre)){ if(bp.games.length!==1) continue; const q=best.pick.get(pid); if(!q) continue;
     const g1=bp.games[0], t1=tipAt(bp.pid,g1.date); if(!t1) continue; let p0=null;
-    for(const o of C){ if(best.pick.has(o.pid)||o.pid===bp.pid||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+    for(const o of C){ if(best.pick.has(o.pid)||o.pid===bp.pid||o.x.a.live||!fitsVia(o.pos,q.slot,pid,g1.date)) continue;
       const og=o.x.a.future.find(h=>h.date===g1.date && h.mu>0); if(!og) continue; const ot=tipAt(o.pid,og.date); if(!ot || ot>t1-LOOK_GAP) continue;
       if(!p0 || og.mu>p0.g.mu) p0={pid:o.pid, g:og} }
     if(!p0) continue;
@@ -2462,7 +2462,7 @@ function planWeek(A,opt={}){
     const c=C.find(c=>c.pid===pid), gs=holdGames(c); if(!gs.length || gs[0].live) continue; const first=gs[0].date, ft=tipAt(pid,first); if(!ft) continue;
     const pr=pre[pid]; if(pr && (pr.then || !pr.same || pr.games[pr.games.length-1].date!==first)) continue;
     const pe= pr? (tipAt(pr.pid,first)||0)+GAME_MS : 0; let br=null;
-    for(const o of C){ if(best.pick.has(o.pid)||(pr && o.pid===pr.pid)||o.x.a.live||!elig(o.pos,SL[q.slot])) continue;
+    for(const o of C){ if(best.pick.has(o.pid)||(pr && o.pid===pr.pid)||o.x.a.live||!fitsVia(o.pos,q.slot,pid,first)) continue;
       const og=o.x.a.future.find(h=>h.date===first && h.mu>0); if(!og) continue; const ot=tipAt(o.pid,first);
       if(!ot || ot>ft-LOOK_GAP || ot+GAME_MS<=ft || ot<pe) continue;
       if(!br || og.mu>br.g.mu) br={pid:o.pid, g:og, date:first} }
@@ -2521,7 +2521,7 @@ function planWeek(A,opt={}){
       // the most (the same idea as the full plan's gain, without simulating every option). Before 11-10 the slot was whichever
       // the assignment happened to pick, so a ~21 could sit behind a ~30 star while a ~15 slot went without.
       if(opt.light){ const usedL=new Set(), val=s=>best.pick.get(s.hp)?.v??0;
-        for(const c of [...C2].sort((a,b)=>b.ch[0].v-a.ch[0].v)){ const s=open.filter(z=>!usedL.has(z.hp) && elig(c.pos,SL[z.slot]) && (!z.th || (tipAt(c.pid,d)||Infinity)<z.th-LOOK_GAP)).sort((a,b)=>val(a)-val(b))[0]; if(!s) continue;
+        for(const c of [...C2].sort((a,b)=>b.ch[0].v-a.ch[0].v)){ const s=open.filter(z=>!usedL.has(z.hp) && fitsVia(c.pos,z.slot,z.hp,d) && (!z.th || (tipAt(c.pid,d)||Infinity)<z.th-LOOK_GAP)).sort((a,b)=>val(a)-val(b))[0]; if(!s) continue;
           usedL.add(s.hp); (idle[s.hp] ||= []).push({pid:c.pid, g:c.o.x.a.future.find(g=>g.date===d), date:d}) } continue }
       // The plan shown: looks are played whenever a slot sits idle (they're free; user, 11-09: "we play the free looks anyway"). A
       // look that pops can still be moved before it's locked (unlocked starters shuffle freely; the lock step puts him in the
@@ -2536,7 +2536,7 @@ function planWeek(A,opt={}){
         // the look would cost that score (user, 11-10: "keep the probable locks in the lineup instead of switching them in and
         // out"; bench players go to other slots or later days). Judged as: holding the score beats playing the look by 0.25+.
         // A held score that isn't worth keeping costs nothing to give up, so there the look is still free.
-        for(const s of open) if(elig(c.pos,SL[s.slot]) && (!s.th || (tipAt(c.pid,d)||Infinity)<s.th-LOOK_GAP)){ const hc=C.find(z=>z.pid===s.hp), x0=heldScore(hc.x), nx=holdGames(hc)[0], lk=mkStep(c.pid,g,0), st=chain(s.hp,lk);
+        for(const s of open) if(fitsVia(c.pos,s.slot,s.hp,d) && (!s.th || (tipAt(c.pid,d)||Infinity)<s.th-LOOK_GAP)){ const hc=C.find(z=>z.pid===s.hp), x0=heldScore(hc.x), nx=holdGames(hc)[0], lk=mkStep(c.pid,g,0), st=chain(s.hp,lk);
           if(x0>0 && nx && d<nx.date){ const V=stepsValue(st), i=st.findIndex(t=>t.key===lk.key); if(i>=0 && gAt(V.G[i+1],x0)-uAtF(V.U[i],1)>0.25) continue }
           opts.push({s, gain: worth(st,s.hp)-v0[s.hp]}) }
         return {c, g, opts, best: Math.max(0,...opts.map(o=>o.gain))} }).filter(x=>x.opts.length).sort((a,b)=>b.best-a.best);
@@ -2566,7 +2566,7 @@ function planWeek(A,opt={}){
         const g=gs.find(g=>g.date===d), lk=(idle[hp]||[]).find(m=>m.date===d), lt= lk? tipAt(lk.pid,d) : null;
         const end= g? gameEnd(hp,g) : lt? lt+GAME_MS : null, after= g? hp : lk? lk.pid : null; if(!end || !after) continue;
         const v0=worth(chain(hp),hp);
-        for(const o of C){ if(best.pick.has(o.pid)||o.x.a.live||usedP.has(o.pid)||took.has(o.pid)||!elig(o.pos,SL[q.slot])) continue;
+        for(const o of C){ if(best.pick.has(o.pid)||o.x.a.live||usedP.has(o.pid)||took.has(o.pid)||!fitsVia(o.pos,q.slot,hp,d)) continue;
           const og=o.x.a.future.find(h=>h.date===d && h.mu>0), tp= og? tipAt(o.pid,d) : null; if(!tp || tp<end) continue;
           if(Object.values(mid).some(L=>L.some(m=>m.pid===o.pid && m.date===d))) continue;
           const gain=worth(chain(hp,mkStep(o.pid,og,0)),hp)-v0; if(gain>1e-4) pairs.push({hp, o, og, tp, after, gain}) } }   // any gain: free looks get played (user)
@@ -3119,7 +3119,12 @@ function todoItems(A,P){
         if(ld && !started){ SWQ.push({t:E.tip, inc:E.pid, out:ld.pid, slotPid:hp, date:N.day, date2:N.day, slot:+slot}); continue }
         // he comes in at someone's 7:00 decision (Clingan after Stewart): that item says it
         const viaDecision= E.bridge && Object.entries(N.early||{}).some(([s2,E2])=>+s2===+slot && E2.then===E.pid && E2.ov);
-        if(!started && !already && !viaDecision && !(X(E.pid)?.starter && !alias[E.pid])) out.push({t:E.tip, pid:E.pid, kind:"look", title:(alias[E.pid]? "Start "+nm(alias[E.pid]) : "Start "+nm(E.pid))+" at "+P.SL[slot], note:"",
+        // in the lineup by then as the day plan has it, not as it is right now (user, 11-19: Powell, benched Thursday for Rollins, had no
+        // "start him" on Friday); one who can't play the slot gets there by a slide (Mitchell to PG, Powell at SG)
+        const inThen=[...prev.values()].includes(E.pid), ePos=X(E.pid)?.a.info.pos||[];
+        let eTitle=(alias[E.pid]? "Start "+nm(alias[E.pid]) : "Start "+nm(E.pid))+" at "+P.SL[slot];
+        if(!alias[E.pid] && !elig(ePos,P.SL[slot])){ try{ const path=slidePath(A,P,E.pid,+slot,new Set()); if(path&&path.length){ let into=+slot; const bits=[]; for(const r2 of path){ bits.push("move "+last(r2.pid)+" to "+P.SL[into]); into=r2.idx } eTitle=bits.join(", ").replace(/^m/,"M")+", start "+nm(E.pid)+" at "+P.SL[into] } }catch(e){} }
+        if(!started && !already && !viaDecision && !(inThen && !alias[E.pid])) out.push({t:E.tip, pid:E.pid, kind:"look", title:eTitle, note:"",
           sub:"Free look"+later+".", rems:[{id:"look-"+E.pid, t:E.tip, lead:15, title:"Move "+nm(E.pid)+" into "+P.SL[slot]+" (free look)"}]});
         continue }
       // his lock line, the same one his row shows once the game is in (a forward's look in UTIL gets locked at SF/PF/F, so the slot's
