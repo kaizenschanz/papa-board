@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-whWW5N6iiVvPIAMae74TyPpdKDYTb9cDmtzz4VlGIWI='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-oIbLj7rwEmX60rJmoGAkB9BJ6asooPCfdC4x7DXg0Uc='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3227,7 +3227,11 @@ function todoItems(A,P){
 // The lock report for one of your pending calls, worked out when its Details link is clicked (user, 11-18: "a button they can click on
 // for in depth analysis... it calculates there instead of calculating before they click"): the same numbers as the lock-report skill.
 async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!M||!body) return;
-  const v=W.vs, A=v?.rows, x=A&&A.find(r=>r.pid===pid); M.hidden=false;
+  M.hidden=false;
+  // mid-refresh the plan is briefly missing: wait for it (up to a minute) instead of saying the call isn't there (seen 11-18)
+  if(!(W.vs?.plan && W.vs.rows?.some(r=>r.pid===pid))){ $("lrTitle").textContent="Lock report"; body.innerHTML='<div class="lrload"><span class="spin"></span>Waiting for the board to finish updating…</div>';
+    for(let k=0;k<120 && !(W.vs?.plan && W.vs.rows?.some(r=>r.pid===pid)); k++) await new Promise(r2=>setTimeout(r2,500)) }
+  const v=W.vs, A=v?.rows, x=A&&A.find(r=>r.pid===pid);
   if(!x||!v.plan){ $("lrTitle").textContent="Lock report"; body.innerHTML='<p class="empty">This call isn\'t on the board right now.</p>'; return }
   const a=x.a, nmP=a.info.name; $("lrTitle").textContent=nmP;
   if(!a.latest||a.latest.dnp||a.lockedOn){ body.innerHTML='<p class="empty">'+esc(nmP)+(a.lockedOn? ' is locked already.' : ' has no score to lock right now.')+'</p>'; return }
@@ -3235,8 +3239,8 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   const P=v.plan, SL=P.SL, d=a.latest.date, fp=a.latest.fp, nm=q=>(A.find(z=>z.pid===q)||{a:{info:{name:q}}}).a.info.name;
   let line=null, o=null; try{ line=lineFor(A,P,x,d); o=v._lfo?.get(x.pid+"|"+d+"|"+x.idx+"|1") }catch(e){}
   let lineNoMed=null, opp=null, season=[], hist=[], phase=0;
-  const hold={...(v.planBase||{force:v.force}), force:{...((v.planBase||{}).force||{}), [x.pid]:"hold"}}; let st=[], V=null, res=[];
-  try{ const PW=planWeek(A,hold); st=slotSteps(A,PW,x.pid); V=stepsValue(st); const N=v.me.tot.length; for(let s2=0;s2<N;s2++) res.push(playSteps(st,V,s2,0,0)); res.sort((p2,q2)=>p2-q2) }catch(e){}
+  const hold={...(v.planBase||{force:v.force}), force:{...((v.planBase||{}).force||{}), [x.pid]:"hold"}}; let st=[], V=null, res=[], PWh=null;
+  try{ const PW=PWh=planWeek(A,hold); st=slotSteps(A,PW,x.pid); V=stepsValue(st); const N=v.me.tot.length; for(let s2=0;s2<N;s2++) res.push(playSteps(st,V,s2,0,0)); res.sort((p2,q2)=>p2-q2) }catch(e){}
   await tick();
   const N=res.length||1, qq=p2=>res.length? res[Math.min(N-1,Math.floor(p2*(N-1)))] : 0, XM=Math.max(50, Math.ceil((res.length? res[Math.min(res.length-1,Math.floor(0.99*(res.length-1)))] : 50)/10)*10), NB=XM/2, bins=new Array(NB).fill(0); for(const y of res) bins[Math.max(0,Math.min(NB-1,Math.floor(y/2)))]++;   // the axis runs to his 99th percentile, the last bar holds the rest (user, 11-18: Luka's chart piled every 48+ week into one 26% bar at 50)
   const wmean= res.length? res.reduce((t2,y)=>t2+y,0)/N : null, beat=res.filter(y=>y>fp).length/N, u15=res.filter(y=>y<15).length/N;
@@ -3302,11 +3306,18 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   add("Your week", pc1(v.win)+" to win, "+pc1(v.med||0)+" to beat the median"+(v.title!=null? ", "+(v.title*100).toFixed(1)+"% title" : "")+". "+(v.win>0.6? "As the favorite, a sure score is worth more than a gamble with the same average." : v.win<0.4? "As the underdog, upside counts for more than a sure score." : ""));
   // each game once, first look first (a mid-game switch lists the earlier game twice: before the later tip and as the fallback after it;
   // user, 11-18: "cam Spencer is on Norman Powell details twice")
+  // how a player who can't play this slot still fills it: one or two unlocked starters slide over (user, 11-18: "how tf is Paolo in Luka's
+  // chain... explain the slide"): the same check the planner makes (fitsVia), written out
+  const slideTxt=row=>{ const sn=x.idx, pos=row.a.info.pos||[], who=row.a.info.name.split(" ").pop(), ir= row.slot==="IR"? " (off IR)" : "";
+    const occ=PWh? [...PWh.pick].filter(([h2,q2])=>q2.k==="hold" && q2.slot!==sn && h2!==row.pid).map(([h2,q2])=>({n:nm(h2).split(" ").pop(), s:q2.slot, pos:(A.find(z=>z.pid===h2)?.a.info.pos)||[]})) : [];
+    for(const o1 of occ) if(elig(o1.pos,SL[sn]) && elig(pos,SL[o1.s])) return o1.n+" slides "+SL[o1.s]+" → "+SL[sn]+", "+who+ir+" takes "+SL[o1.s];
+    for(const o1 of occ) if(elig(o1.pos,SL[sn])) for(const o2 of occ) if(o2!==o1 && elig(o2.pos,SL[o1.s]) && elig(pos,SL[o2.s])) return o1.n+" "+SL[o1.s]+" → "+SL[sn]+", "+o2.n+" "+SL[o2.s]+" → "+SL[o1.s]+", "+who+ir+" takes "+SL[o2.s];
+    return "via a lineup shuffle (he can't play "+SL[sn]+")" };
   const seenG=new Set();
   const chain=st.map((t2,k)=>[t2,k]).filter(([t2])=>{ const kk=t2.pid+"|"+t2.date; if(seenG.has(kk)) return false; seenG.add(kk); return true }).map(([t2,k])=>{ let pm=t2.pm||0; const row=A.find(z=>z.pid===t2.pid), g=row&&row.a.future.find(f3=>f3.date===t2.date); try{ if(g) pm=dnpP(g,row.a.future.indexOf(g),t2.pid) }catch(e){}
     const tp=tipAt(t2.pid,t2.date), tm=playerInfo(t2.pid).team, G=W.games.find(y=>y.date===t2.date && (y.home?.team===tm || y.away?.team===tm)), home=G&&G.home?.team===tm, ov= G? (home? 'vs '+(G.away?.team||'') : '@ '+(G.home?.team||'')) : '';
     // who plays, when, and against whom (user, 11-18: "put their name when it's them playing... put who they're playing too")
-    return '<div class="lrg"><div class="d">'+esc(nm(t2.pid))+'</div><div class="s" style="margin-top:2px">'+dayLabel(t2.date)+(tp? ' '+clock(tp) : '')+(ov? ' '+esc(ov) : '')+'</div>'+(row && !elig(row.a.info.pos||[],SL[x.idx])? '<div class="s">via a lineup shuffle (he can\'t play '+esc(SL[x.idx])+'; others slide over)</div>' : '')+'<div class="m">'+f1(t2.mu)+'</div><div class="s">projected · '+Math.round(pm*100)+'% chance he sits</div><div class="k">'+(k<st.length-1&&V? "Keep it if it's "+f1(V[k+1])+"+" : "Last chance: the slot keeps it")+'</div></div>' }).join("");
+    return '<div class="lrg"><div class="d">'+esc(nm(t2.pid))+'</div><div class="s" style="margin-top:2px">'+dayLabel(t2.date)+(tp? ' '+clock(tp) : '')+(ov? ' '+esc(ov) : '')+'</div>'+(row && !elig(row.a.info.pos||[],SL[x.idx])? '<div class="s">'+esc(slideTxt(row))+'</div>' : '')+'<div class="m">'+f1(t2.mu)+'</div><div class="s">projected · '+Math.round(pm*100)+'% chance he sits</div><div class="k">'+(k<st.length-1&&V? "Keep it if it's "+f1(V[k+1])+"+" : "Last chance: the slot keeps it")+'</div></div>' }).join("");
   // the other players who could fill this slot and where the plan uses their games instead (user, 11-18: "not Powell other games,
   // Spencer's": Spencer's Thursday and Saturday are planned for his own SG slot, so they aren't in Powell's F chain)
   let elsewhere=""; try{ const PW=planWeek(A,hold), inCh=new Set(st.map(t2=>t2.pid)), where=new Map();
