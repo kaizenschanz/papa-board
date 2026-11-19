@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-FeL4zoTE5gf4Uj6aA9oiDBSk2qAGFQLLbciZKGidi8E='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ozMo9I+sOy1k52JV+SacNggtGRpSwu96tnOi+qsjIpA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3216,7 +3216,8 @@ function todoItems(A,P){
       // the benched player's score so far is gone, a slide puts the newcomer where he can play (Clingan in UTIL, Stewart to F), and
       // everything after is planned again (Mitchell at 7:30 now has to bump Clingan). Scoring one slot alone let Clingan count at F
       // with Mitchell still free for UTIL.
-      const ck="sw|"+(W.updated||0)+"|"+inc+"|"+t+"|"+[v?.wt?.perWin, v?.median? 1 : 0, v?._oppOwn? 1 : 0, v?.opp?.m, v?.me?.m, v?.title].map(z=>z==null? "" : (+z).toFixed(6)).join(",");   // the state it was worked out on (11-18: a first-draw +4.00% stayed up; worked out fresh it was +0.01%) W._swOdds ||= new Map(); let O=W._swOdds.get(ck);
+      const ck="sw|"+(W.updated||0)+"|"+inc+"|"+t+"|"+[v?.wt?.perWin, v?.median? 1 : 0, v?._oppOwn? 1 : 0, v?.opp?.m, v?.me?.m, v?.title].map(z=>z==null? "" : (+z).toFixed(6)).join(",");   // the state it was worked out on (11-18: a first-draw +4.00% stayed up; worked out fresh it was +0.01%)
+      W._swOdds ||= new Map(); let O=W._swOdds.get(ck);
       if(!O){ O={}; try{ O.keep=teamOddsOf(keepRows(A,inc,L[0].date2),DUE_N);   // a decision being made now: 10,000 weeks
         for(const c of L){ const R=benchRows(A,P,c.out,inc); O[c.out]= R? teamOddsOf(R,DUE_N) : null } }catch(e){ O=null }
         if(O){ if(W._swOdds.size>20) W._swOdds.clear(); W._swOdds.set(ck,O) } }
