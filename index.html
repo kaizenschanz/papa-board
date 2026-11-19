@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jq6h4rAxhr9DYBRlZibB3qkCAiYygbE22qv6fMnYJt0='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/IHRpS7/cHR4Y+D/axMII9E53cePFiN5D00H4ZoCed8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1096,6 +1096,7 @@ async function loadWeek(force){
     try{ const lu=await fetch("lineups.json?t="+Date.now(),{cache:"no-store"}); if(lu.ok){ const d=await lu.json(); for(const k in d) LINEUPS[k]=d[k] } }catch(e){}
     if(!W.projH){ try{ const ph=await fetch("proj_hist.json?t="+Date.now(),{cache:"no-store"}); if(ph.ok) W.projH=await ph.json() }catch(e){} }
     if(!W.medlog){ try{ const ml=await fetch("medlog.json?t="+Date.now(),{cache:"no-store"}); if(ml.ok) W.medlog=await ml.json() }catch(e){} }
+    if(!W.leagueHist){ try{ const lh=await fetch("league_hist.json?t="+Date.now(),{cache:"no-store"}); if(lh.ok) W.leagueHist=await lh.json() }catch(e){} }
     if(!GRADES.site){ try{ const gr=await fetch("grades.json?t="+Date.now(),{cache:"no-store"}); if(gr.ok){ const d=await gr.json(); if(d && d.v===GRADE_V && String(d.league)===String(lid)){ GRADES.site=d.g||{}; if(GRADES.m) GRADES.m={...GRADES.m, ...GRADES.site} } } }catch(e){} }
     await loadLegs(lid,week);
     await loadClocks();
@@ -1668,7 +1669,7 @@ const DUE_N = 10000;
 // the opponent's week at N draws (the comparison needs as many draws on his side), worked out once per view
 function oppDN(N){ const v=W.vs; if(!v || N<=SIM_N || !v.oppRows || !v.oppPlan) return v?.opp; const k=N+"|"+(v._oppOwn? 1 : 0)+"|"+(W.updated||0);
   if(v._oppN?.k===k) return v._oppN.D; let D=v.opp; try{ const pc= POS_ON && v.posC? {ctx:ctxOf(v.me), med:v.posC.medOpp, wt:v.posC.allIn? null : v.wtOpp, pkm:v.pkOpp?.m||0} : null;
-    D=withPickups(teamDist(v.oppRows,v.oppPlan,N,0,false,pc),v.pkOpp) }catch(e){} v._oppN={k,D}; return D }
+    D=withPickups(teamDist(v.oppRows,v.oppPlan,N,0,false,pc),v.pkOpp); if(v.oppShift && D.tot) D={...D, m:D.m+v.oppShift, tot:Float64Array.from(D.tot,y=>y+v.oppShift)} }catch(e){} v._oppN={k,D}; return D }
 const CALIB = {"str":{"blend":0.33,"shrink":0.62,"wk_sd":23.14,"lvl_sd":8.5,"fit":{"blend":0.35,"shrink":0.7,"wk_sd":19.89,"lvl_sd":7.5},"n":36,"weeks":[1,2,3,4],"rmse":15.66,"rmse_default":15.88},"pos":{"on":false,"team_weeks":48,"h2h":[0.6024,0.6053],"median":[0.5257,0.5292]},"replay":{"team_weeks":48,"team_days":312,"weeks":[1,2,3,4],"f":1.0324,"raw_f":1.0403,"open_bias":-0.0155,"openK":0.9923,"at":1794927781},"openK":0.9923,"med":{"n":2,"weeks":[4],"bias":1.3,"sd0":12.64,"raw_bias":5.2},"f":1.0324,"n":22,"prior_n":12,"weeks":[3,4],"raw_f":1.1625,"brier":0.1519,"games":23,"bins":[{"from":0.5,"n":2,"said":0.512,"won":1.0},{"from":0.6,"n":2,"said":0.674,"won":0.5},{"from":0.7,"n":5,"said":0.737,"won":0.8},{"from":0.8,"n":5,"said":0.832,"won":0.6},{"from":0.9,"n":9,"said":0.953,"won":1.0}],"asof":"2026-11-18","wait":{"single":{"bias":0.0,"n":0,"raw":null,"z_sd":null},"multi":{"bias":0.152,"n":3,"raw":0.657,"z_sd":0.312}},"calls":[{"call":"lock","promised":0.46,"got":0.0},{"call":"lock","promised":-0.1,"got":0.0},{"call":"lock","promised":-3.9,"got":0.0},{"call":"lock","promised":-5.89,"got":0.0},{"call":"lock","promised":-0.05,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.01,"got":0.0},{"call":"lock","promised":0.0,"got":0.0},{"call":"lock","promised":0.0,"got":0.9},{"call":"lock","promised":0.03,"got":0.0},{"call":"lock","promised":0.0,"got":0.0}]};
 function calF(){ const f=CALIB&&CALIB.f; return f>0.5&&f<2? f : 1 }
 // Learned correction to what an open slot is worth, from grading the board's own slot predictions against how weeks ended
@@ -3626,10 +3627,13 @@ function replanLine(A,P,x,date,claims){
   // step; days out it's 3,000 until then (user, 11-17: "sure", to save ~6 s a redraw; those lines wobble ~0.1 until they're due)
   const nt= known && a.future.length? (tipAt(x.pid,a.future[0].date)||Date.parse(a.future[0].date+"T19:00:00")) : 0, soon= !nt || nt-(W.updated||Date.now())<6*3600e3;
   const NN= REPLAN_X?.N || LINE_N || ((known && soon) || (a.live && a.live.date===date)? DUE_N : SIM_N), OPP=oppDN(NN);
-  const QW=planWeek(AW,base), pkW=pkOf(AW), DW0=withPickups(teamDist(AW,QW,NN),pkW);
+  // a replay can set your week's level to your projected total as logged then (REPLAN_X.meShift), both sides alike: the comparison is still
+  // the rebuilt lineup's, only its level matches what was known (11-19: the rebuild ran 4.7 under the board's 245.6 at Buzelis' 4:18 lock)
+  const msh=REPLAN_X?.meShift||0, shD=Dd=> msh && Dd && Dd.tot? {...Dd, m:Dd.m+msh, tot:Float64Array.from(Dd.tot,y=>y+msh)} : Dd;
+  const QW=planWeek(AW,base), pkW=pkOf(AW), DW0=shD(withPickups(teamDist(AW,QW,NN),pkW));
   // playing to win (POS_ON): both sides priced with the calls made on the score so far; the lock side's other slots play as if his
   // locked score were the plain line (the break-even score, which is what the line asks about)
-  const PC= POS_ON && v.posC? {ctx:ctxOf(OPP), med:v.posC.med, wt:v.wt, pkm:pkW?.m||0} : null, DW= PC? withPickups(teamDist(AW,QW,NN,0,false,PC),pkW) : DW0;
+  const PC= POS_ON && v.posC? {ctx:ctxOf(OPP), med:v.posC.med, wt:v.wt, pkm:pkW?.m||0} : null, DW= PC? shD(withPickups(teamDist(AW,QW,NN,0,false,PC),pkW)) : DW0;
   // every open slot he fits, the same ones the lock step picks from (lockSlotFor): a forward sitting in UTIL gets locked at
   // SF/PF/F, which keeps the UTILs for the centers, so that's the lock his line has to price (Walker in UTIL was priced as a
   // UTIL lock, 22.4, 11-11). The cheapest slot counts.
@@ -3642,8 +3646,8 @@ function replanLine(A,P,x,date,claims){
     // was credited ~30 points of waiver adds against 1.2 for waiting; the lines only came right once the game was over)
     // one pickup estimate per line, the no-lock side's, for every slot tried (11-16: per-slot estimates were ~11 s of a 36 s redraw,
     // and the lock side's could come out ~30 points too high: Tre Jones "lock at 0.00+")
-    const DL0=withPickups(teamDist(AL,QL,NN), pkW), l0=lockBarD(DL0, fp, DW0, OPP, OPP, v.tab, v.median, v.wt);
-    const DLi= PC? withPickups(teamDist(AL,QL,NN,0,false,{...PC, ovr:{pid:x.pid, v:l0}}), pkW) : DL0, l= PC? lockBarD(DLi, fp, DW, OPP, OPP, v.tab, v.median, v.wt) : l0;
+    const DL0=shD(withPickups(teamDist(AL,QL,NN), pkW)), l0=lockBarD(DL0, fp, DW0, OPP, OPP, v.tab, v.median, v.wt);
+    const DLi= PC? shD(withPickups(teamDist(AL,QL,NN,0,false,{...PC, ovr:{pid:x.pid, v:l0}}), pkW)) : DL0, l= PC? lockBarD(DLi, fp, DW, OPP, OPP, v.tab, v.median, v.wt) : l0;
     if(best==null || l<best){ best=l; at=i; DLb=DLi }
     if(typeof LOGX!=="undefined" && (W._dbgLine===x.pid)) (W._dbgOut ||= []).push({slot:SLn[i], l, mL:DLi.m, mW:DW.m, fp, wL:titleObjD(DLi,OPP,v.tab,v.median,v.wt), wW:titleObjD(DW,OPP,v.tab,v.median,v.wt), pickL:[...QL.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), pickW:[...QW.pick].map(([p,q])=>[p,q.slot,q.k,+q.v.toFixed(1)]), partsL:[...DLi.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), partsW:[...DW.parts].map(([p,q])=>[p,+q.m.toFixed(1)]), pkL:DLi.pk, pkW:DW.pk, baseL:DLi.base, baseW:DW.base}) }
   // the odds each way for a score that's in, from the same two plans as the line (lockOdds shows them, so the two can't disagree)
@@ -4560,7 +4564,7 @@ async function loadLeague(force){
 // when locking, how good the locked game was against his average that week, and how many games he gave up.
 // Bump when the grading itself changes, so stored grades are redone once.
 const LIVE_GRADE=true;   // the live-line grader (v19): on once its full regrade is published with it
-const GRADE_V= LIVE_GRADE? 22 : 18;   // 22: a lock is judged at the moment it was made where the Mac recorded it (else at the next tip), on the current planner (live players hold a slot for tonight only, slides only through starters not locked by then); user-asked regrade 11-18   // 21: same grading as 20; flushes the cached copies of a regrade that re-priced settled lines (11-18)   // 20: benched calls get a confidence too   // 19: each call priced by the live board's own lock line (replanLine), 3,000 weeks   // 18: confidence weighted by how much each simulated week changed   // 17: pc, the confidence of the board's side   // 15: rg, both sides of each call replayed on real scores, whole lineup   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
+const GRADE_V= LIVE_GRADE? 23 : 18;   // 23: the full live board at each lock moment (its pricing: waiver move, opponent's best response, playing to win, 10,000 weeks on close calls), from what was known then (scores finished, locks made before, projections as of then, IR as IR), with every team's level at its logged projected total (league_hist.json, from 11-07); user-asked 11-19 (Buzelis replays 20.82 vs the 20.76 shown)   // 22: a lock is judged at the moment it was made where the Mac recorded it (else at the next tip), on the current planner (live players hold a slot for tonight only, slides only through starters not locked by then); user-asked regrade 11-18   // 21: same grading as 20; flushes the cached copies of a regrade that re-priced settled lines (11-18)   // 20: benched calls get a confidence too   // 19: each call priced by the live board's own lock line (replanLine), 3,000 weeks   // 18: confidence weighted by how much each simulated week changed   // 17: pc, the confidence of the board's side   // 15: rg, both sides of each call replayed on real scores, whole lineup   // 14: each call keeps what not locking really ended with (wr); 13: replayed medians anchored at the morning, moving through the day; 12: weeks 1-3's median from the season replay; 11: the median as the live board had it (medlog.json); 10: calls on games before he joined the team aren't graded (11-17)
 // grade versions: 4: per-player sit chances; 5: unverified waits don't count (11-12); 6: passed up by benching (11-13)
 function mergePer(per, add){ for(const [rid,a] of Object.entries(add)){ const P=(per[rid] ||= {slots:0, early:0, ratios:[], left:[], log:[], dec:0, right:0, waitMiss:0, lockMiss:0, lost:0});
     for(const [k,v] of Object.entries(a)){ if(Array.isArray(v)) P[k]=(P[k]||[]).concat(v); else if(typeof v==="number") P[k]=(P[k]||0)+v;
@@ -4804,6 +4808,10 @@ const LIVE_VS=new Map();
 // then), set up the way buildMatchup sets up the live board (each side's full plan and pickups, the opponent's best response, the league
 // median from every other team, playing to win), and the live lock-line path itself: replanLine, again on 10,000 weeks within a point of
 // the line, and with your best waiver move each way within two (this week only: the free-agent pool is today's).
+// each team's logged projected total at moment D in week w (the last point at or before D, within 45 minutes), or null
+function ctxAt(w,D){ const H=W.leagueHist?.[String(w)]; if(!H||!D) return null; const out={}; let n=0;
+  for(const [rid,L] of Object.entries(H)){ let best=null; for(const [ms,v] of L){ if(ms<=D) best=[ms,v]; else break } if(best && D-best[0]<=45*60e3){ out[rid]=best[1]; n++ } }
+  return n? out : null }
 function liveLineFor(r,T1,opp1,others1,me,sl,g,i,s,D,futP,wt,median,ds){ if(!LIVE_GRADE) return null;
   const key=r.rid+"|"+D+"|"+(T1.A.length); let fv=LIVE_VS.get(key);
   if(!fv){ const cur=!!r.current, pkOf=rid=>{ if(!cur) return null; try{ return pickupFor(rid) }catch(e){ return null } }, pkO=pkOf(opp1.r.rid), pkM=pkOf(r.rid);
@@ -4813,20 +4821,27 @@ function liveLineFor(r,T1,opp1,others1,me,sl,g,i,s,D,futP,wt,median,ds){ if(!LIV
     const othFor=Dd=>oth.filter(o=>o.rid!==opp1.r.rid).concat([{rid:r.rid, m:Dd.m, s:Math.sqrt((Dd.v||400)+36), tot:Dd.tot||null}]);
     let O0=null; try{ O0=oppBest(opp1.A,myD,{oth:othFor(myD), median, wt:wtOpp, pk:pkO}) }catch(e){}
     const Qf=planWeek(opp1.A,{force:O0?.force||{}}), oD0=withPickups(teamDist(opp1.A,Qf,SIM_N,O0?.risk||0),pkO);
+    // every other team's week at its projected total as it stood at that moment (the Mac's log, league_hist.json, from 11-07): what
+    // anyone could see then, and rebuilt teams came out 4-20 points off (user, 11-19: Buzelis' replay read 21.55 against the 20.76 the
+    // board showed when he locked; with the logged totals it reads ~20.8). Shapes stay the replay's; only the level moves.
+    const C=ctxAt(self.__gw?.w, D), sh=(tot,want)=>{ if(want==null||!tot) return tot; const m=tot.reduce((a,b)=>a+b,0)/tot.length; return Float64Array.from(tot,y=>y+want-m) };
+    if(C) for(const o of oth){ o.tot=sh(o.tot,C[o.rid]) }
     const tab= median? pTopTable(oth) : null, tabOpp= median? pTopTable(othFor(myD)) : null, wt0=wt||{perWin:1,perPt:0};
     const posC={med: median? medNormal(tab) : null, medOpp: median? medNormal(tabOpp) : null, allIn:false};
     let meD=myD, oD=oD0;
+    let oppShift=0; if(C && C[opp1.r.rid]!=null && oD0.tot){ oppShift=C[opp1.r.rid]-oD0.tot.reduce((a,b)=>a+b,0)/oD0.tot.length; oD0.tot=Float64Array.from(oD0.tot,y=>y+oppShift); oD0.m+=oppShift; oD=oD0 }
     if(POS_ON){ try{ meD=withPickups(teamDist(T1.A,Pm,SIM_N,0,false,{ctx:ctxOf(oD0), med:posC.med, wt:wt0, pkm:pkM?.m||0}),pkM);
-      oD=withPickups(teamDist(opp1.A,Qf,SIM_N,O0?.risk||0,false,{ctx:ctxOf(myD), med:posC.medOpp, wt:wtOpp, pkm:pkO?.m||0}),pkO) }catch(e){ meD=myD; oD=oD0 } }
-    fv={me:meD, opp:oD, oppRows:opp1.A, oppPlan:Qf, pkOpp:pkO, pkMe:pkM, tab, tabOpp, oth, median, wt:wt0, wtOpp, posC, planBase:{force:{}}, force:{}, rid:opp1.r.rid, rows:T1.A};
+      oD=withPickups(teamDist(opp1.A,Qf,SIM_N,O0?.risk||0,false,{ctx:ctxOf(myD), med:posC.medOpp, wt:wtOpp, pkm:pkO?.m||0}),pkO); if(oppShift && oD.tot){ oD={...oD, m:oD.m+oppShift, tot:Float64Array.from(oD.tot,y=>y+oppShift)} } }catch(e){ meD=myD; oD=oD0 } }
+    fv={me:meD, opp:oD, oppShift, oppRows:opp1.A, oppPlan:Qf, pkOpp:pkO, pkMe:pkM, tab, tabOpp, oth, median, wt:wt0, wtOpp, posC, planBase:{force:{}}, force:{}, rid:opp1.r.rid, rows:T1.A};
     LIVE_VS.set(key,fv); if(LIVE_VS.size>400) LIVE_VS.delete(LIVE_VS.keys().next().value) }
   const xr={...me, rid:r.rid, starter:true, idx:sl.si, slot:me.slot, a:{...me.a, live:null, lockedOn:null, latest:{id:g[i].id, date:g[i].date, fp:s, dnp:false, done:true, live:false},
     future:futP}};
   const A2=T1.A.map(z=> z.pid===me.pid? xr : z), sv=W.vs, su=W.updated, own= !!r.current && r.rid===myRoster()?.roster_id;
   W.vs=fv; W.updated=D;
-  try{ REPLAN_X={N:SIM_N, noPk:!r.current, keep:true}; let fx=replanLine(A2, planWeek(A2,{}), xr, g[i].date, true);
+  const Cm=ctxAt(self.__gw?.w, D), meShift= Cm && Cm[r.rid]!=null && fv.me?.tot? Cm[r.rid]-fv.me.tot.reduce((a,b)=>a+b,0)/fv.me.tot.length : 0;
+  try{ REPLAN_X={N:SIM_N, noPk:!r.current, keep:true, meShift}; let fx=replanLine(A2, planWeek(A2,{}), xr, g[i].date, true);
     // the live board's close-call pass (lineFor): within two of the line, again with the waiver move; within one, on 10,000 weeks
-    if(fx && fx.l!=null && Math.abs(s-fx.l)<2){ REPLAN_X={N: Math.abs(s-fx.l)<1? DUE_N : SIM_N, noPk:!r.current, keep:true, fa:own}; FA_ON= own && FA_BACKUP;
+    if(fx && fx.l!=null && Math.abs(s-fx.l)<2){ REPLAN_X={N: Math.abs(s-fx.l)<1? DUE_N : SIM_N, noPk:!r.current, keep:true, fa:own, meShift}; FA_ON= own && FA_BACKUP;
       try{ const f2=replanLine(A2, planWeek(A2,{}), xr, g[i].date, true); if(f2) fx=f2 }finally{ FA_ON=false } }
     if(fx) fx.tab=fv.tab;
     try{ const o0=titleObjD(fv.me,fv.opp,fv.tab,median,fv.wt); (self.__llLast ||= {})[r.rid+"|"+me.pid+"|"+g[i].date]={D, me:+fv.me.m.toFixed(2), opp:+fv.opp.m.toFixed(2), win:+o0.h.toFixed(3), med:+o0.md.toFixed(3), l:fx&&fx.l, pkMe:fv.pkMe?.m, pkOpp:fv.pkOpp?.m, oth:Object.fromEntries(fv.oth.map(o=>[o.rid,+(o.tot.reduce((a,b)=>a+b,0)/o.tot.length).toFixed(1)])), rows:Object.fromEntries(others1.concat([T1,opp1]).map(x=>[x.r.rid, x.A.filter(z=>z.starter||z.a.future.length).map(z=>[z.a.info.name.split(' ').pop(), z.starter?1:0, z.a.lockedOn? +z.a.lockedOn.fp.toFixed(1) : null, z.a.latest? +z.a.latest.fp.toFixed(1) : null, z.a.future.map(f=>f.date.slice(8)+':'+f.mu.toFixed(1)).join(' ')])]))} }catch(e){}
