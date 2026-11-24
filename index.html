@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qkziqMDQd4QbFBcpRAL2z1M7b+3ZaUQiNHbUj7RoWls='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qVyUOxtowmlUceunpbt4PSJkuXB5Z1plomrdpRRe12U='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3912,7 +3912,10 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       if(away) bits.push('→ '+SL[pq.slot]);
       // ...and the starter sliding in to take this slot (Hartenstein UTIL -> C to lock while Clingan goes to UTIL): his value is shown
       // here, the slot he's planned in, or it showed on no row (user, 11-24: "missing slot values", 22.08 off the visible total)
-      let slidIn=null; if(away && slide && hp0){ const q2=D.parts.get(hp0), o2=R.find(y=>y.pid===hp0); if(q2 && o2){ p=q2; slidIn=o2; bits.push(esc(o2.a.info.name)+' moves here') } }
+      // ...only when his own row doesn't already show it (11-24: Garland's 24.72 showed on PG and on his own G row, a slide between starters)
+      const ownShown=y=>{ if(!y.starter || y.a.lockedOn) return false; const h=holderAt(Q,y.idx), sl= h && h!==y.pid && R.find(z=>z.pid===h)?.starter && Q?.pick?.has(y.pid), hh= sl? y.pid : h;
+        if(hh && hh!==y.pid) return false; const q=Q?.pick?.get(y.pid), toS= q && R.some(z=>z.starter && z.idx===q.slot && z.pid!==y.pid && Q?.pick?.has(z.pid)); return !(q && q.slot!==y.idx && !toS) && !!D.parts.get(y.pid) };
+      let slidIn=null; if(away && slide && hp0){ const q2=D.parts.get(hp0), o2=R.find(y=>y.pid===hp0); if(q2 && o2){ bits.push(esc(o2.a.info.name)+' moves here'); if(!ownShown(o2)){ p=q2; slidIn=o2 } } }
       // the game's score next to its clock (user, 11-16: "no scores in the live view"): his team's first
       if(a.live){ const ck=W.clock?.[a.info.team]?.[a.live.date]; bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):'')+(ck?.sc? ' · '+ck.sc[0]+'-'+ck.sc[1] : '')) }
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
