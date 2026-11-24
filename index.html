@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-FhOuclU4RGvLk8zWFKdn+dJUDPJzN6zkEKzvzYHAJD8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VuMnWK+e9kOS4pjXo/ZrQei6ApzCSwxXVa5UEvXK1dk='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -159,6 +159,8 @@ button.g:hover{border-color:var(--ink)}
 .g.counted{border-color:var(--accent);background:var(--accent-soft)}
 .g.counted b{color:var(--accent)}
 .g.live{border-color:var(--good);background:var(--good-soft)}
+.g.gc{cursor:pointer}.g.gc:hover{border-color:var(--ink)}.g.gon{outline:2px solid var(--ink);outline-offset:1px}
+.pd .gst{margin-top:6px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-size:12.5px;line-height:1.45;color:var(--muted)}.pd .gst b{color:var(--ink)}
 .g.live b{color:var(--good)}
 .wk-detail{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 12px}
 .wk-detail b{color:var(--ink);font-weight:600}
@@ -3526,6 +3528,14 @@ function projLine(pid,g){
   const so= g.live? (W.stats[pid]?.[g.id]?.stats||{}) : {}, rem= g.live? Math.max(0,1-(g.lf||0)) : 1;
   const out=STAT_SHOW.map(([key,lab])=>{ const v=(+so[key]||0)+rem*k*(+base[key]||0); return v>=0.05? v.toFixed(1)+" "+lab : null }).filter(Boolean);   // one decimal on every stat (user, 11-12)
   return out.length? out.join(" · ") : null }
+// a game's box score, live or final (user, 11-23: "when you click on a player's game it shows their current or finished stats")
+function boxLine(pid,gid){ const r=W.stats[pid]?.[gid], s=r?.stats; if(!s || !Object.keys(s).length) return '<span class="muted">No stats yet for this game.</span>';
+  const G=W.games.find(y=>y.game_id===gid), d= r.date||G?.date, live= G && G.status!=="complete" && !(W.clock?.[r.team]?.[G.date]?.state==="post");
+  const n=k=>+s[k]||0, min= s.min!=null? n("min") : n("sp")/60, sh=(m,a)=>n(a)? n(m)+"-"+n(a) : null;
+  const bits=[[n("pts"),"pts"],[n("reb"),"reb"],[n("ast"),"ast"],[n("stl"),"stl"],[n("blk"),"blk"],[n("tpm"),"3pm"],[n("to"),"to"]].map(([v,l])=>'<b>'+v+'</b> '+l);
+  const shoot=[sh("fgm","fga")&&"FG "+sh("fgm","fga"), sh("tpm","tpa")&&"3P "+sh("tpm","tpa"), sh("ftm","fta")&&"FT "+sh("ftm","fta")].filter(Boolean);
+  const fp= scoreStats(s);
+  return '<div><b>'+(d? dayLabel(d) : '')+(live? ' · live' : ' · final')+'</b>'+(min>0? ' · '+(Math.floor(min))+':'+String(Math.round((min%1)*60)).padStart(2,"0")+' min' : '')+' · <b>'+fp.toFixed(2)+'</b> fantasy pts</div><div>'+bits.join(' · ')+'</div>'+(shoot.length? '<div>'+shoot.join(' · ')+(s.pf!=null? ' · '+n("pf")+' fouls' : '')+(s.plus_minus!=null? ' · '+(n("plus_minus")>0?'+':'')+n("plus_minus") : '')+'</div>' : '') }
 function playerDetail(x,mine,L){
   const a=x.a, pid=x.pid;
   // who he plays (user, 11-10: "put who they're facing for each game"): vs at home, @ away
@@ -3538,8 +3548,9 @@ function playerDetail(x,mine,L){
     return '<i>'+(home? 'vs ' : '@ ')+esc(o)+sc+'</i>' };
   const chips=a.games.map(g=>{
     const counted = a.lockedOn ? g.id===a.lockedOn.id : (x.starter && g===a.latest && !a.future.length);
-    if(g.done) return '<span class="g'+(counted?' counted':'')+'"><span>'+dayLabel(g.date)+'</span><b>'+(g.dnp?'DNP':g.fp.toFixed(2))+'</b>'+vs(g)+'</span>';
-    if(g.live) return '<span class="g live"><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(1)+'</b>'+vs(g)+'</span>';
+    const gk= (g.done && !g.dnp) || g.live? ' data-gst="'+esc(pid+"|"+g.id)+'" role="button" tabindex="0"' : '', on= W._gst===pid+"|"+g.id? ' gon' : '';
+    if(g.done) return '<span class="g'+(counted?' counted':'')+(gk?' gc':'')+on+'"'+gk+'><span>'+dayLabel(g.date)+'</span><b>'+(g.dnp?'DNP':g.fp.toFixed(2))+'</b>'+vs(g)+'</span>';
+    if(g.live) return '<span class="g live gc'+on+'"'+gk+'><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(1)+'</b>'+vs(g)+'</span>';
     return '<span class="g future'+(g.src==="dk"?' dk':'')+'"><span>'+dayLabel(g.date)+tipLabel(pid,g.date)+'</span><b>'+(g.mu>0?'~'+g.mu.toFixed(1):'out')+'</b>'+vs(g)+'</span>';
   }).join("") || '<span class="muted">No games this week</span>';
   const r4=recent(pid,4), st=[];
@@ -3558,7 +3569,8 @@ function playerDetail(x,mine,L){
   if(mine===false && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length && W.vs?.oppPlan)
     why= (W.vs.oppLines?.[pid]!=null? a.latest.fp>=W.vs.oppLines[pid] : W.vs.oppPlan.pick.get(pid)?.k==="lock")? "Their best play: lock it." : "Their best play: play on.";
   if(!why && L?.why?.[pid] && x.starter && !a.lockedOn && !a.live) why=L.why[pid];   // League tab: that team's own lock odds
-  return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div>'+
+  const gsel= W._gst && W._gst.startsWith(pid+"|")? boxLine(pid, W._gst.slice(pid.length+1)) : "";
+  return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div><div class="gst"'+(gsel?'':' hidden')+'>'+gsel+'</div>'+
     (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(sitL?'<div class="ln">'+sitL+'</div>':'')+ovL+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+(mine && a.oddsT && why===a.why? oddsTable(a.oddsT, a.whyPre, a.whyPost) : esc(why))+'</div>':'')+'</div>';
 }
 // One matchup as rows: each slot's player, his lock or live score, his next game, and the slot's projected value (from that
@@ -5626,6 +5638,12 @@ document.addEventListener("click",e=>{ const b=e.target.closest("[data-sitov]");
   for(const dd of dates){ if(v==="x") delete o[pid+"|"+dd]; else o[pid+"|"+dd]=+v }
   store.set(sitOvKey(),o); W._sitOvK=null; sitOvAll(); DNPM.clear(); W._swOdds=null; W._pk=null; if(typeof TL!=="undefined") for(const k of Object.keys(TL)) delete TL[k];
   renderWeekBusy(); if(W.view==="league") try{ renderLeague() }catch(_){} });
+// tap a played or live game: its box score under the games, tap again to close; stays open across refreshes
+const gstTap=b=>{ const k=b.dataset.gst, pd=b.closest(".pd"), box=pd?.querySelector(".gst"); if(!box) return; const [pid,gid]=[k.slice(0,k.indexOf("|")), k.slice(k.indexOf("|")+1)];
+  W._gst= W._gst===k? null : k; pd.querySelectorAll(".g.gon").forEach(c=>c.classList.remove("gon"));
+  if(W._gst){ b.classList.add("gon"); box.innerHTML=boxLine(pid,gid); box.hidden=false } else { box.hidden=true; box.innerHTML="" } };
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-gst]"); if(!b) return; e.preventDefault(); e.stopPropagation(); gstTap(b) }, true);
+document.addEventListener("keydown",e=>{ if(e.key!=="Enter" && e.key!==" ") return; const b=e.target.closest?.("[data-gst]"); if(!b) return; e.preventDefault(); gstTap(b) });
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-open]"); if(!b) return; const d=$(b.dataset.open); if(d){ d.open=true; d.scrollIntoView({behavior:"smooth",block:"start"}) } });
 $("setupEdit").addEventListener("click",()=>$("setup").classList.remove("compact"));
 const cleanTok=v=>fixTok(v);
