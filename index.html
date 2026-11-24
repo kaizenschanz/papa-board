@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-pjnQAOU56dyPd6JhWv7b3LSZ5YfesQE9cesD9LQhRbU='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tnlWwHvMeuDBB/Cx/C+Q3oZzas7ld7c/mGYfjrdbt5M='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2110,7 +2110,7 @@ function resolveDraw(slots,s,risk,sharedPid,pre){
   // pre: fastDraw just played every slot unblocked in this draw (playLite), which is exactly playPath's first play
   const blk=new Array(slots.length).fill(null), res= pre? slots.map(S=>{ const used=[]; for(let u=0;u<S.nuu;u++){ const t=S.st[S.ub[u]]; used.push({key:t.key, pid:t.pid, at:t.t||t.ord, gain:S.ug[u]}) } return {val:S.v, used, kept:S.kept} })
     : slots.map(S=>playPath(S.st,S.V,s,RK(S),null,sharedPid,S.x0||0));
-  for(let guard=0;guard<400;guard++){ let hit=null; if(guard===399) (self.__rdOut=(self.__rdOut||0)+1);
+  for(let guard=0;guard<400;guard++){ let hit=null;   // 400, was 16 (11-24): with many slots sharing bench games one pass settles one clash, and 16 ran out, leaving games counted in two slots (Not enough +8 to +30)
     for(let a=0;a<res.length;a++) for(const u of res[a].used) for(let b=a+1;b<res.length;b++) for(const w of res[b].used)
       if(u.key===w.key && (!hit || u.at<hit.at)) hit={at:u.at, key:u.key, lose: u.gain>=w.gain? b : a};
     for(let a=0;a<res.length;a++){ const k=res[a].kept; if(k<0) continue; const kt=slots[a].st[k]; if(!sharedPid.has(kt.pid)) continue; const kat=kt.t||kt.ord;
@@ -3994,7 +3994,6 @@ function buildMatchup(me, isMe, main, pre, pins, holds){
     if(POS_ON){ const myP=withPickups(teamDist(A,P,SIM_N,0,false,{ctx:ctxOf(oD0), med:posC.med, wt:wtMe, pkm:pkMe?.m||0}),pkMe);
       oD=withPickups(teamDist(B,Qf,SIM_N,O0.risk,false,{ctx:ctxOf(myD), med:posC.medOpp, wt:allIn? null : wtOpp, pkm:pkOpp?.m||0}),pkOpp); myD=myP }
     const O={...O0, Q:Qf, D:oD};
-    try{ self.__vsDbg={risk:O0.risk, m:+oD0.m.toFixed(2), byRisk:[0,4,8].map(r=>+withPickups(teamDist(B,Qf,SIM_N,r),pkOpp).m.toFixed(2)), quick:[0,4,8].map(r=>+withPickups(teamDist(B,O0.Q,SIM_N,r),pkOpp).m.toFixed(2)), me:+myD.m.toFixed(2)} }catch(e){ self.__vsDbg={err:String(e)} }   // 11-24 debug: the opponent's assumed play style and his total under each
     for(const [pid,c] of Object.entries(calls)) if(c.wpts!=null) P.thr[pid]=c.wpts;
     const fin=titleObjD(myD,oD,tabMe,median,wtMe), worst=titleObjD(myD,Ow.D,null,false);
     const gamble=B.filter(x=>O.dec.includes(x.pid) && O.Q.pick.get(x.pid)?.k!=="lock").map(x=>x.a.info.name);
@@ -5706,7 +5705,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
 if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={bestMove,landChance,takenChance,restOfSeason,pickupFor,oppBest,othersDist,pTopTable,replanLine,dnpP,liveTag,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD,ctxOf,medNormal,lockSlotFor,liveRest0,liveRest,drawScore,stepDraw,projF,psKept:()=>PS_KEPT,scoreStats,jx,shapeFor,liveTagX:(p,g)=>liveTag(p,g),computeLeagueX:()=>computeLeague(),baseMeanX:p=>baseMean(p),seasonAvailX:(p,i)=>seasonAvail(p,i),strengthX:r=>strength(r),missedLastX:p=>missedLast(p),b2bX:(p,d)=>b2bOf(p,d),sitFloorX:(g,p)=>typeof sitFloor==="function"? sitFloor(g,p) : null,teamOddsOf,benchRows,todoItems,keepRows,rowsForX:(r,m,me)=>rowsFor(r,m,me),playerInfoX:p=>playerInfo(p),tipAtX:(p,d)=>tipAt(p,d)} }
-if(ENV.onReady) ENV.onReady({status:()=>({vsDbg:self.__vsDbg||null, loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
+if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
   team:rid=>{ const R=S.rosters[rid]; if(!R) return {err:"no such team"}; const H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false); if(!H||!H.vs) return {err:"no matchup"};
