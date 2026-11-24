@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VuMnWK+e9kOS4pjXo/ZrQei6ApzCSwxXVa5UEvXK1dk='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1mEbfaYMlf90sYLMnpQ63giDIiCDPUFxSmMMTHqiEw8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2859,7 +2859,7 @@ function lockSlotFor(A,pid,fix){
     // his own lock-or-wait call aside (the first pass of the lock step can have him on "wait", which left no lock to place: no slot
     // came back for Clingan or Embiid and the line's cheapest slot sent Clingan to UTIL, 11-17)
     const fo={...(b0.force||{})}; delete fo[pid];
-    const Q=planWeek(A,{...b0,force:fo,pins:pn0,pinLock:{pid,slot:i,from:x.idx}, light:!due}); if(Q.pick.get(pid)?.slot!==i) continue;
+    const Q=planWeek(A,{...b0,force:fo,pins:pn0,pinLock:{pid,slot:i,from:x.idx}}); if(Q.pick.get(pid)?.slot!==i) continue;   // the full planner every time (user, 11-23: "just full planner check it every time")
     const o=titleObjD(withPickups(teamDist(A,Q),v.pkMe),v.opp,v.tab,v.median,v.wt).obj; opts.push({slot:i, name:SL[i], o, Q, occ}) }
   if(!opts.length) return v._ls[key]=null;
   // Lock order (user, 11-09): narrow first, but only where the narrow slot's pool sits inside the wider one's (PG or SG inside G,
@@ -2874,6 +2874,10 @@ function lockSlotFor(A,pid,fix){
   const nests=(a,b)=> a!==b && (SLOT_ACC[a]||[]).every(p=>(SLOT_ACC[b]||[]).includes(p)), bar= v.wt? 5e-5 : 1e-3;   // 0.005%: clears real edges, still ignores the refresh-to-refresh wobble (Dalton, 11-14)
   // a nested narrower slot always wins (user, 11-23: "for the 10,000th time I'm going to lock clingan in at C before i lock him at
   // utility with no center locked"): the wider slot left open takes everyone the narrow one would, so any edge for the wide lock is noise
+  // a narrower slot is worth at least the wider one it sits inside (locking at SF leaves F open for the same players): the planner doesn't
+  // always find that (11-23: Tre at F 0.522% title, at SF 0.513%, because with Tre at SF it moved Spencer to SG instead of F), so SF gets F's value
+  { const o0=new Map(opts.map(o=>[o,o.o])); for(const o of opts) for(const q of opts) if(nests(o.name,q.name) && o0.get(q)>o.o) o.o=o0.get(q);
+    opts.sort((a,b)=> Math.abs(a.o-b.o)>2e-6? b.o-a.o : (b.slot===x.idx)-(a.slot===x.idx)) }
   let best=opts[0]; for(let moved=true; moved;){ moved=false; for(const o of opts) if(nests(o.name,best.name)){ best=o; moved=true; break } }
   // Stay put unless another slot is clearly better (user, 11-14: every time Dalton made the board's move it asked him to move back:
   // Zion at SF, then F, then SF, on simulation noise). A slot of the same kind (UTIL and UTIL) is never a move.
@@ -2886,8 +2890,11 @@ function lockSlotFor(A,pid,fix){
   // the order of locks comes first (user, 11-09 "always lock pg, sg, sf, pf, or C first", and 11-23: "why lock AD here at util before
   // center... the order of operations of locks"): among the even slots only the narrowest tier counts (PG/SG/SF/PF/C, then G/F,
   // then UTIL); "don't move him" and the scarcest slot only break ties inside that tier (Clingan already at C stays at C)
-  if(even.length>1){ const rk=Math.min(...even.map(o=>SLOT_RANK[o.name]??1)), tier=even.filter(o=>(SLOT_RANK[o.name]??1)===rk);
-    const stay= cur && tier.find(o=>o.name===cur.name); if(stay) best=stay; else { const mc=Math.min(...tier.map(o=>cov(o.name))); best=tier.find(o=>cov(o.name)===mc) } }
+  // ...but only over slots that nest (user, 11-23: "always lock everything over utility and pg/sg over g and sf/pf over f, but sg vs sf/f
+  // is tricky for those g/f types"): an even slot drops out only when a narrower slot inside it is even too; SG vs F is the value's call,
+  // then the scarcer slot
+  if(even.length>1){ const tier=even.filter(o=>!even.some(q=>nests(q.name,o.name)));
+    const mc=Math.min(...tier.map(o=>cov(o.name))), sc=tier.filter(o=>cov(o.name)===mc), stay= cur && sc.find(o=>o.name===cur.name); best= stay || sc[0] }   // scarcest slot first (Tre at SF, "SG has guards to spare"), then no move
   if(cur && cur.name===best.name) best=cur;
   const worst=opts.reduce((m,o)=>o.o<m.o?o:m,best);
   // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
@@ -4154,7 +4161,10 @@ function renderWeek(){
         // the slot the plan pins his lock to, so the call and the To do agree (11-23: "Lock Clingan's 32.46 at C" while the plan locked
         // Hartenstein at C first and Clingan at UTIL)
         { const pin=W.vs.planBase?.pins?.[x.pid]; if(pin!=null && P.SL[pin] && (!ls || ls.slot!==pin)){ const o=A.find(y=>y.starter && y.idx===pin && y.pid!==x.pid), to=o? P.pick.get(o.pid)?.slot : null;
-          ls={slot:pin, name:P.SL[pin], how: pin===x.idx? "" : o? (to!=null && to!==pin? "Move "+o.a.info.name+" to "+P.SL[to]+" and "+x.a.info.name+" to "+P.SL[pin]+", then lock." : "Move "+x.a.info.name+" to "+P.SL[pin]+" for "+o.a.info.name+", then lock.") : "Move him to "+P.SL[pin]+", then lock."} } } a.lockSlot=ls; a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(2)+" at "+(ls? ls.name : P.SL[x.idx])}; a.why=(oddsWhy(lo)||callWhy(vc))+(ls&&ls.how? " "+ls.how : ""); a.oddsT=lo; a.whyPre=""; a.whyPost=ls&&ls.how? ls.how : "" }
+          ls={slot:pin, name:P.SL[pin], how: pin===x.idx? "" : o? (to!=null && to!==pin? "Move "+o.a.info.name+" to "+P.SL[to]+" and "+x.a.info.name+" to "+P.SL[pin]+", then lock." : "Move "+x.a.info.name+" to "+P.SL[pin]+" for "+o.a.info.name+", then lock.") : "Move him to "+P.SL[pin]+", then lock."} } } if(ls && ls.how){ const pins=W.vs.planBase?.pins||{}, due=y=>{ const g=y.a.future?.[0]; return g? (tipAt(y.pid,g.date)||Date.parse(g.date+"T19:00:00")) : 0 };
+          // an earlier lock already moved him here (Tre's "move Spencer to F and Tre to SF, then lock" at 4:00: Spencer's own lock at 5:00 is just "lock")
+          if(A.some(y=>y.pid!==x.pid && pins[y.pid]===x.idx && pins[x.pid]===ls.slot && due(y)<=due(x))) ls={...ls, how:""} }
+        a.lockSlot=ls; a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(2)+" at "+(ls? ls.name : P.SL[x.idx])}; a.why=(oddsWhy(lo)||callWhy(vc))+(ls&&ls.how? " "+ls.how : ""); a.oddsT=lo; a.whyPre=""; a.whyPost=ls&&ls.how? ls.how : "" }
       else { const lo=lockOdds(A,P,x); a.call={c:"wait",t:"Wait"}; a.why=(kl!=null? "Needs "+kl.toFixed(1)+". " : "")+(oddsWhy(lo)||callWhy(vc)); a.oddsT=lo; a.whyPre=kl!=null? "Needs "+kl.toFixed(1)+"." : ""; a.whyPost="" }
     }
     if(P.night){ const r=P.night.role[x.pid];
