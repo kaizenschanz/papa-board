@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PXCsTcmGh/s4ilx/6/Wi1GJvZKmfhD8DxAHcRX+Z89I='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/1oR9Snpv0Kxmm5udjQYDzPbgMk8VA3DPMFh+AcZpGo='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3335,6 +3335,14 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   let slotHolder=x.pid;
   try{ const PW=PWh=planWeek(A,hold); slotHolder=[...PW.pick].find(([p2,q2])=>q2.k==="hold" && q2.slot===x.idx)?.[0] ?? x.pid; st=slotSteps(A,PW,slotHolder); V=stepsValue(st); const N=v.me.tot.length; for(let s2=0;s2<N;s2++) res.push(playSteps(st,V,s2,0,0)); res.sort((p2,q2)=>p2-q2) }catch(e){}
   await tick();
+  // the whole team both ways (user, 11-23: "Spencer and Jones lock lines read as though they are only weighing against their own
+  // games"): the line compares whole rosters, so say what waiting does to the other slots, not just his
+  let teamL=null, teamW=null, moved=[];
+  try{ const lockF={...(v.planBase||{force:v.force}), force:{...((v.planBase||{}).force||{}), [x.pid]:"lock"}}, PL=planWeek(A,lockF);
+    teamL=teamDist(A,PL,2000).m; if(PWh) teamW=teamDist(A,PWh,2000).m;
+    const at=(Q,i)=>[...Q.pick].find(([,q2])=>q2.slot===i)?.[0];
+    if(PWh) for(let i=0;i<SL.length;i++){ const hL=at(PL,i), hW=at(PWh,i); if(hL && hW && hL!==hW) moved.push(SL[i]+" ("+String(nm(hL)).split(" ").pop()+" → "+String(nm(hW)).split(" ").pop()+")") } }catch(e){}
+  await tick();
   const N=res.length||1, qq=p2=>res.length? res[Math.min(N-1,Math.floor(p2*(N-1)))] : 0, XM=Math.max(50, Math.ceil((res.length? res[Math.min(res.length-1,Math.floor(0.99*(res.length-1)))] : 50)/10)*10), BW= XM>60? 4 : 2, NB=Math.ceil(XM/BW), bins=new Array(NB).fill(0); for(const y of res) bins[Math.max(0,Math.min(NB-1,Math.floor(y/BW)))]++;   // ~22 bars: 2-point bars on a 90-point axis zig-zagged with simulation noise (user, 11-18: "his histogram is just totally off")   // the axis runs to his 99th percentile, the last bar holds the rest (user, 11-18: Luka's chart piled every 48+ week into one 26% bar at 50)
   const wmean= res.length? res.reduce((t2,y)=>t2+y,0)/N : null, beat=res.filter(y=>y>fp).length/N, u15=res.filter(y=>y<15).length/N;
   const slow=async()=>{ await tick(); LINE_N=SIM_N;   // context, not the call itself: the 3,000-week run
@@ -3385,6 +3393,7 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   const paint=()=>{ if(M.hidden || $("lrTitle").textContent!==nmP) return;
   const sv=season.map(e=>e[1]), above=sv.filter(t2=>t2>fp).length, rank=[...sv].sort((p2,q2)=>q2-p2).findIndex(t2=>Math.abs(t2-fp)<0.01)+1, ord=n2=>n2+(n2%10===1&&n2!==11?"st":n2%10===2&&n2!==12?"nd":n2%10===3&&n2!==13?"rd":"th");
   const facts=[]; const add=(k,t2)=>facts.push('<li><b>'+k+'</b><span>'+t2+'</span></li>');
+  if(teamL!=null && teamW!=null) add("Whole team", f1(teamL)+" projected if you lock, "+f1(teamW)+" if you play on ("+(teamL>=teamW? "locking +" : "playing on +")+Math.abs(teamL-teamW).toFixed(1)+")."+(moved.length? " Playing on changes "+moved.join(", ")+"." : " No other slot changes."));
   if(lineNoMed){ const dm=lineNoMed[1]-lineNoMed[0]; add("League median", Math.abs(dm)<0.05? "Barely moves the line." : (dm>0? "Raises" : "Lowers")+" the line by "+Math.abs(dm).toFixed(2)+" (a "+f2(lineNoMed[0])+" line without it, "+f2(lineNoMed[1])+" with it, same simulated weeks).") }
   if(sv.length) add("His season", f2(fp)+" is "+(rank>0? "his "+ord(rank)+"-best game" : "one of his games")+" of "+sv.length+"; "+above+" game"+(above===1?"":"s")+" beat it. Average "+f1(sv.reduce((t2,y)=>t2+y,0)/sv.length)+", last 4 "+f1(sv.slice(-4).reduce((t2,y)=>t2+y,0)/Math.min(4,sv.length))+".");
   const g0=a.future[0]; if(g0&&g0.parts){ const Pp=g0.parts, src=[["DraftKings",Pp.dk],["Sleeper",Pp.slp],["DARKO",Pp.darko],["Recent form",Pp.form],["Season",Pp.season]].filter(e=>e[1]!=null).map(e=>e[0]+" "+f1(e[1])).join(", "); add("Next projection", f1(g0.mu)+" ("+src+").") }
