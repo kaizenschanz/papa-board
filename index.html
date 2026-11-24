@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-R/kOT/QtYOeJsgn4U6K/FfjgoVUVRhew5Iz8QRP1nXU='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u8u9tAZu+/a1Asszs/F8ILyh2UJDBYde15pUlphtogY='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4160,7 +4160,15 @@ function fullMatchup(me, isMe, main){
         if(LOGX) (W._lockDbg ||= []).push([it, x.a.info.name, ls?.all, ls?.name, sl, dueAt(x)]) }
       const samePins= Object.keys(np).length===Object.keys(pins).length && Object.keys(np).every(q=>pins[q]===np[q]), placed=Object.keys(np).every(q=>M.P.pick.get(q)?.slot===np[q]);
       if(it===0? (!Object.keys(ll).length && !holds.length && placed) : (!changed && samePins && placed)) break;
-      pins=np; M=buildMatchup(me, isMe, main, ll, pins, holds); W.vs=M.vs; if(W.vs) W.vs.lineLocks=ll } }
+      pins=np; M=buildMatchup(me, isMe, main, ll, pins, holds); W.vs=M.vs; if(W.vs) W.vs.lineLocks=ll }
+    // the lines priced again on the final plan, the one the rows, the To do and the report all read (user, 11-24: Garland's row said
+    // "lock at 21.2+" from the first pass, before Jerome's and LeBron's locks were placed; his report, on the final plan, said 24.79,
+    // a coin flip leaning play on): a score that no longer clears its line goes back to play on, and the plan is built once more
+    if(W.vs && Object.keys(ll).length){ let back=false;
+      for(const pid of Object.keys(ll)){ const y=M.A.find(z=>z.pid===pid); if(!y || !lockable(y)) continue; let l=null; try{ l=slotLine(M.A,M.P,y,y.a.latest.date) }catch(e){} if(l==null) continue;
+        if(y.a.latest.fp<l){ delete ll[pid]; delete pins[pid]; holds.push(pid); back=true } else ll[pid]=l }
+      if(back){ M=buildMatchup(me, isMe, main, ll, pins, holds); W.vs=M.vs }
+      if(W.vs) W.vs.lineLocks=ll } }
   return M }
 function renderWeek(){
   if(W.pastWk){ renderPastWeek(W.pastWk); return }   // looking at a finished week: the refresh doesn't pull it back
