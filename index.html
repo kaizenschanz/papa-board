@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mmzVmMSK2rRWuNOnfxrz/++mhgyoqlTuH9aiI4aMe/k='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-s0mmW0sMu6JSrkQ09zhZxME01Yzmof8YqBipUAbusvA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3994,6 +3994,7 @@ function buildMatchup(me, isMe, main, pre, pins, holds){
     if(POS_ON){ const myP=withPickups(teamDist(A,P,SIM_N,0,false,{ctx:ctxOf(oD0), med:posC.med, wt:wtMe, pkm:pkMe?.m||0}),pkMe);
       oD=withPickups(teamDist(B,Qf,SIM_N,O0.risk,false,{ctx:ctxOf(myD), med:posC.medOpp, wt:allIn? null : wtOpp, pkm:pkOpp?.m||0}),pkOpp); myD=myP }
     const O={...O0, Q:Qf, D:oD};
+    try{ self.__vsDbg={risk:O0.risk, m:+oD0.m.toFixed(2), byRisk:[0,4,8].map(r=>+withPickups(teamDist(B,Qf,SIM_N,r),pkOpp).m.toFixed(2)), quick:[0,4,8].map(r=>+withPickups(teamDist(B,O0.Q,SIM_N,r),pkOpp).m.toFixed(2)), me:+myD.m.toFixed(2)} }catch(e){ self.__vsDbg={err:String(e)} }   // 11-24 debug: the opponent's assumed play style and his total under each
     for(const [pid,c] of Object.entries(calls)) if(c.wpts!=null) P.thr[pid]=c.wpts;
     const fin=titleObjD(myD,oD,tabMe,median,wtMe), worst=titleObjD(myD,Ow.D,null,false);
     const gamble=B.filter(x=>O.dec.includes(x.pid) && O.Q.pick.get(x.pid)?.k!=="lock").map(x=>x.a.info.name);
