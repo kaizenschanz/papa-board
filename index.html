@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-94H9ZJmK3jKmUi+cAy7z5Xzfrqji4WGduodvjFz+9Pc='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-c5ZfzHsHN57y2+byRgdJ02bFLroHRTmCXD9rlCdWwQM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3561,7 +3561,7 @@ function playerDetail(x,mine,L){
     return '<i>'+(home? 'vs ' : '@ ')+esc(o)+sc+'</i>' };
   const chips=a.games.map(g=>{
     const counted = a.lockedOn ? g.id===a.lockedOn.id : (x.starter && g===a.latest && !a.future.length);
-    const gk= (g.done && !g.dnp) || g.live? ' data-gst="'+esc(pid+"|"+g.id)+'" role="button" tabindex="0"' : '', on= W._gst===pid+"|"+g.id? ' gon' : '';
+    const gk= (g.done && !g.dnp) || g.live? ' data-gst="'+esc(pid+"|"+g.id)+'" role="button" tabindex="0"' : '', on='';
     if(g.done) return '<span class="g'+(counted?' counted':'')+(gk?' gc':'')+on+'"'+gk+'><span>'+dayLabel(g.date)+'</span><b>'+(g.dnp?'DNP':g.fp.toFixed(2))+'</b>'+vs(g)+'</span>';
     if(g.live) return '<span class="g live gc'+on+'"'+gk+'><span>'+esc(g.clock||"live")+'</span><b>'+(g.cur||0).toFixed(2)+' → ~'+g.mu.toFixed(1)+'</b>'+vs(g)+'</span>';
     return '<span class="g future'+(g.src==="dk"?' dk':'')+'"><span>'+dayLabel(g.date)+tipLabel(pid,g.date)+'</span><b>'+(g.mu>0?'~'+g.mu.toFixed(1):'out')+'</b>'+vs(g)+'</span>';
@@ -3582,8 +3582,10 @@ function playerDetail(x,mine,L){
   if(mine===false && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length && W.vs?.oppPlan)
     why= (W.vs.oppLines?.[pid]!=null? a.latest.fp>=W.vs.oppLines[pid] : W.vs.oppPlan.pick.get(pid)?.k==="lock")? "Their best play: lock it." : "Their best play: play on.";
   if(!why && L?.why?.[pid] && x.starter && !a.lockedOn && !a.live) why=L.why[pid];   // League tab: that team's own lock odds
-  const gsel= W._gst && W._gst.startsWith(pid+"|")? boxLine(pid, W._gst.slice(pid.length+1)) : "";
-  return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div><div class="gst" data-p="'+esc(pid)+'"'+(gsel?'':' hidden')+'>'+gsel+'</div>'+
+  // every played or live game's box score, drawn now and hidden: a tap opens it on the page at once, without waiting for the
+  // board's worker (user, 11-24: "it take a super long time to open the players box score": the tap queued behind a recalculation)
+  const gboxes=a.games.filter(g=>(g.done && !g.dnp) || g.live).map(g=>'<div class="gst" data-for="'+esc(pid+"|"+g.id)+'" hidden>'+boxLine(pid,g.id)+'</div>').join("");
+  return '<div class="pd"><div class="who">'+esc(a.info.name)+' <span>'+esc((a.info.team||"FA")+" · "+a.info.pos.join("/"))+'</span></div><div class="games">'+chips+'</div>'+gboxes+
     (st.length?'<div class="ln">'+st.join(' · ')+'</div>':'')+(sitL?'<div class="ln">'+sitL+'</div>':'')+ovL+(pl?'<div class="ln">'+(gp.live? 'This game' : dayLabel(gp.date))+' ~ '+esc(pl)+'</div>':'')+(why?'<div class="ln why">'+(mine && a.oddsT && why===a.why? oddsTable(a.oddsT, a.whyPre, a.whyPost) : esc(why))+'</div>':'')+'</div>';
 }
 // One matchup as rows: each slot's player, his lock or live score, his next game, and the slot's projected value (from that
@@ -5657,20 +5659,6 @@ document.addEventListener("click",e=>{ const b=e.target.closest("[data-sitov]");
   for(const dd of dates){ if(v==="x") delete o[pid+"|"+dd]; else o[pid+"|"+dd]=+v }
   store.set(sitOvKey(),o); W._sitOvK=null; sitOvAll(); DNPM.clear(); W._swOdds=null; W._pk=null; if(typeof TL!=="undefined") for(const k of Object.keys(TL)) delete TL[k];
   renderWeekBusy(); if(W.view==="league") try{ renderLeague() }catch(_){} });
-// tap a played or live game: its box score under the games, tap again to close; stays open across refreshes
-const gstTap=b=>{
-  // by selector, not by walking from the tapped chip: the board normally runs in a worker that only sees the tap as data, so the
-  // chip's own .closest()/.querySelector() can't reach the page (user, 11-24: "stats still don't show when you click on a players game")
-  const k=String(b.dataset.gst||""), i=k.indexOf("|"); if(i<0) return; const pid=k.slice(0,i), gid=k.slice(i+1), prev=W._gst;
-  W._gst= prev===k? null : k;
-  if(prev){ const pc=document.querySelector('.g[data-gst="'+prev+'"]'); if(pc) pc.classList.remove("gon");
-    const pp=prev.slice(0,prev.indexOf("|")); if(pp!==pid){ const bx=document.querySelector('.gst[data-p="'+pp+'"]'); if(bx){ bx.hidden=false; bx.hidden=true } } }
-  const box=document.querySelector('.gst[data-p="'+pid+'"]'); if(!box) return;
-  // each value set after its opposite, so the worker's copy of the page never skips one as "already set" after a redraw
-  if(W._gst){ const c=document.querySelector('.g[data-gst="'+k+'"]'); if(c) c.classList.add("gon"); box.innerHTML=""; box.innerHTML=boxLine(pid,gid); box.hidden=true; box.hidden=false }
-  else { box.hidden=false; box.hidden=true } };
-document.addEventListener("click",e=>{ const b=e.target.closest("[data-gst]"); if(!b) return; e.preventDefault(); e.stopPropagation(); gstTap(b) }, true);
-document.addEventListener("keydown",e=>{ if(e.key!=="Enter" && e.key!==" ") return; const b=e.target.closest?.("[data-gst]"); if(!b) return; e.preventDefault(); gstTap(b) });
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-open]"); if(!b) return; const d=$(b.dataset.open); if(d){ d.open=true; d.scrollIntoView({behavior:"smooth",block:"start"}) } });
 $("setupEdit").addEventListener("click",()=>$("setup").classList.remove("compact"));
 const cleanTok=v=>fixTok(v);
@@ -5877,7 +5865,16 @@ if(typeof document==="undefined"){   // this copy is the worker
     if(m.t==="init" && !E){ self.postMessage({t:"hello", bench:benchMs()}); return }
     if(m.t==="go" && !E){ E=makeWorkerEnv(m, x=>self.postMessage(x)); try{ APP(E.env) }catch(err){ self.postMessage({t:"fatal", msg:String(err&&err.stack||err)}) } }
     else if(E) E.dispatch(m) };
-} else pageBoot();
+} else { boxTaps(); pageBoot() }
+// Box scores open on the page itself, instantly, whether or not the board's worker is busy (user, 11-24). The boxes are drawn with the
+// player's details (one per played or live game, hidden); a tap shows the one for that game, and it stays open across redraws.
+function boxTaps(){ let open=null;
+  const apply=()=>{ for(const c of document.querySelectorAll('.g.gon')) if(c.dataset.gst!==open) c.classList.remove('gon');
+    for(const b of document.querySelectorAll('.gst[data-for]')){ const on=b.dataset.for===open; if(b.hidden===on) b.hidden=!on }
+    if(open) for(const c of document.querySelectorAll('.g[data-gst]')) if(c.dataset.gst===open && !c.classList.contains('gon')) c.classList.add('gon') };
+  const tap=c=>{ open= open===c.dataset.gst? null : c.dataset.gst; apply() };
+  document.addEventListener('click',e=>{ const c=e.target.closest && e.target.closest('[data-gst]'); if(!c) return; e.preventDefault(); e.stopPropagation(); tap(c) }, true);
+  document.addEventListener('keydown',e=>{ if(e.key!=='Enter' && e.key!==' ') return; const c=e.target.closest && e.target.closest('[data-gst]'); if(!c) return; e.preventDefault(); tap(c) });
+  let q=false; new MutationObserver(()=>{ if(open && !q){ q=true; requestAnimationFrame(()=>{ q=false; apply() }) } }).observe(document.body,{childList:true, subtree:true}) }
 </script>
 </body>
-</html>
