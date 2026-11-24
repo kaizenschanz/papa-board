@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-c5ZfzHsHN57y2+byRgdJ02bFLroHRTmCXD9rlCdWwQM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IaUpudcTl7BJa/tQBsT3C5u6aRGU9ajzP0UzlyWFUb8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3443,10 +3443,15 @@ async function openLockReport(pid){ const M=$("lrModal"), body=$("lrBody"); if(!
   // the other players who could fill this slot and where the plan uses their games instead (user, 11-18: "not Powell other games,
   // Spencer's": Spencer's Thursday and Saturday are planned for his own SG slot, so they aren't in Powell's F chain)
   let elsewhere=""; try{ const PW=planWeek(A,hold), inCh=new Set(st.map(t2=>t2.pid)), where=new Map();
+    // his game counts toward a slot he can't play (Robinson's Friday "→ PG"): the slot he really takes and who slides over
+    const physOf=(z,sn2)=>{ const pos=z.a.info.pos||[], hs=[...PW.pick].filter(([h2,q2])=>q2.k==="hold" && SL[q2.slot]!==sn2 && h2!==z.pid).map(([h2,q2])=>({n:nm(h2).split(" ").pop(), s:SL[q2.slot], pos:(A.find(y=>y.pid===h2)?.a.info.pos)||[]}));
+      for(const o1 of hs) if(elig(o1.pos,sn2) && elig(pos,o1.s)) return o1.s+" ("+o1.n+" slides "+o1.s+" → "+sn2+")";
+      for(const o1 of hs) if(elig(o1.pos,sn2)) for(const o2 of hs) if(o2!==o1 && elig(o2.pos,o1.s) && elig(pos,o2.s)) return o2.s+" ("+o1.n+" "+o1.s+" → "+sn2+", "+o2.n+" "+o2.s+" → "+o1.s+")";
+      return sn2+" slot, through a lineup shuffle" };
     for(const [hp,q] of PW.pick){ if(q.k==="lock"){ where.set(hp,"locks his score at "+SL[q.slot]); continue } if(q.k!=="hold") continue;
       for(const t2 of slotSteps(A,PW,hp)){ if(t2.pid===x.pid && slotHolder===x.pid) continue; const w2=where.get(t2.pid)||{}; if(typeof w2==="string") continue; (w2[SL[q.slot]] ||= new Set()).add(dayLabel(t2.date).slice(0,3)); where.set(t2.pid,w2) } }
     elsewhere=A.filter(z=>(z.pid!==pid || slotHolder!==pid) && !inCh.has(z.pid) && elig(z.a.info.pos||[],SL[x.idx]) && !z.a.lockedOn && z.slot!=="IR").map(z=>{ const w2=where.get(z.pid);
-      const t3= typeof w2==="string"? w2 : w2&&Object.keys(w2).length? Object.entries(w2).map(([sn2,ds])=>[...ds].join(", ")+" → "+sn2+(elig(z.a.info.pos||[],sn2)? "" : " slot, through a slide (he can't play "+sn2+": a teammate moves there and he takes that player's spot)")).join("; ") : (z.a.future.some(f=>f.mu>0)? "not used this week" : "no games left");
+      const t3= typeof w2==="string"? w2 : w2&&Object.keys(w2).length? Object.entries(w2).map(([sn2,ds])=>[...ds].join(", ")+" → "+(elig(z.a.info.pos||[],sn2)? sn2 : physOf(z,sn2))).join("; ") : (z.a.future.some(f=>f.mu>0)? "not used this week" : "no games left");
       return '<li><b>'+esc(z.a.info.name)+'</b><span>'+esc(t3)+'</span></li>' }).join("") }catch(e){}
   body.innerHTML='<div class="lrs"><div class="lrv"><div class="lrcall'+(!close&&!lockIt? " w" : "")+'">'+callTxt+'<small>'+esc(sub)+'</small></div>'+(conf!=null? '<span class="lrchip">'+confLabel(conf)+'</span>' : '')+'</div>'+
     '<div class="lrkv">'+(tD!=null? '<div><b>'+(tD>=0?"+":"−")+Math.abs(tD*100).toFixed(2)+'%</b><span>title chance for locking</span></div>' : '')+'<div><b>'+sg(eW)+'</b><span>win chance for locking</span></div><div><b>'+sg(eM)+'</b><span>median chance for locking</span></div><div><b>'+(wmean!=null? f2(wmean) : "–")+'</b><span>average if you wait</span></div></div></div>'+
