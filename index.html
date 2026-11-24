@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qVyUOxtowmlUceunpbt4PSJkuXB5Z1plomrdpRRe12U='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-R/kOT/QtYOeJsgn4U6K/FfjgoVUVRhew5Iz8QRP1nXU='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3891,7 +3891,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       let own='';
       if(side==="me" && x.starter && !a.live && a.latest && !a.latest.dnp && a.future.length){ let l=a.kl??null; if(l==null) try{ l=lineFor(R,Q,x,a.latest.date) }catch(e){}   // the call's own line (11-24: LeBron read LOCK beside "lock at 24.6+" on 23.82: the row re-priced him as if already at SF, the call priced him from F at 23.53)
         const lk= a.call?.c==="lock" || (l!=null && a.latest.fp>=l);
-        own=(lk? '<span class="badge lock">Lock</span> ' : '')+'Can lock '+a.latest.fp.toFixed(2)+(tgt!=null&&SL[tgt]? ' at '+SL[tgt] : '')+(l!=null&&isFinite(l)? ' · lock at '+l.toFixed(1)+'+' : '')+(mine && viewingMe() && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? ' <button type="button" class="lrbtn" data-lr="'+esc(x.pid)+'">Details ›</button>' : '')+' · '+(SL[x.idx]? SL[x.idx]+' ' : '') }
+        own=(lk? '<span class="badge lock">Lock</span> ' : '')+'Can lock '+a.latest.fp.toFixed(2)+(tgt!=null&&SL[tgt]? ' at '+SL[tgt] : '')+(l!=null&&isFinite(l)? ' · lock at '+l.toFixed(1)+'+' : '')+(mine && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? ' <button type="button" class="lrbtn" data-lr="'+esc(x.pid)+'">Details ›</button>' : '')+' · '+(SL[x.idx]? SL[x.idx]+' ' : '') }
       return '<div class="pc"><span class="n">'+esc(a.info.name)+(a.live?.on?' 🏀':'')+'</span><span class="s">'+(own? own : ln0>0&&isFinite(ln0)? (a.live? 'lock at ' : dayLabel(g0.date)+': lock at ')+ln0.toFixed(1)+'+ · else ' : '')+'→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
     // the opponent's plan locks it (Flagg's 49.20): say so plainly instead of "Can lock · next game" (user, 11-10)
     const lnO= !mine && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? lnOf(a.latest.date) : null;   // mid-game: nothing to lock (user, 11-11: Eason)   // his line, when it's worked out: the badge follows it
@@ -3915,11 +3915,17 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       // ...only when his own row doesn't already show it (11-24: Garland's 24.72 showed on PG and on his own G row, a slide between starters)
       const ownShown=y=>{ if(!y.starter || y.a.lockedOn) return false; const h=holderAt(Q,y.idx), sl= h && h!==y.pid && R.find(z=>z.pid===h)?.starter && Q?.pick?.has(y.pid), hh= sl? y.pid : h;
         if(hh && hh!==y.pid) return false; const q=Q?.pick?.get(y.pid), toS= q && R.some(z=>z.starter && z.idx===q.slot && z.pid!==y.pid && Q?.pick?.has(z.pid)); return !(q && q.slot!==y.idx && !toS) && !!D.parts.get(y.pid) };
-      let slidIn=null; if(away && slide && hp0){ const q2=D.parts.get(hp0), o2=R.find(y=>y.pid===hp0); if(q2 && o2){ bits.push(esc(o2.a.info.name)+' moves here'); if(!ownShown(o2)){ p=q2; slidIn=o2 } } }
+      // a move to lock (Garland G -> PG, Braun SF -> G behind him): the value follows the slot, so every row shows whoever the plan has
+      // in it, once (user, 11-24: "still no slot value in the pg spot"). A plain swap of two starters, no lock in it, reads as it stands (11-16)
+      const lockish=q=>Q?.pick?.get(q)?.k==="lock" || R.find(y=>y.pid===q)?.a.call?.c==="lock";
+      let slidIn=null; const lm= pq && pq.slot!==x.idx && lockish(x.pid), ls2= slide && hp0 && lockish(hp0);
+      if(lm || ls2){ if(!away && pq && pq.slot!==x.idx) bits.push('→ '+SL[pq.slot]); p=null;
+        const o2= hp0 && hp0!==x.pid? R.find(y=>y.pid===hp0) : null, q2= o2? D.parts.get(hp0) : null; if(q2){ bits.push(esc(o2.a.info.name)+' moves here'); p=q2; slidIn=o2 } }
+      else if(away && slide && hp0){ const q2=D.parts.get(hp0), o2=R.find(y=>y.pid===hp0); if(q2 && o2){ bits.push(esc(o2.a.info.name)+' moves here'); if(!ownShown(o2)){ p=q2; slidIn=o2 } } }
       // the game's score next to its clock (user, 11-16: "no scores in the live view"): his team's first
       if(a.live){ const ck=W.clock?.[a.info.team]?.[a.live.date]; bits.push('Live '+(a.live.cur||0).toFixed(2)+(a.live.clock?' · '+esc(a.live.clock):'')+(ck?.sc? ' · '+ck.sc[0]+'-'+ck.sc[1] : '')) }
       else if(now && !g){ bits.push(p? 'Final · counts' : 'Final · swap planned'); val=a.latest.fp.toFixed(2); vc= p? ' lk' : '' }   // last game over: that's his score
-      else if(now){ const ln= g? lnOf(a.latest.date) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(ln!=null? ' · lock at '+ln.toFixed(1)+'+' : '')+(mine && viewingMe() && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? ' <button type="button" class="lrbtn" data-lr="'+esc(x.pid)+'">Details ›</button>' : '')) }   // the in-page lock report (user, 11-18: "put the details link in the matchup part")
+      else if(now){ const ln= g? lnOf(a.latest.date) : null; bits.push('Can lock '+a.latest.fp.toFixed(2)+(ln!=null? ' · lock at '+ln.toFixed(1)+'+' : '')+(mine && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? ' <button type="button" class="lrbtn" data-lr="'+esc(x.pid)+'">Details ›</button>' : '')) }   // the in-page lock report (user, 11-18: "put the details link in the matchup part")
       else if(x.starter && a.latest && a.latest.gone!=null) bits.push(a.latest.gone.toFixed(2)+' gone (was benched)');
       if(a.live){ bits.push('~'+a.live.mu.toFixed(1));   // his game now, not the next one (user, 11-09: "why display their next game projection when they're mid game?")
         if(x.starter && a.future.length){ const ln=lnOf(a.live.date); if(ln!=null) bits.push('lock '+ln.toFixed(1)+'+') } }
