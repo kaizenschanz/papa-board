@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sydjMhKxuRTbZgHcIyynL8cX/2wjfG0DpROt0x5hftE='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mmzVmMSK2rRWuNOnfxrz/++mhgyoqlTuH9aiI4aMe/k='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2257,6 +2257,7 @@ function teamDist(A,P,N=SIM_N,risk=0,wantOwn=false,pos=null){
   return out;
 }
 const TD_CACHE=new Map();
+function slotLog(D){ try{ const R=(D&&(D.raw||D))||{}; return R.parts? [...R.parts].map(([pid,q])=>[pid,+(+q.m).toFixed(1)]) : null }catch(e){ return null } }
 // A team's simulated week slot by slot, for the other side's calls (teamDist pos.ctx): each open slot's draws (spread factor taken
 // out) and when its score is final in each draw, plus what's fixed (locks, field shift, pickups). Kept on the week object.
 let TD_ID=0;
@@ -4217,7 +4218,7 @@ function renderWeek(){
       // the real lock line and its confidence, so a flip can be traced afterwards (11-17: Buzelis' line jumped 20.4 <-> 20.9 and the log couldn't say why)
       ...(()=>{ try{ if(!x||!x.a.latest||x.a.latest.dnp) return {}; const d=x.a.latest.date, l=lineFor(A,W.vs.plan,x,d), o=W.vs._lfo?.get(x.pid+"|"+d+"|"+x.idx+"|1");
         return {line: l!=null&&isFinite(l)? +l.toFixed(2) : null, conf: o&&o.conf!=null? +o.conf.toFixed(3) : null, med: W.vs.med!=null? +W.vs.med.toFixed(4) : null, oppM: W.vs.opp?.m!=null? +W.vs.opp.m.toFixed(1) : null} }catch(e){ return {} } })()} }) : null,
-    odds: W.vs? {win:+W.vs.win.toFixed(4), worst:+(W.vs.winWorst??0).toFixed(4), med:W.vs.med!=null?+W.vs.med.toFixed(4):null, me:+W.vs.me.m.toFixed(2), opp:+W.vs.opp.m.toFixed(2), oppName:W.vs.name, allIn:!!W.oppAllIn, pkMe:+(W.vs.me.pk||0).toFixed(2), pkOpp:+(W.vs.opp.pk||0).toFixed(2)} : null,
+    odds: W.vs? {win:+W.vs.win.toFixed(4), worst:+(W.vs.winWorst??0).toFixed(4), med:W.vs.med!=null?+W.vs.med.toFixed(4):null, me:+W.vs.me.m.toFixed(2), opp:+W.vs.opp.m.toFixed(2), oppName:W.vs.name, allIn:!!W.oppAllIn, pkMe:+(W.vs.me.pk||0).toFixed(2), pkOpp:+(W.vs.opp.pk||0).toFixed(2), slMe:slotLog(W.vs.me), slOpp:slotLog(W.vs.opp)} : null,   // each open slot's projection (11-24: the header jumped 20-50 points mid-game while the league view held; this shows which slot)
     cal: W._cal? {M:+W._cal.M.toFixed(2), sim:W._cal.sim!=null?+W._cal.sim.toFixed(2):null, prior:W._cal.prior!=null?+W._cal.prior.toFixed(2):null, phi:+W._cal.phi.toFixed(3), k:+W._cal.k.toFixed(3), sd0:(CALIB?.med?.sd0)||MED_SD0, t:Object.fromEntries(W._cal.raw.map(t=>[t.rid,[+t.m.toFixed(2),+(t.own||0).toFixed(2),+t.base.toFixed(2)]]))} : null,
     v:SIM_V, proj: LOGX? safeLog(logProj) : null, dec: LOGX? safeLog(logDec) : null, season: LOGX? safeLog(logSeason) : null,
     events:items.flatMap(i=>(i.rems||[]).map(r=>({id:"w"+W.week+"-"+r.id, t:r.t, lead:r.lead, title:r.title, note:i.title+". "+(i.sub||"")})))});
