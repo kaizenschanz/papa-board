@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UUzijZJKiZWXc7BJ3+RrjfQ0KediNPaJfHbyyTAjXsY='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H65ix+nDQoMQsKT3cRUYVb3VQkrJGlD2DTJ/++genH4='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2917,7 +2917,9 @@ function lockSlotFor(A,pid,fix){
   // how to get him there: whoever sits in that slot now moves to the slot the plan gives him (often a straight swap)
   let how="";
   if(best.slot!==x.idx){ const o=best.occ, to=o? best.Q.pick.get(o.pid)?.slot : null;
-    how= o? "Move "+o.a.info.name+" to "+(to!=null? SL[to] : SL[x.idx])+" and "+x.a.info.name+" to "+SL[best.slot]+", then lock." : "Move him to "+SL[best.slot]+", then lock." }
+    // he moves on his own earlier (Braun to G at his Tue 7:00 tip, before LeBron's Wed lock): said once, in his own To do line (11-24)
+    const dueT=y=>{ const g=y?.a.future?.find(f=>f.mu>0)||y?.a.future?.[0]; return g? (tipAt(y.pid,g.date)||Date.parse(g.date+"T19:00:00")) : Infinity }, moved= o && to!=null && to!==best.slot && dueT(o)<dueT(x);
+    how= moved? "Move "+x.a.info.name+" to "+SL[best.slot]+", then lock." : o? "Move "+o.a.info.name+" to "+(to!=null? SL[to] : SL[x.idx])+" and "+x.a.info.name+" to "+SL[best.slot]+", then lock." : "Move him to "+SL[best.slot]+", then lock." }
   const gap=best.o-worst.o;
   return v._ls[key]={slot:best.slot, name:best.name, how, gap, n:opts.length, all:opts.map(o=>[o.name, +o.o.toFixed(5)]),
     why: opts.length<2? "" : gap>2e-6? "Locking him at "+best.name+" instead of "+worst.name+" adds "+tChance(gap)+" title chance (keeps the right slots open for your bench)." : "Every open slot he fits is even on title chances, so use the narrowest ("+best.name+") and keep the wide slots open."};
@@ -3873,7 +3875,7 @@ function gridHTML(A, DA, QA, B, DB, QB, nameA, nameB, mineA, LA, LB){
       // the To do said "Lock Michael Porter's 23.52 at SF"): his own call first, then who takes this slot
       const pk=Q?.pick?.get(x.pid), tgt= pk && pk.slot!=null && pk.slot!==x.idx? pk.slot : null;
       let own='';
-      if(side==="me" && x.starter && !a.live && a.latest && !a.latest.dnp && a.future.length){ let l=null; try{ l=lineFor(R,Q,{...x, idx: tgt??x.idx},a.latest.date) }catch(e){}
+      if(side==="me" && x.starter && !a.live && a.latest && !a.latest.dnp && a.future.length){ let l=a.kl??null; if(l==null) try{ l=lineFor(R,Q,x,a.latest.date) }catch(e){}   // the call's own line (11-24: LeBron read LOCK beside "lock at 24.6+" on 23.82: the row re-priced him as if already at SF, the call priced him from F at 23.53)
         const lk= a.call?.c==="lock" || (l!=null && a.latest.fp>=l);
         own=(lk? '<span class="badge lock">Lock</span> ' : '')+'Can lock '+a.latest.fp.toFixed(2)+(tgt!=null&&SL[tgt]? ' at '+SL[tgt] : '')+(l!=null&&isFinite(l)? ' · lock at '+l.toFixed(1)+'+' : '')+(mine && viewingMe() && x.starter && !a.lockedOn && !a.live && a.latest && !a.latest.dnp && a.future.length? ' <button type="button" class="lrbtn" data-lr="'+esc(x.pid)+'">Details ›</button>' : '')+' · '+(SL[x.idx]? SL[x.idx]+' ' : '') }
       return '<div class="pc"><span class="n">'+esc(a.info.name)+(a.live?.on?' 🏀':'')+'</span><span class="s">'+(own? own : ln0>0&&isFinite(ln0)? (a.live? 'lock at ' : dayLabel(g0.date)+': lock at ')+ln0.toFixed(1)+'+ · else ' : '')+'→ '+esc(o? o.a.info.name : other)+'</span>'+(q?'<span class="v">~'+slotShown(q).toFixed(2)+'</span>':'')+'</div>' }
@@ -4189,7 +4191,8 @@ function renderWeek(){
         // the slot the plan pins his lock to, so the call and the To do agree (11-23: "Lock Clingan's 32.46 at C" while the plan locked
         // Hartenstein at C first and Clingan at UTIL)
         { const pin=W.vs.planBase?.pins?.[x.pid]; if(pin!=null && P.SL[pin] && (!ls || ls.slot!==pin)){ const o=A.find(y=>y.starter && y.idx===pin && y.pid!==x.pid), to=o? P.pick.get(o.pid)?.slot : null;
-          ls={slot:pin, name:P.SL[pin], how: pin===x.idx? "" : o? (to!=null && to!==pin? "Move "+o.a.info.name+" to "+P.SL[to]+" and "+x.a.info.name+" to "+P.SL[pin]+", then lock." : "Move "+x.a.info.name+" to "+P.SL[pin]+" for "+o.a.info.name+", then lock.") : "Move him to "+P.SL[pin]+", then lock."} } } if(ls && ls.how){ const pins=W.vs.planBase?.pins||{}, due=y=>{ const g=y.a.future?.[0]; return g? (tipAt(y.pid,g.date)||Date.parse(g.date+"T19:00:00")) : 0 };
+          const dueT=y=>{ const g=y?.a.future?.find(f=>f.mu>0)||y?.a.future?.[0]; return g? (tipAt(y.pid,g.date)||Date.parse(g.date+"T19:00:00")) : Infinity }, moved= o && to!=null && to!==pin && dueT(o)<dueT(x);   // he moves on his own earlier (Braun to G at his 7:00 Tue tip, before LeBron's Wed lock): not said twice (11-24)
+          ls={slot:pin, name:P.SL[pin], how: pin===x.idx? "" : moved? "Move "+x.a.info.name+" to "+P.SL[pin]+", then lock." : o? (to!=null && to!==pin? "Move "+o.a.info.name+" to "+P.SL[to]+" and "+x.a.info.name+" to "+P.SL[pin]+", then lock." : "Move "+x.a.info.name+" to "+P.SL[pin]+" for "+o.a.info.name+", then lock.") : "Move him to "+P.SL[pin]+", then lock."} } } if(ls && ls.how){ const pins=W.vs.planBase?.pins||{}, due=y=>{ const g=y.a.future?.[0]; return g? (tipAt(y.pid,g.date)||Date.parse(g.date+"T19:00:00")) : 0 };
           // an earlier lock already moved him here (Tre's "move Spencer to F and Tre to SF, then lock" at 4:00: Spencer's own lock at 5:00 is just "lock")
           if(A.some(y=>y.pid!==x.pid && pins[y.pid]===x.idx && pins[x.pid]===ls.slot && due(y)<=due(x))) ls={...ls, how:""} }
         a.lockSlot=ls; a.call={c:"lock",t:"Lock "+a.latest.fp.toFixed(2)+" at "+(ls? ls.name : P.SL[x.idx])}; a.why=(oddsWhy(lo)||callWhy(vc))+(ls&&ls.how? " "+ls.how : ""); a.oddsT=lo; a.whyPre=""; a.whyPost=ls&&ls.how? ls.how : "" }
