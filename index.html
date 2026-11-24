@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1mEbfaYMlf90sYLMnpQ63giDIiCDPUFxSmMMTHqiEw8='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Hcu2UAuRyVyQ4/7fg2eVxgU/Gk969tel6tL+6vvketM='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -684,7 +684,7 @@ function totalPicks(){return draftTeams()*(S.draft?.settings?.rounds||14)}
 // Sleeper's CDN can serve an older cached copy of a plain URL, so every request gets a unique query string.
 async function j(path){
   let r;
-  const to=()=> AbortSignal.timeout? AbortSignal.timeout(20000) : undefined;   // a Sleeper request that never answers can't hold the refresh (11-17)
+  const to=()=> smartSig(20000);   // a Sleeper request that never answers can't hold the refresh (11-17)
   try{ r=await fetch(API+path+(path.includes("?")?"&":"?")+"_="+Date.now(),{cache:"no-store", signal:to()}) }catch(e){ r=null }
   if(!r||!r.ok) r=await fetch(API+path,{cache:"no-store", signal:to()});
   if(!r.ok) throw new Error(path+" returned "+r.status);
@@ -975,6 +975,12 @@ function modelMu(pid, x){
   return {mu:Math.max(0,mu), pat};
 }
 const RAW = "https://api.sleeper.app";
+// A request timeout that doesn't count time the board itself is busy (user, 11-23: "Couldn't load this week from Sleeper: signal timed
+// out" while Sleeper answered in 0.1 s): the whole board runs on one thread, so a long simulation held Sleeper's answer unread and the
+// plain 20 s timer then aborted it. Each time the timer fires late (the thread was busy) it waits again; it only gives up after a full
+// wait with the thread free and still no answer. Aborting a request that already finished does nothing.
+function smartSig(ms){ if(typeof AbortController==="undefined") return undefined; const c=new AbortController();
+  const arm=()=>{ const due=Date.now()+ms; setTimeout(()=>{ if(Date.now()-due>1500) arm(); else try{ c.abort(new DOMException("signal timed out","TimeoutError")) }catch(e){ c.abort() } }, ms) }; arm(); return c.signal }
 async function jx(url){
   let r;
   try{ r=await fetch(url+(url.includes("?")?"&":"?")+"_="+Date.now(),{cache:"no-store"}) }catch(e){ r=null }
@@ -1229,7 +1235,7 @@ async function loadLegs(lid,week){
   $("tokState").textContent = tok? "· on" : "";
   if(tok){
     try{
-      const r=await fetch("https://sleeper.com/graphql",{signal: AbortSignal.timeout? AbortSignal.timeout(20000) : undefined, method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
+      const r=await fetch("https://sleeper.com/graphql",{signal: smartSig(20000), method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
         body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+week+') { roster_id matchup_id starters starters_games players points subs player_map } }'})});
       let d; try{ d=await r.json() }catch(e){ throw new Error("Sleeper answered "+r.status) }
       if(d.errors&&d.errors.length) throw new Error(d.errors[0].message+(r.status===401?" (the saved login isn't accepted; paste it again)":""));
@@ -1252,7 +1258,7 @@ async function loadLegs(lid,week){
   // "I don't wanna have to login every device"). 60 reads an hour per network, so only when the Pages copy is over a minute old, and a
   // device that hits the limit goes back to the Pages copy for half an hour.
   if(legs && snap && !snap.final && Date.now()-snap.at>60e3 && !(store.get("liveNo",0)>Date.now())){
-    try{ const r=await fetch("https://api.github.com/repos/kaizenschanz/papa-board/contents/legs.json?ref=live&_="+Math.floor(Date.now()/30e3),{cache:"no-store", headers:{Accept:"application/vnd.github.raw+json"}, signal:AbortSignal.timeout? AbortSignal.timeout(8000) : undefined});
+    try{ const r=await fetch("https://api.github.com/repos/kaizenschanz/papa-board/contents/legs.json?ref=live&_="+Math.floor(Date.now()/30e3),{cache:"no-store", headers:{Accept:"application/vnd.github.raw+json"}, signal:smartSig(8000)});
       if(r.status===403||r.status===429) store.set("liveNo",Date.now()+30*60e3);
       else if(r.ok){ const d=await r.json(); if(+d.week===+week && Array.isArray(d.legs) && d.legs.length && +d.at>snap.at){ legs=d.legs; snap={at:+d.at, live:true} } } }catch(e){} }
   W.legs=legs; W.legLive=false; W.legSnap=snap; W.legsPastSnap=past;
@@ -1388,7 +1394,7 @@ async function loadClocks(){
   const days=[...new Set(W.games.filter(g=>g.status!=="complete" && g.date<=todayStr()).map(g=>g.date))];
   await Promise.all(days.map(async day=>{
     try{
-      const sb=await fetch(ESPN_SITE+"/scoreboard?dates="+day.replace(/-/g,"")+"&_="+Date.now(),{cache:"no-store", signal: AbortSignal.timeout? AbortSignal.timeout(15000) : undefined}).then(r=>r.json());
+      const sb=await fetch(ESPN_SITE+"/scoreboard?dates="+day.replace(/-/g,"")+"&_="+Date.now(),{cache:"no-store", signal: smartSig(15000)}).then(r=>r.json());
       for(const e of sb.events||[]){
         const s=e.status||{}, st=s.type?.state; if(st!=="in" && st!=="post") continue;
         const per=s.period||1, left=+s.clock||0;
@@ -4603,7 +4609,7 @@ async function pastWeeks(){
   const lid=S.league.league_id, weeks=[]; for(let w=1; w<W.week; w++) if(!(w===W.baseWeek && !W.baseDone)) weeks.push(w);
   const raw=store.get("slpToken",null), tok=raw? fixTok(raw) : null;
   if(tok){ try{
-    const res=await Promise.all(weeks.map(async w=>{ const r=await fetch("https://sleeper.com/graphql",{signal: AbortSignal.timeout? AbortSignal.timeout(20000) : undefined, method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
+    const res=await Promise.all(weeks.map(async w=>{ const r=await fetch("https://sleeper.com/graphql",{signal: smartSig(20000), method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
       body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+w+') { roster_id matchup_id points starters starters_games } }'})});
       const d=await r.json(); if(d.errors&&d.errors.length) throw new Error(d.errors[0].message); return legTotals((d.data.matchup_legs||[]).map(x=>({...x,points:+x.points||0})),w) }));
     if(res.every(m=>m.some(x=>x.points>0))){ LG.pastSrc="sleeper"; LG.pastGql=true; return res }
@@ -4688,7 +4694,7 @@ async function managerTendencies0(){
     const hasG= Object.keys(gradeGet()===null && GRADES.m || {}).some(k=>k.startsWith(w+"|"));   // a week marked done whose grades never got saved is graded again
     if(kept && kept.per && hasG){ mergePer(per, kept.per); LG.waitChk.push(...(kept.wc||[])); if(kept.dates) (LG.weekDates ||= {})[w]=kept.dates; if(!kept.exact) exact=false; continue }
     let legs=null;
-    if(tok){ try{ const r=await fetch("https://sleeper.com/graphql",{signal: AbortSignal.timeout? AbortSignal.timeout(20000) : undefined, method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
+    if(tok){ try{ const r=await fetch("https://sleeper.com/graphql",{signal: smartSig(20000), method:"POST",headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
       body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+w+') { roster_id matchup_id starters starters_games players points } }'})});
       const d=await r.json(); legs=d?.data?.matchup_legs||null; if(legs) (W.legsPast ||= {})[w]=legs.map(pickLeg) }catch(e){ legs=null } }
     if(!legs && W.legsPastSnap?.[w]) legs=W.legsPastSnap[w];
@@ -5785,7 +5791,7 @@ function pageBoot(){
   window.__legsFeed=async()=>{ try{ const g=k=>{ try{ return JSON.parse(ls.getItem("prb:"+k)) }catch(e){ return null } }, tok=String(g("slpToken")||"").replace(/^\s*bearer\s+/i,""), lid=g("league");
       if(!tok||!lid) return {err:"no login or league saved"};
       const st=await fetch("https://api.sleeper.app/v1/state/nba?_="+Date.now(),{cache:"no-store"}).then(r=>r.json()), week=+(st.display_week||st.week);
-      const r=await fetch("https://sleeper.com/graphql",{method:"POST", signal:AbortSignal.timeout? AbortSignal.timeout(20000) : undefined, headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
+      const r=await fetch("https://sleeper.com/graphql",{method:"POST", signal:smartSig(20000), headers:{"content-type":"application/json","authorization":tok,"x-sleeper-graphql-op":"matchup_legs"},
         body:JSON.stringify({operationName:"matchup_legs",variables:{},query:'query matchup_legs { matchup_legs(league_id: "'+lid+'", round: '+week+') { roster_id matchup_id starters starters_games players points } }'})});
       const d=await r.json(); if(d.errors&&d.errors.length) return {err:String(d.errors[0].message||"error").slice(0,120), status:r.status};
       return {week, at:Date.now(), legs:(d.data?.matchup_legs||[]).map(l=>({roster_id:l.roster_id, matchup_id:l.matchup_id, starters:l.starters||[], starters_games:l.starters_games||{}, players:l.players||[], points:+l.points||0}))} }catch(e){ return {err:String(e&&e.message||e).slice(0,120)} } };
