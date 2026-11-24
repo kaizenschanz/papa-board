@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-s0mmW0sMu6JSrkQ09zhZxME01Yzmof8YqBipUAbusvA='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Qcgx7+xL/6eHGs9u/9W9h8GKYPPCJzkD42wpQED//ac='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5706,7 +5706,7 @@ if(new URLSearchParams(location.search).get("prof")==="1"){ const WR=[["calibrat
 // On the page (not in the worker) the board's state stays reachable as before: the Mac's sync checks W and LG to know the
 // board has finished loading (11-10: wrapping the app in APP hid them, and the sync read nothing for half an hour).
 if(!IN_WORKER){ window.W=W; window.LG=LG; window.S=S; window.__lines={bestMove,landChance,takenChance,restOfSeason,pickupFor,oppBest,othersDist,pTopTable,replanLine,dnpP,liveTag,lineFor,slotLinesFor,slotSteps,titleBar,stepsValue,playSteps,waitBias,calF,titleObjD,planWeek,teamDist,withPickups,lockBarD,ctxOf,medNormal,lockSlotFor,liveRest0,liveRest,drawScore,stepDraw,projF,psKept:()=>PS_KEPT,scoreStats,jx,shapeFor,liveTagX:(p,g)=>liveTag(p,g),computeLeagueX:()=>computeLeague(),baseMeanX:p=>baseMean(p),seasonAvailX:(p,i)=>seasonAvail(p,i),strengthX:r=>strength(r),missedLastX:p=>missedLast(p),b2bX:(p,d)=>b2bOf(p,d),sitFloorX:(g,p)=>typeof sitFloor==="function"? sitFloor(g,p) : null,teamOddsOf,benchRows,todoItems,keepRows,rowsForX:(r,m,me)=>rowsFor(r,m,me),playerInfoX:p=>playerInfo(p),tipAtX:(p,d)=>tipAt(p,d)} }
-if(ENV.onReady) ENV.onReady({status:()=>({loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
+if(ENV.onReady) ENV.onReady({status:()=>({vsDbg:self.__vsDbg||null, loaded:!!W.loaded, view:W.view, week:W.week, busy:BUSY, me:W.vs?.me?.m??null, opp:W.vs?.opp?.m??null, win:W.vs?.win??null, med:W.vs?.med??null, medProj:W.vs?.medProj??null,
   k:W._cal?.k??null, lgTeams:LG.out?.teams?.length??0, tend:!!LG.tend, tendErr:LG.tendErr||null, openM:[...(LG.openM||[])], tl:Object.keys(TL), err:W.err||null, updated:W.updated||0, tm:W.tm||null}),
   // diagnostic: one team's full plan from its own view (who holds each slot, each slot's chain of games, the lock lines)
   team:rid=>{ const R=S.rosters[rid]; if(!R) return {err:"no such team"}; const H=buildMatchup(R, R.roster_id===myRoster()?.roster_id, false); if(!H||!H.vs) return {err:"no matchup"};
