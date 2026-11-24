@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MOMKl0JHa0GUPGFnQBWG6GhFiqHu4HyjE3X32UK6jPw='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-pjnQAOU56dyPd6JhWv7b3LSZ5YfesQE9cesD9LQhRbU='; worker-src blob:; child-src blob:; frame-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.sleeper.app https://*.sleeper.app https://sleeper.com https://*.sleeper.com https://site.api.espn.com https://sports.core.api.espn.com https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Papa Rebirth Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2110,7 +2110,7 @@ function resolveDraw(slots,s,risk,sharedPid,pre){
   // pre: fastDraw just played every slot unblocked in this draw (playLite), which is exactly playPath's first play
   const blk=new Array(slots.length).fill(null), res= pre? slots.map(S=>{ const used=[]; for(let u=0;u<S.nuu;u++){ const t=S.st[S.ub[u]]; used.push({key:t.key, pid:t.pid, at:t.t||t.ord, gain:S.ug[u]}) } return {val:S.v, used, kept:S.kept} })
     : slots.map(S=>playPath(S.st,S.V,s,RK(S),null,sharedPid,S.x0||0));
-  for(let guard=0;guard<16;guard++){ let hit=null;
+  for(let guard=0;guard<400;guard++){ let hit=null; if(guard===399) (self.__rdOut=(self.__rdOut||0)+1);
     for(let a=0;a<res.length;a++) for(const u of res[a].used) for(let b=a+1;b<res.length;b++) for(const w of res[b].used)
       if(u.key===w.key && (!hit || u.at<hit.at)) hit={at:u.at, key:u.key, lose: u.gain>=w.gain? b : a};
     for(let a=0;a<res.length;a++){ const k=res[a].kept; if(k<0) continue; const kt=slots[a].st[k]; if(!sharedPid.has(kt.pid)) continue; const kat=kt.t||kt.ord;
