@@ -1,7 +1,7 @@
 {
   "name": "Papa Rebirth Board",
   "short_name": "Papa Board",
-  "start_url": "./?me=2",
+  "start_url": "./?me=2&app=1",
   "scope": "./",
   "display": "standalone",
   "background_color": "#1b2230",
